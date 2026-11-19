@@ -211,6 +211,19 @@ extern void * newspace_to_tospace (void *);
 extern bool save_tospace (gc_walk_proc_t *, void *);
 extern void discard_tospace (void);
 
+extern bool open_code_tospace (unsigned long);
+extern void discard_code_tospace (void);
+extern SCHEME_OBJECT * get_code_newspace_start (void);
+extern SCHEME_OBJECT * get_code_newspace_ptr (void);
+extern bool code_tospace_available_p (unsigned long);
+extern SCHEME_OBJECT * gc_transport_words_to_code_tospace
+  (SCHEME_OBJECT *, unsigned long, bool);
+extern void gc_scan_code_tospace (SCHEME_OBJECT *, SCHEME_OBJECT *);
+extern void open_stage_tospace
+  (SCHEME_OBJECT *, SCHEME_OBJECT *, unsigned long);
+extern void close_stage_tospace (void);
+extern void gc_scan_stage_tospace (void);
+
 extern void initialize_weak_chain (void);
 extern void update_weak_pointers (void);
 

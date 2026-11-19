@@ -181,8 +181,8 @@ code_arena_setup (unsigned long initial_words)
   primary_initialized_p = true;
 }
 
-void
-code_arena_teardown (void)
+static void
+free_overflow_chunks (void)
 {
   code_arena_chunk_t * c = code_overflow_chunks;
   while (c != 0)
@@ -194,6 +194,45 @@ code_arena_teardown (void)
       c = following;
     }
   code_overflow_chunks = 0;
+}
+
+void
+code_arena_reset (unsigned long required_words)
+{
+  free_overflow_chunks ();
+  code_free_list = 0;
+  mark_stack_top = 0;
+
+  if (!primary_initialized_p)
+    {
+      code_arena_setup (required_words);
+      return;
+    }
+
+  if ((primary_chunk.total_words) < required_words)
+    {
+      jit_unmap_code_space ((primary_chunk.start), (primary_chunk.byte_size));
+      free (primary_chunk.mark_bits);
+      memset ((&primary_chunk), 0, (sizeof (primary_chunk)));
+      init_chunk ((&primary_chunk),
+		  (required_words + CODE_ARENA_MIN_OVERFLOW_WORDS));
+      code_start = (primary_chunk.start);
+      code_alloc_next = (primary_chunk.alloc_next);
+      code_end = (primary_chunk.end);
+    }
+  else
+    {
+      size_t n_bit_words = (((primary_chunk.total_words) + 63UL) / 64UL);
+      (primary_chunk.alloc_next) = (primary_chunk.start);
+      code_alloc_next = code_start;
+      memset ((primary_chunk.mark_bits), 0, (n_bit_words * (sizeof (uint64_t))));
+    }
+}
+
+void
+code_arena_teardown (void)
+{
+  free_overflow_chunks ();
 
   if (primary_initialized_p)
     {
@@ -249,6 +288,40 @@ code_arena_chunk_count (void)
 }
 
 unsigned long
+code_arena_nonempty_chunk_count (void)
+{
+  unsigned long count = 0;
+  code_arena_chunk_t * c;
+  for (c = (first_chunk ()); (c != 0); c = (next_chunk (c)))
+    if ((c->alloc_next) > (c->start))
+      count += 1;
+  return (count);
+}
+
+SCHEME_OBJECT *
+code_arena_max_end (void)
+{
+  SCHEME_OBJECT * best = 0;
+  code_arena_chunk_t * c;
+  for (c = (first_chunk ()); (c != 0); c = (next_chunk (c)))
+    if (((uintptr_t) (c->end)) > ((uintptr_t) best))
+      best = (c->end);
+  return (best);
+}
+
+void
+code_arena_mark_hole (SCHEME_OBJECT * start, unsigned long n_words)
+{
+  if ((start == 0) || (n_words == 0))
+    return;
+  jit_write_begin ();
+  (start[0]) = (make_nmv_header (n_words - 1));
+  if (n_words >= 2)
+    (start[1]) = 0;
+  jit_write_end ();
+}
+
+unsigned long
 code_arena_live_words (void)
 {
   unsigned long live = 0;
@@ -266,6 +339,43 @@ code_arena_live_words (void)
 	}
     }
   return (live);
+}
+
+void
+code_arena_for_each_live_block (void (*callback) (SCHEME_OBJECT *,
+						  unsigned long,
+						  void *),
+				void * ctx)
+{
+  code_arena_chunk_t * c;
+  for (c = (first_chunk ()); (c != 0); c = (next_chunk (c)))
+    {
+      SCHEME_OBJECT * scan = (c->start);
+      while (scan < (c->alloc_next))
+	{
+	  SCHEME_OBJECT hdr = (*scan);
+	  unsigned long hdr_type = (object_type (hdr));
+	  unsigned long len = (1 + (object_datum (hdr)));
+	  SCHEME_OBJECT * block = scan;
+
+	  if (((hdr_type != TC_MANIFEST_VECTOR)
+	       && (hdr_type != TC_MANIFEST_NM_VECTOR))
+	      || (len == 0)
+	      || ((scan + len) > (c->alloc_next)))
+	    {
+	      outf_fatal
+		("code_arena_for_each_live_block: corrupt header %#lx at %p\n",
+		 ((unsigned long) hdr), ((const void *) scan));
+	      outf_flush_fatal ();
+	      abort ();
+	    }
+
+	  /* Advance before invoking callback in case callback overwrites hdr. */
+	  scan += len;
+	  if (hdr_type == TC_MANIFEST_VECTOR)
+	    callback (block, len, ctx);
+	}
+    }
 }
 
 static SCHEME_OBJECT *

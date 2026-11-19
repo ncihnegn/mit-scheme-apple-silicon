@@ -39,11 +39,15 @@ USA.
 #include "trap.h"
 #include "option.h"
 #include "fasl.h"
+#include "code_arena.h"
+#include "jit.h"
 
 static fasl_header_t fasl_header;
 static fasl_header_t * fh;
 static SCHEME_OBJECT * new_heap_start;
 static SCHEME_OBJECT * new_constant_start;
+static SCHEME_OBJECT * new_code_start;
+static SCHEME_OBJECT * new_code_end;
 static SCHEME_OBJECT * new_stack_start;
 static SCHEME_OBJECT * new_stack_end;
 static SCHEME_OBJECT * new_utilities;
@@ -72,6 +76,8 @@ static void close_fasl_file (void *);
 
 static SCHEME_OBJECT load_file (fasl_file_handle_t, unsigned long);
 static void * read_from_file (void *, size_t, fasl_file_handle_t);
+static SCHEME_OBJECT * read_code_from_file
+  (SCHEME_OBJECT *, size_t, fasl_file_handle_t);
 static bool primitive_numbers_unchanged_p (SCHEME_OBJECT *);
 
 static gc_table_t * relocate_block_table (void);
@@ -268,6 +274,7 @@ read_band_file (SCHEME_OBJECT s)
 
   reset_allocator_parameters
     ((FASLHDR_CONSTANT_SIZE (fh)), (FASLHDR_HEAP_RESERVED (fh)));
+  code_arena_reset (FASLHDR_CODE_SIZE (fh));
   /* We cleared the heap; the ephemeron array is now bogus.  */
   ephemeron_array = SHARP_F;
   result = (load_file (handle, 0));
@@ -367,11 +374,27 @@ execute_reload_cleanups (void)
     (* ((cleanup_t *) (scan++))) ();
 }
 
+struct code_load_abort_state
+{
+  SCHEME_OBJECT * start;
+  unsigned long n_words;
+};
+
+static void
+abort_code_load (void * ap)
+{
+  struct code_load_abort_state * state = ap;
+  code_arena_mark_hole ((state->start), (state->n_words));
+  code_arena_rebuild_free_list ();
+}
+
 static SCHEME_OBJECT
 load_file (fasl_file_handle_t handle, unsigned long old_ephemeron_count)
 {
   new_heap_start = Free;
   new_constant_start = constant_alloc_next;
+  new_code_start = 0;
+  new_code_end = 0;
   new_stack_start = stack_start;
   new_stack_end = stack_end;
   new_utilities
@@ -384,6 +407,27 @@ load_file (fasl_file_handle_t handle, unsigned long old_ephemeron_count)
     = (read_from_file (constant_alloc_next,
 		       (FASLHDR_CONSTANT_SIZE (fh)),
 		       handle));
+
+  if ((FASLHDR_CODE_SIZE (fh)) > 0)
+    {
+      unsigned long code_words = (FASLHDR_CODE_SIZE (fh));
+      new_code_start = (code_arena_alloc (code_words));
+      if (!FASLHDR_BAND_P (fh))
+	{
+	  struct code_load_abort_state * abort_state
+	    = (dstack_alloc (sizeof (struct code_load_abort_state)));
+	  (abort_state->start) = new_code_start;
+	  (abort_state->n_words) = ((code_words < 2) ? 2 : code_words);
+	  transaction_record_action
+	    (tat_abort, abort_code_load, abort_state);
+	}
+      {
+	void * scope = (code_arena_write_scope_begin ());
+	new_code_end
+	  = (read_code_from_file (new_code_start, code_words, handle));
+	code_arena_write_scope_end (scope);
+      }
+    }
 
   new_prim_table = Free;
   {
@@ -419,6 +463,8 @@ load_file (fasl_file_handle_t handle, unsigned long old_ephemeron_count)
 	 && ((FASLHDR_HEAP_START (fh)) == new_heap_start)
 	 && (((FASLHDR_CONSTANT_START (fh)) == new_constant_start)
 	     || ((FASLHDR_CONSTANT_START (fh)) == (FASLHDR_CONSTANT_END (fh))))
+	 && (((FASLHDR_CODE_SIZE (fh)) == 0)
+	     || ((FASLHDR_CODE_START (fh)) == new_code_start))
 	 && (((FASLHDR_STACK_START (fh)) == 0)
 	     || ((FASLHDR_STACK_START (fh)) == new_stack_start))
 	 && ((FASLHDR_STACK_END (fh)) == new_stack_end)
@@ -430,12 +476,33 @@ load_file (fasl_file_handle_t handle, unsigned long old_ephemeron_count)
       current_gc_table = (relocate_block_table ());
       gc_scan_oldspace (new_heap_start, Free);
       gc_scan_oldspace (new_constant_start, constant_alloc_next);
+      if (new_code_end > new_code_start)
+	{
+	  void * scope = (code_arena_write_scope_begin ());
+	  gc_scan_oldspace (new_code_start, new_code_end);
+	  code_arena_write_scope_end (scope);
+	}
     }
   if (!FASLHDR_BAND_P (fh))
     {
       current_gc_table = (intern_block_table ());
       gc_scan_oldspace (new_heap_start, Free);
       gc_scan_oldspace (new_constant_start, constant_alloc_next);
+      if (new_code_end > new_code_start)
+	{
+	  void * scope = (code_arena_write_scope_begin ());
+	  gc_scan_oldspace (new_code_start, new_code_end);
+	  code_arena_write_scope_end (scope);
+	}
+    }
+
+  if (new_code_end > new_code_start)
+    {
+      if (FASLHDR_BAND_P (fh))
+	code_arena_rebuild_free_list ();
+      jit_flush_icache
+	(new_code_start,
+	 (((size_t) (new_code_end - new_code_start)) * SIZEOF_SCHEME_OBJECT));
     }
 
 #ifdef PUSH_D_CACHE_REGION
@@ -463,6 +530,31 @@ read_from_file (void * p, size_t n_words, fasl_file_handle_t handle)
   if (!read_from_fasl_file (p, n_words, handle))
     signal_error_from_primitive (ERR_FASL_FILE_BAD_DATA);
   return (((char *) p) + (n_words * SIZEOF_SCHEME_OBJECT));
+}
+
+/* Stage file reads through an ordinary stack buffer so kernel copyout()
+   never writes directly into a MAP_JIT VMA.  */
+static SCHEME_OBJECT *
+read_code_from_file (SCHEME_OBJECT * dst,
+		     size_t n_words,
+		     fasl_file_handle_t handle)
+{
+  SCHEME_OBJECT buf [512];
+  size_t remaining = n_words;
+
+  while (remaining > 0)
+    {
+      size_t chunk
+	= ((remaining > ((sizeof (buf)) / SIZEOF_SCHEME_OBJECT))
+	   ? ((sizeof (buf)) / SIZEOF_SCHEME_OBJECT)
+	   : remaining);
+      if (!read_from_fasl_file (buf, chunk, handle))
+	signal_error_from_primitive (ERR_FASL_FILE_BAD_DATA);
+      memcpy (dst, buf, (chunk * SIZEOF_SCHEME_OBJECT));
+      dst += chunk;
+      remaining -= chunk;
+    }
+  return (dst);
 }
 
 static bool
@@ -591,6 +683,11 @@ relocate_address (void * vaddr)
     result
       = (((uint8_t *) new_constant_start)
 	 + (caddr - ((uint8_t *) (FASLHDR_CONSTANT_START (fh)))));
+  else if ((caddr >= ((uint8_t *) (FASLHDR_CODE_START (fh))))
+	   && (caddr < ((uint8_t *) (FASLHDR_CODE_END (fh)))))
+    result
+      = (((uint8_t *) new_code_start)
+	 + (caddr - ((uint8_t *) (FASLHDR_CODE_START (fh)))));
   else if ((caddr >= ((uint8_t *) (FASLHDR_UTILITIES_START (fh))))
 	   && (caddr < ((uint8_t *) (FASLHDR_UTILITIES_END (fh)))))
     result
@@ -609,13 +706,16 @@ relocate_address (void * vaddr)
   else
     {
       outf_fatal ("Pointer out of range: %#lx\n", ((unsigned long) caddr));
-      outf_fatal ("Heap: %#lx-%#lx, Constant: %#lx-%#lx, Stack: %#lx-%#lx\n",
-		  ((unsigned long) (FASLHDR_HEAP_START (fh))),
-		  ((unsigned long) (FASLHDR_HEAP_END (fh))),
-		  ((unsigned long) (FASLHDR_CONSTANT_START (fh))),
-		  ((unsigned long) (FASLHDR_CONSTANT_END (fh))),
-		  ((unsigned long) (FASLHDR_STACK_START (fh))),
-		  ((unsigned long) (FASLHDR_STACK_END (fh))));
+      outf_fatal
+	("Heap: %#lx-%#lx, Constant: %#lx-%#lx, Code: %#lx-%#lx, Stack: %#lx-%#lx\n",
+	 ((unsigned long) (FASLHDR_HEAP_START (fh))),
+	 ((unsigned long) (FASLHDR_HEAP_END (fh))),
+	 ((unsigned long) (FASLHDR_CONSTANT_START (fh))),
+	 ((unsigned long) (FASLHDR_CONSTANT_END (fh))),
+	 ((unsigned long) (FASLHDR_CODE_START (fh))),
+	 ((unsigned long) (FASLHDR_CODE_END (fh))),
+	 ((unsigned long) (FASLHDR_STACK_START (fh))),
+	 ((unsigned long) (FASLHDR_STACK_END (fh))));
       signal_error_from_primitive (ERR_FASL_FILE_BAD_DATA);
     }
   return (result);

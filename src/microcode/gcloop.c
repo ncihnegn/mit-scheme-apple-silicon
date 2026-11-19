@@ -83,6 +83,18 @@ static SCHEME_OBJECT * newspace_start;
 static SCHEME_OBJECT * newspace_next;
 static SCHEME_OBJECT * newspace_end;
 
+static SCHEME_OBJECT * code_tospace_start = 0;
+static SCHEME_OBJECT * code_tospace_next = 0;
+static SCHEME_OBJECT * code_tospace_end = 0;
+static SCHEME_OBJECT * code_newspace_start = 0;
+static SCHEME_OBJECT * code_newspace_next = 0;
+static SCHEME_OBJECT * code_newspace_end = 0;
+
+static SCHEME_OBJECT * stage_tospace_start = 0;
+static SCHEME_OBJECT * stage_tospace_end = 0;
+static SCHEME_OBJECT * stage_newspace_start = 0;
+static SCHEME_OBJECT * stage_newspace_end = 0;
+
 gc_table_t * current_gc_table;
 static SCHEME_OBJECT * current_scan;
 static SCHEME_OBJECT current_object;
@@ -265,14 +277,14 @@ SCHEME_OBJECT
 read_tospace (SCHEME_OBJECT * addr)
 {
   GUARANTEE_TOSPACE_OPEN ();
-  return (READ_TOSPACE (addr));
+  return (* ((SCHEME_OBJECT *) (newspace_to_tospace (addr))));
 }
 
 void
 write_tospace (SCHEME_OBJECT * addr, SCHEME_OBJECT object)
 {
   GUARANTEE_TOSPACE_OPEN ();
-  WRITE_TOSPACE (addr, object);
+  (* ((SCHEME_OBJECT *) (newspace_to_tospace (addr)))) = object;
 }
 
 void
@@ -292,23 +304,160 @@ get_newspace_ptr (void)
 void *
 tospace_to_newspace (void * addr)
 {
-  return
-    (((addr >= ((void *) tospace_start))
-      && (addr <= ((void *) tospace_end)))
-     ? ((((uint8_t *) addr) - ((uint8_t *) tospace_start))
-	+ ((uint8_t *) newspace_start))
-     : addr);
+  uintptr_t a = ((uintptr_t) addr);
+  if ((tospace_next != 0)
+      && (a >= ((uintptr_t) tospace_start))
+      && (a <= ((uintptr_t) tospace_end)))
+    return ((((uint8_t *) addr) - ((uint8_t *) tospace_start))
+	    + ((uint8_t *) newspace_start));
+  if ((code_tospace_next != 0)
+      && (a >= ((uintptr_t) code_tospace_start))
+      && (a <= ((uintptr_t) code_tospace_end)))
+    return ((((uint8_t *) addr) - ((uint8_t *) code_tospace_start))
+	    + ((uint8_t *) code_newspace_start));
+  if ((stage_tospace_start != 0)
+      && (a >= ((uintptr_t) stage_tospace_start))
+      && (a <= ((uintptr_t) stage_tospace_end)))
+    return ((((uint8_t *) addr) - ((uint8_t *) stage_tospace_start))
+	    + ((uint8_t *) stage_newspace_start));
+  return (addr);
 }
 
 void *
 newspace_to_tospace (void * addr)
 {
-  return
-    (((addr >= ((void *) newspace_start))
-      && (addr <= ((void *) newspace_end)))
-     ? ((((uint8_t *) addr) - ((uint8_t *) newspace_start))
-	+ ((uint8_t *) tospace_start))
-     : addr);
+  uintptr_t a = ((uintptr_t) addr);
+  if ((tospace_next != 0)
+      && (a >= ((uintptr_t) newspace_start))
+      && (a <= ((uintptr_t) newspace_end)))
+    return ((((uint8_t *) addr) - ((uint8_t *) newspace_start))
+	    + ((uint8_t *) tospace_start));
+  if ((code_tospace_next != 0)
+      && (a >= ((uintptr_t) code_newspace_start))
+      && (a <= ((uintptr_t) code_newspace_end)))
+    return ((((uint8_t *) addr) - ((uint8_t *) code_newspace_start))
+	    + ((uint8_t *) code_tospace_start));
+  if ((stage_tospace_start != 0)
+      && (a >= ((uintptr_t) stage_newspace_start))
+      && (a <= ((uintptr_t) stage_newspace_end)))
+    return ((((uint8_t *) addr) - ((uint8_t *) stage_newspace_start))
+	    + ((uint8_t *) stage_tospace_start));
+  return (addr);
+}
+
+static uintptr_t
+max_addr (uintptr_t a, void * p)
+{
+  uintptr_t b = ((uintptr_t) p);
+  return ((a > b) ? a : b);
+}
+
+bool
+open_code_tospace (unsigned long n_words)
+{
+  size_t alloc_words;
+  SCHEME_OBJECT * buf;
+  uintptr_t min_base = 0;
+  uintptr_t align_bytes = (512UL * SIZEOF_SCHEME_OBJECT);
+  uintptr_t aligned_addr;
+
+  if (code_tospace_next != 0)
+    discard_code_tospace ();
+  if (n_words > ((SIZE_MAX / SIZEOF_SCHEME_OBJECT) - 1))
+    return (false);
+  alloc_words = (((size_t) n_words) + 1);
+  buf = (malloc (alloc_words * SIZEOF_SCHEME_OBJECT));
+  if (buf == 0)
+    return (false);
+
+  code_tospace_start = buf;
+  code_tospace_next = buf;
+  code_tospace_end = (buf + alloc_words);
+
+  if (p_fromspace_end != 0)
+    min_base = (max_addr (min_base, (*p_fromspace_end)));
+  min_base = (max_addr (min_base, newspace_end));
+  min_base = (max_addr (min_base, tospace_end));
+  min_base = (max_addr (min_base, code_tospace_end));
+  min_base = (max_addr (min_base, (code_arena_max_end ())));
+
+  if (min_base > (UINTPTR_MAX - (2 * align_bytes)))
+    {
+      discard_code_tospace ();
+      return (false);
+    }
+  aligned_addr = (((min_base + align_bytes + (align_bytes - 1)) / align_bytes)
+		  * align_bytes);
+  code_newspace_start = ((SCHEME_OBJECT *) aligned_addr);
+  code_newspace_next = code_newspace_start;
+  code_newspace_end = (code_newspace_start + alloc_words);
+  if ((address_to_datum (code_newspace_end)) > DATUM_MASK)
+    {
+      discard_code_tospace ();
+      return (false);
+    }
+  return (true);
+}
+
+void
+discard_code_tospace (void)
+{
+  free (code_tospace_start);
+  code_tospace_start = 0;
+  code_tospace_next = 0;
+  code_tospace_end = 0;
+  code_newspace_start = 0;
+  code_newspace_next = 0;
+  code_newspace_end = 0;
+}
+
+SCHEME_OBJECT *
+get_code_newspace_start (void)
+{
+  return (code_newspace_start);
+}
+
+SCHEME_OBJECT *
+get_code_newspace_ptr (void)
+{
+  return (code_newspace_next);
+}
+
+bool
+code_tospace_available_p (unsigned long n_words)
+{
+  if (code_tospace_next == 0)
+    tospace_closed ();
+  return (((unsigned long) (code_tospace_end - code_tospace_next))
+	  >= (n_words + 1));
+}
+
+void
+open_stage_tospace (SCHEME_OBJECT * orig_start,
+		    SCHEME_OBJECT * buf,
+		    unsigned long n_words)
+{
+  stage_tospace_start = buf;
+  stage_tospace_end = (buf + n_words);
+  stage_newspace_start = orig_start;
+  stage_newspace_end = (orig_start + n_words);
+}
+
+void
+close_stage_tospace (void)
+{
+  stage_tospace_start = 0;
+  stage_tospace_end = 0;
+  stage_newspace_start = 0;
+  stage_newspace_end = 0;
+}
+
+void
+gc_scan_stage_tospace (void)
+{
+  if (stage_tospace_start == 0)
+    tospace_closed ();
+  gc_scan_oldspace (stage_tospace_start, stage_tospace_end);
 }
 
 #define SIMPLE_HANDLER(name)						\
@@ -416,6 +565,21 @@ gc_scan_tospace (SCHEME_OBJECT * scan, SCHEME_OBJECT * end)
     {
       SCHEME_OBJECT * tend = (NEWSPACE_TO_TOSPACE (end));
       run_gc_loop ((NEWSPACE_TO_TOSPACE (scan)), (&tend));
+    }
+}
+
+void
+gc_scan_code_tospace (SCHEME_OBJECT * scan, SCHEME_OBJECT * end)
+{
+  if (code_tospace_next == 0)
+    tospace_closed ();
+  if (end == 0)
+    run_gc_loop (((SCHEME_OBJECT *) (newspace_to_tospace (scan))),
+		 (&code_tospace_next));
+  else
+    {
+      SCHEME_OBJECT * tend = ((SCHEME_OBJECT *) (newspace_to_tospace (end)));
+      run_gc_loop (((SCHEME_OBJECT *) (newspace_to_tospace (scan))), (&tend));
     }
 }
 
@@ -571,44 +735,75 @@ DEFINE_GC_PRECHECK_FROM (gc_precheck_from_no_transport)
   return (from);
 }
 
-DEFINE_GC_TRANSPORT_WORDS (gc_transport_words)
+static SCHEME_OBJECT *
+transport_words_into (SCHEME_OBJECT * from,
+		      unsigned long n_words,
+		      bool align_p,
+		      SCHEME_OBJECT ** p_to_next,
+		      SCHEME_OBJECT * to_end,
+		      SCHEME_OBJECT ** p_new_next,
+		      bool check_code_arena_p)
 {
   SCHEME_OBJECT * from_start = from;
   SCHEME_OBJECT * from_end = (from_start + n_words);
   SCHEME_OBJECT * new_address;
 
-  GUARANTEE_TOSPACE_OPEN ();
   if (align_p)
-    while (!FLOATING_ALIGNED_P (newspace_next))
+    while (!FLOATING_ALIGNED_P (*p_new_next))
       {
-	(*tospace_next++) = (make_nmv_header (0));
-	newspace_next += 1;
+	(* (*p_to_next)++) = (make_nmv_header (0));
+	(*p_new_next) += 1;
       }
 #ifdef ENABLE_GC_DEBUGGING_TOOLS
-  if (tospace_next >= tospace_end)
+  if ((*p_to_next) >= to_end)
     std_gc_death ("tospace completely filled");
   {
-    SCHEME_OBJECT * end = (tospace_next + n_words);
-    if (end > tospace_end)
+    SCHEME_OBJECT * end = ((*p_to_next) + n_words);
+    if (end > to_end)
       std_gc_death ("block overflows tospace: %#lx",
 		    ((unsigned long) end));
   }
   if (n_words == 0)
     std_gc_death ("gc_transport_words: attempt to transfer zero words.");
-#if 0
-  if (n_words > 0x10000)
-      outf_error_line ("\nWarning: copying large block: %lu", n_words);
+#else
+  (void) to_end;
 #endif
-#endif
-  new_address = newspace_next;
+  new_address = (*p_new_next);
   while (from < from_end)
     {
       DEBUG_TRANSPORT_ONE_WORD (current_object, from);
-      (*tospace_next++) = (*from++);
-      newspace_next += 1;
+      (* (*p_to_next)++) = (*from++);
+      (*p_new_next) += 1;
     }
-  (*from_start) = (MAKE_BROKEN_HEART (new_address));
+  if (check_code_arena_p && (code_address_p (from_start)))
+    {
+      code_arena_write_begin ();
+      (*from_start) = (MAKE_BROKEN_HEART (new_address));
+      code_arena_write_end ();
+    }
+  else
+    (*from_start) = (MAKE_BROKEN_HEART (new_address));
   return (new_address);
+}
+
+DEFINE_GC_TRANSPORT_WORDS (gc_transport_words)
+{
+  GUARANTEE_TOSPACE_OPEN ();
+  return (transport_words_into (from, n_words, align_p,
+				(&tospace_next), tospace_end,
+				(&newspace_next), false));
+}
+
+SCHEME_OBJECT *
+gc_transport_words_to_code_tospace (SCHEME_OBJECT * from,
+				    unsigned long n_words,
+				    bool align_p)
+{
+  if (code_tospace_next == 0)
+    tospace_closed ();
+  return (transport_words_into (from, n_words, align_p,
+				(&code_tospace_next), code_tospace_end,
+				(&code_newspace_next), true));
 }
 
 DEFINE_GC_TRANSPORT_WORDS (gc_no_transport_words)

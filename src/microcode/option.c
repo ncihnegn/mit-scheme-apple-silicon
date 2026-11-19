@@ -832,7 +832,8 @@ conflicting_options (const char * option1, const char * option2)
 static int
 read_band_sizes (const char * filename,
 		 unsigned long * constant_size,
-		 unsigned long * heap_size)
+		 unsigned long * heap_size,
+		 unsigned long * code_size)
 {
   fasl_file_handle_t handle;
   fasl_header_t h;
@@ -852,6 +853,7 @@ read_band_sizes (const char * filename,
     return (0);
   (*constant_size) = (SCHEME_WORDS_TO_BLOCKS (FASLHDR_CONSTANT_SIZE (&h)));
   (*heap_size) = (SCHEME_WORDS_TO_BLOCKS (FASLHDR_HEAP_SIZE (&h)));
+  (*code_size) = (SCHEME_WORDS_TO_BLOCKS (FASLHDR_CODE_SIZE (&h)));
   return (1);
 }
 
@@ -926,6 +928,7 @@ read_command_line_options (int argc, const char ** argv)
   bool band_sizes_valid = false;
   unsigned long band_constant_size = 0;
   unsigned long band_heap_size = 0;
+  unsigned long band_code_size = 0;
   const char * library_path;
   const char * default_library_path = DEFAULT_LIBRARY_PATH;
 
@@ -1001,7 +1004,8 @@ read_command_line_options (int argc, const char ** argv)
     band_sizes_valid
       = (read_band_sizes (option_band_file,
 			  (&band_constant_size),
-			  (&band_heap_size)));
+			  (&band_heap_size),
+			  (&band_code_size)));
 
   option_heap_size
     = (standard_numeric_option ("heap",
@@ -1030,6 +1034,8 @@ read_command_line_options (int argc, const char ** argv)
 				option_raw_code,
 				CODE_SIZE_VARIABLE,
 				DEFAULT_CODE_SIZE));
+  if (band_sizes_valid)
+    option_code_size += band_code_size;
   if (option_show_version)
     {
       outf_console ("%s\n", PACKAGE_STRING);

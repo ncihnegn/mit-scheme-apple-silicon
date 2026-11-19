@@ -198,6 +198,14 @@ encode_fasl_header (SCHEME_OBJECT * raw, fasl_header_t * h)
   if ((FASLHDR_VERSION (h)) >= FASL_VERSION_EPHEMERONS)
     (raw[FASL_OFFSET_EPHEMERONS])
       = (make_object (TC_BROKEN_HEART, (FASLHDR_EPHEMERON_COUNT (h))));
+
+  if ((FASLHDR_VERSION (h)) >= FASL_VERSION_CODE_SPACE)
+    {
+      (raw[FASL_OFFSET_CODE_BASE])
+	= (MAKE_BROKEN_HEART (FASLHDR_CODE_START (h)));
+      (raw[FASL_OFFSET_CODE_SIZE])
+	= (make_object (TC_BROKEN_HEART, (FASLHDR_CODE_SIZE (h))));
+    }
 }
 
 static bool
@@ -293,6 +301,22 @@ decode_fasl_header (SCHEME_OBJECT * raw, fasl_header_t * h)
   if ((FASLHDR_VERSION (h)) >= FASL_VERSION_EPHEMERONS)
     (FASLHDR_EPHEMERON_COUNT (h))
       = (object_datum (raw[FASL_OFFSET_EPHEMERONS]));
+  else
+    (FASLHDR_EPHEMERON_COUNT (h)) = 0;
+
+  if ((FASLHDR_VERSION (h)) >= FASL_VERSION_CODE_SPACE)
+    {
+      (FASLHDR_CODE_START (h))
+	= (fasl_object_address ((raw[FASL_OFFSET_CODE_BASE]), h));
+      (FASLHDR_CODE_END (h))
+	= ((FASLHDR_CODE_START (h))
+	   + (object_datum (raw[FASL_OFFSET_CODE_SIZE])));
+    }
+  else
+    {
+      (FASLHDR_CODE_START (h)) = 0;
+      (FASLHDR_CODE_END (h)) = 0;
+    }
   return (true);
 }
 
@@ -358,9 +382,18 @@ SCHEME_OBJECT *
 faslhdr_utilities_end (fasl_header_t * h)
 {
   if (((__FASLHDR_UTILITIES_END (h)) == 0)
-      && (VECTOR_P (FASLHDR_UTILITIES_VECTOR (h))))
-    (__FASLHDR_UTILITIES_END (h))
-      = (vector_loc ((FASLHDR_UTILITIES_VECTOR (h)),
-		     (vector_length (FASLHDR_UTILITIES_VECTOR (h)))));
+      && ((FASLHDR_UTILITIES_START (h)) != 0))
+    {
+      if (CC_BLOCK_P (compiler_utilities))
+	(__FASLHDR_UTILITIES_END (h))
+	  = ((FASLHDR_UTILITIES_START (h))
+	     + 1
+	     + (object_datum (memory_ref (compiler_utilities, 0))));
+      else if (VECTOR_P (compiler_utilities))
+	(__FASLHDR_UTILITIES_END (h))
+	  = ((FASLHDR_UTILITIES_START (h))
+	     + 1
+	     + (vector_length (compiler_utilities)));
+    }
   return (__FASLHDR_UTILITIES_END (h));
 }

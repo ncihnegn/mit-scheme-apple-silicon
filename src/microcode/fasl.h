@@ -72,6 +72,8 @@ USA.
 #define FASL_OFFSET_STACK_SIZE	16	/* # of words in stack area */
 #define FASL_OFFSET_HEAP_RSVD	17	/* value of heap_reserved */
 #define FASL_OFFSET_EPHEMERONS	18	/* # of ephemerons in fasl */
+#define FASL_OFFSET_CODE_SIZE	19	/* # of words in code area */
+#define FASL_OFFSET_CODE_BASE	20	/* Address of code area at dump */
 
 /* Version information encoding */
 
@@ -108,15 +110,17 @@ typedef enum
   FASL_VERSION_C_CODE,
   FASL_VERSION_STACK_END,
   FASL_VERSION_EPHEMERONS,
+  FASL_VERSION_CODE_SPACE,
 } fasl_version_t;
 
 #define OLDEST_INPUT_FASL_VERSION FASL_VERSION_C_CODE
-#define NEWEST_INPUT_FASL_VERSION FASL_VERSION_EPHEMERONS
+#define NEWEST_INPUT_FASL_VERSION FASL_VERSION_CODE_SPACE
 
 /* Nothing uses this at the moment -- the fasdumper selects C_CODE for
-   non-bands, STACK_END if there are no ephemerons, or EPHEMERONS if
-   there is at least one ephemeron in the fasl.  */
-#define OUTPUT_FASL_VERSION FASL_VERSION_EPHEMERONS
+   non-bands, STACK_END if there are no ephemerons, EPHEMERONS if
+   there is at least one ephemeron, or CODE_SPACE if there is compiled
+   code in the code segment.  */
+#define OUTPUT_FASL_VERSION FASL_VERSION_CODE_SPACE
 
 typedef struct
 {
@@ -132,6 +136,8 @@ typedef struct
   unsigned long heap_reserved;
   SCHEME_OBJECT * constant_start;
   SCHEME_OBJECT * constant_end;
+  SCHEME_OBJECT * code_start;
+  SCHEME_OBJECT * code_end;
   SCHEME_OBJECT * stack_start;
   SCHEME_OBJECT * stack_end;
   unsigned long n_primitives;
@@ -156,6 +162,8 @@ typedef struct
 #define FASLHDR_HEAP_RESERVED(h) ((h)->heap_reserved)
 #define FASLHDR_CONSTANT_START(h) ((h)->constant_start)
 #define FASLHDR_CONSTANT_END(h) ((h)->constant_end)
+#define FASLHDR_CODE_START(h) ((h)->code_start)
+#define FASLHDR_CODE_END(h) ((h)->code_end)
 #define FASLHDR_STACK_START(h) ((h)->stack_start)
 #define FASLHDR_STACK_END(h) ((h)->stack_end)
 #define FASLHDR_N_PRIMITIVES(h) ((h)->n_primitives)
@@ -176,6 +184,10 @@ typedef struct
 #define FASLHDR_CONSTANT_SIZE(h)					\
   ((unsigned long)							\
    ((FASLHDR_CONSTANT_END (h)) - (FASLHDR_CONSTANT_START (h))))
+
+#define FASLHDR_CODE_SIZE(h)						\
+  ((unsigned long)							\
+   ((FASLHDR_CODE_END (h)) - (FASLHDR_CODE_START (h))))
 
 #define FASLHDR_STACK_SIZE(h)						\
   ((unsigned long)							\

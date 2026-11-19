@@ -38,15 +38,22 @@ extern SCHEME_OBJECT * code_alloc_next;
 extern SCHEME_OBJECT * code_end;
 
 extern void code_arena_setup (unsigned long initial_words);
+extern void code_arena_reset (unsigned long required_words);
 extern void code_arena_teardown (void);
 
 extern bool code_address_p (const void * addr);
 extern bool code_range_valid_p (const SCHEME_OBJECT * start,
 				const SCHEME_OBJECT * end);
 extern unsigned long code_arena_chunk_count (void);
+extern unsigned long code_arena_nonempty_chunk_count (void);
 extern unsigned long code_arena_live_words (void);
+extern void code_arena_for_each_live_block
+  (void (*) (SCHEME_OBJECT *, unsigned long, void *), void * ctx);
+extern SCHEME_OBJECT * code_arena_max_end (void);
 
 extern SCHEME_OBJECT * code_arena_alloc (unsigned long n_words);
+extern void code_arena_mark_hole (SCHEME_OBJECT * start,
+				  unsigned long n_words);
 
 extern void code_arena_mark_begin (void);
 extern bool code_arena_mark_block (SCHEME_OBJECT * block);

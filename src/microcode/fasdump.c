@@ -38,6 +38,7 @@ USA.
 #include "trap.h"
 #include "lookup.h"
 #include "fasl.h"
+#include "code_arena.h"
 #include <setjmp.h>
 
 #ifdef ENABLE_GC_DEBUGGING_TOOLS
@@ -71,7 +72,7 @@ typedef struct
 
 static void close_fasl_file (void *);
 static void abort_fasdump (void *);
-static gc_walk_proc_t save_tospace_write;
+static gc_walk_proc_t save_fasdump_tospace;
 
 static fasl_header_t fasl_header;
 static fasl_header_t * fh;
@@ -88,10 +89,14 @@ static gc_handler_t handle_symbol;
 static gc_handler_t handle_broken_heart;
 static gc_handler_t handle_environment;
 static gc_handler_t handle_ephemeron;
+static gc_handler_t handle_compiled_code_block;
 
 static gc_object_handler_t fasdump_cc_entry;
+static gc_object_handler_t fasdump_cc_return;
 static gc_precheck_from_t fasdump_precheck_from;
 static gc_transport_words_t fasdump_transport_words;
+static gc_transport_words_t fasdump_transport_code_words;
+static SCHEME_OBJECT * fasdump_transport_cc_block (SCHEME_OBJECT *);
 
 static void initialize_fixups (void);
 static void add_fixup (SCHEME_OBJECT *);
@@ -125,9 +130,15 @@ at by compiled code are ignored (and discarded).")
 {
   fasl_file_info_t ff_info;
   SCHEME_OBJECT * new_heap_start;
+  SCHEME_OBJECT * new_heap_end;
+  SCHEME_OBJECT * new_code_start;
+  SCHEME_OBJECT * new_code_end;
+  SCHEME_OBJECT * heap_scan;
+  SCHEME_OBJECT * code_scan;
   SCHEME_OBJECT * prim_table_start;
   unsigned long prim_table_length;
   unsigned long n_primitives;
+  unsigned long max_code_words;
   bool ok;
   PRIMITIVE_HEADER (3);
 
@@ -143,6 +154,13 @@ at by compiled code are ignored (and discarded).")
   open_tospace (heap_start);
   /* This must be _before_ the call to initialize_fixups(): */
   transaction_record_action (tat_abort, abort_fasdump, 0);
+  max_code_words
+    = ((code_arena_live_words ())
+       + ((unsigned long) (Free - heap_start))
+       + ((unsigned long) (constant_alloc_next - constant_start))
+       + 1024);
+  if (!open_code_tospace (max_code_words))
+    signal_error_from_primitive (ERR_FASDUMP_OBJECT_TOO_LARGE);
   initialize_fixups ();
 
   new_heap_start = (get_newspace_ptr ());
@@ -160,9 +178,31 @@ at by compiled code are ignored (and discarded).")
        : FE_DROP_CC);
   current_pr = (make_prim_renumber ());
   cc_seen_p = false;
-  gc_scan_tospace (new_heap_start, 0);
 
-  prim_table_start = (get_newspace_ptr ());
+  heap_scan = new_heap_start;
+  code_scan = (get_code_newspace_start ());
+  while ((heap_scan < (get_newspace_ptr ()))
+	 || (code_scan < (get_code_newspace_ptr ())))
+    {
+      if (heap_scan < (get_newspace_ptr ()))
+	{
+	  SCHEME_OBJECT * target = (get_newspace_ptr ());
+	  gc_scan_tospace (heap_scan, target);
+	  heap_scan = target;
+	}
+      if (code_scan < (get_code_newspace_ptr ()))
+	{
+	  SCHEME_OBJECT * target = (get_code_newspace_ptr ());
+	  gc_scan_code_tospace (code_scan, target);
+	  code_scan = target;
+	}
+    }
+
+  new_heap_end = (get_newspace_ptr ());
+  new_code_start = (get_code_newspace_start ());
+  new_code_end = (get_code_newspace_ptr ());
+
+  prim_table_start = new_heap_end;
   prim_table_length = (renumbered_primitives_export_length (current_pr));
   increment_tospace_ptr (prim_table_length);
   export_renumbered_primitives
@@ -176,14 +216,17 @@ at by compiled code are ignored (and discarded).")
   (FASLHDR_CONSTANT_START (fh)) = new_heap_start;
   (FASLHDR_CONSTANT_END (fh)) = new_heap_start;
   (FASLHDR_HEAP_START (fh)) = new_heap_start;
-  (FASLHDR_HEAP_END (fh)) = prim_table_start;
+  (FASLHDR_HEAP_END (fh)) = new_heap_end;
+  (FASLHDR_CODE_START (fh)) = new_code_start;
+  (FASLHDR_CODE_END (fh)) = new_code_end;
   (FASLHDR_ROOT_POINTER (fh)) = new_heap_start;
   (FASLHDR_N_PRIMITIVES (fh)) = n_primitives;
   (FASLHDR_PRIMITIVE_TABLE_SIZE (fh)) = prim_table_length;
   finalize_fasl_header (dumped_ephemeron_count);
 
   ok = ((write_fasl_header (fh, (ff_info . handle)))
-	&& (save_tospace (save_tospace_write, (&ff_info))));
+	&& (save_tospace (save_fasdump_tospace, (&ff_info))));
+  discard_code_tospace ();
   transaction_commit ();	/* 1 */
 
   COMPARE_GC_VARS ();
@@ -203,14 +246,31 @@ close_fasl_file (void * p)
 static void
 abort_fasdump (void * p)
 {
+  (void) p;
+  discard_code_tospace ();
   discard_tospace ();
 }
 
 static bool
-save_tospace_write (SCHEME_OBJECT * start, SCHEME_OBJECT * end, void * p)
+save_fasdump_tospace (SCHEME_OBJECT * start, SCHEME_OBJECT * end, void * p)
 {
   fasl_file_info_t * ff_info = p;
-  return (write_to_fasl_file (start, (end - start), (ff_info->handle)));
+  unsigned long heap_words = (FASLHDR_HEAP_SIZE (fh));
+  unsigned long code_words = (FASLHDR_CODE_SIZE (fh));
+  unsigned long prim_words = (FASLHDR_PRIMITIVE_TABLE_SIZE (fh));
+
+  if (((unsigned long) (end - start)) != (heap_words + prim_words))
+    return (false);
+  if (!write_to_fasl_file (start, heap_words, (ff_info->handle)))
+    return (false);
+  if ((code_words > 0)
+      && (!write_to_fasl_file
+	  ((newspace_to_tospace (FASLHDR_CODE_START (fh))),
+	   code_words,
+	   (ff_info->handle))))
+    return (false);
+  return (write_to_fasl_file
+	  ((start + heap_words), prim_words, (ff_info->handle)));
 }
 
 #ifdef ENABLE_GC_DEBUGGING_TOOLS
@@ -311,6 +371,10 @@ compute_memory_checksum (void)
 	      fasdump_saved_heap_start,
 	      ((fasdump_saved_Free - fasdump_saved_heap_start)
 	       * SIZEOF_SCHEME_OBJECT));
+  if ((code_start != 0) && (code_alloc_next > code_start))
+    md5_update ((&ctx),
+		code_start,
+		((code_alloc_next - code_start) * SIZEOF_SCHEME_OBJECT));
   hash = (malloc (MD5_HASHLEN));
   if (hash == NULL)
     return NULL;
@@ -331,9 +395,12 @@ fasdump_table (void)
       initialize_gc_table ((&table), true);
 
       (GCT_CC_ENTRY ((&table))) = fasdump_cc_entry;
+      (GCT_CC_RETURN ((&table))) = fasdump_cc_return;
       (GCT_PRECHECK_FROM ((&table))) = fasdump_precheck_from;
       (GCT_TRANSPORT_WORDS ((&table))) = fasdump_transport_words;
 
+      (GCT_ENTRY ((&table), TC_COMPILED_CODE_BLOCK))
+	= handle_compiled_code_block;
       (GCT_ENTRY ((&table), TC_PRIMITIVE)) = handle_primitive;
       (GCT_ENTRY ((&table), TC_MANIFEST_CLOSURE)) = handle_manifest_closure;
       (GCT_ENTRY ((&table), TC_LINKAGE_SECTION)) = handle_linkage_section;
@@ -349,33 +416,83 @@ fasdump_table (void)
   return (&table);
 }
 
+static SCHEME_OBJECT *
+fasdump_transport_cc_block (SCHEME_OBJECT * old_addr)
+{
+  SCHEME_OBJECT * new_addr;
+  if ((compiler_utilities != SHARP_F)
+      && (old_addr == (object_address (compiler_utilities))))
+    return (old_addr);
+  new_addr = (GC_PRECHECK_FROM (old_addr));
+  if (new_addr == 0)
+    {
+      unsigned long length = (object_datum (*old_addr));
+      if ((object_type (*old_addr)) == TC_MANIFEST_CLOSURE)
+	new_addr = (GC_TRANSPORT_WORDS (old_addr, (1 + length), true));
+      else
+	{
+	  SCHEME_OBJECT * eptr;
+	  new_addr
+	    = (fasdump_transport_code_words (old_addr, (1 + length), true));
+	  eptr = (new_addr + length);
+	  if ((current_env_mode == FE_DROP_CC)
+	      && ((object_type (read_tospace (eptr))) == TC_ENVIRONMENT))
+	    write_tospace (eptr, SHARP_F);
+	}
+    }
+  return (new_addr);
+}
+
 static
 DEFINE_GC_OBJECT_HANDLER (fasdump_cc_entry)
 {
 #ifdef CC_SUPPORT_P
   SCHEME_OBJECT * old_addr;
   SCHEME_OBJECT * new_addr;
-  unsigned long length;
-  SCHEME_OBJECT * eptr;
 
   cc_seen_p = true;
   old_addr = (cc_entry_to_block_address (object));
-  if (old_addr == (object_address (compiler_utilities)))
-    return (object);
-  new_addr = (GC_PRECHECK_FROM (old_addr));
-  if (new_addr == 0)
-    {
-      length = (object_datum (*old_addr));
-      new_addr = (GC_TRANSPORT_WORDS (old_addr, (1 + length), true));
-      eptr = (new_addr + length);
-      if ((current_env_mode == FE_DROP_CC)
-	  && ((object_type (read_tospace (eptr))) == TC_ENVIRONMENT))
-	write_tospace (eptr, SHARP_F);
-    }
+  new_addr = (fasdump_transport_cc_block (old_addr));
   return (CC_ENTRY_NEW_BLOCK (object, new_addr, old_addr));
 #else
   gc_no_cc_support ();
   return (object);
+#endif
+}
+
+static
+DEFINE_GC_OBJECT_HANDLER (fasdump_cc_return)
+{
+#ifdef CC_SUPPORT_P
+  SCHEME_OBJECT * old_addr;
+  SCHEME_OBJECT * new_addr;
+
+  cc_seen_p = true;
+  old_addr = (cc_return_to_block_address (object));
+  new_addr = (fasdump_transport_cc_block (old_addr));
+  return (CC_RETURN_NEW_BLOCK (object, new_addr, old_addr));
+#else
+  gc_no_cc_support ();
+  return (object);
+#endif
+}
+
+static
+DEFINE_GC_HANDLER (handle_compiled_code_block)
+{
+#ifdef CC_SUPPORT_P
+  SCHEME_OBJECT * old_addr = (object_address (object));
+  SCHEME_OBJECT * new_addr;
+
+  cc_seen_p = true;
+  new_addr = (fasdump_transport_cc_block (old_addr));
+  (*scan) = (object_new_address (object, new_addr));
+  return (scan + 1);
+#else
+  (void) scan;
+  (void) object;
+  gc_no_cc_support ();
+  return (scan);
 #endif
 }
 
@@ -394,6 +511,15 @@ DEFINE_GC_TRANSPORT_WORDS (fasdump_transport_words)
     signal_error_from_primitive (ERR_FASDUMP_OBJECT_TOO_LARGE);
   add_fixup (from);
   return (gc_transport_words (from, n_words, align_p));
+}
+
+static
+DEFINE_GC_TRANSPORT_WORDS (fasdump_transport_code_words)
+{
+  if (!code_tospace_available_p (n_words))
+    signal_error_from_primitive (ERR_FASDUMP_OBJECT_TOO_LARGE);
+  add_fixup (from);
+  return (gc_transport_words_to_code_tospace (from, n_words, align_p));
 }
 
 static
@@ -502,14 +628,214 @@ static void
 run_fixups (void * p)
 {
   fixup_t * scan = fixups_start;
+  (void) p;
+  code_arena_write_begin ();
   while (scan < fixups_next)
     {
       (* (scan->addr)) = (scan->object);
       scan += 1;
     }
+  code_arena_write_end ();
   OS_free (fixups_start);
 }
 
+typedef struct
+{
+  SCHEME_OBJECT * heap_buf;
+  SCHEME_OBJECT * const_buf;
+} band_compact_ctx_t;
+
+static DEFINE_GC_TUPLE_HANDLER (band_compact_tuple)
+{
+  (void) n_words;
+  return (tuple);
+}
+
+static DEFINE_GC_VECTOR_HANDLER (band_compact_vector)
+{
+  (void) align_p;
+  if ((object_type (vector)) == TC_COMPILED_CODE_BLOCK)
+    {
+      SCHEME_OBJECT * old_addr = (object_address (vector));
+      if ((code_address_p (old_addr)) && (BROKEN_HEART_P (*old_addr)))
+	return (object_new_address (vector, (object_address (*old_addr))));
+    }
+  return (vector);
+}
+
+static DEFINE_GC_OBJECT_HANDLER (band_compact_cc_entry)
+{
+#ifdef CC_SUPPORT_P
+  SCHEME_OBJECT * old_addr = (cc_entry_to_block_address (object));
+  if ((code_address_p (old_addr)) && (BROKEN_HEART_P (*old_addr)))
+    return (CC_ENTRY_NEW_BLOCK (object, (object_address (*old_addr)), old_addr));
+#endif
+  return (object);
+}
+
+static DEFINE_GC_OBJECT_HANDLER (band_compact_cc_return)
+{
+#ifdef CC_SUPPORT_P
+  SCHEME_OBJECT * old_addr = (cc_return_to_block_address (object));
+  if ((code_address_p (old_addr)) && (BROKEN_HEART_P (*old_addr)))
+    return (CC_RETURN_NEW_BLOCK (object, (object_address (*old_addr)), old_addr));
+#endif
+  return (object);
+}
+
+static gc_table_t *
+band_compact_table (void)
+{
+  static bool initialized_p = false;
+  static gc_table_t table;
+
+  if (!initialized_p)
+    {
+      initialize_gc_table ((&table), false);
+
+      (GCT_TUPLE (&table)) = band_compact_tuple;
+      (GCT_VECTOR (&table)) = band_compact_vector;
+      (GCT_CC_ENTRY (&table)) = band_compact_cc_entry;
+      (GCT_CC_RETURN (&table)) = band_compact_cc_return;
+
+      (GCT_ENTRY ((&table), TC_WEAK_CONS)) = gc_handle_pair;
+      (GCT_ENTRY ((&table), TC_EPHEMERON)) = gc_handle_unaligned_vector;
+      (GCT_ENTRY ((&table), TC_BROKEN_HEART)) = gc_handle_non_pointer;
+
+      initialized_p = true;
+    }
+  return (&table);
+}
+
+static void
+band_compact_transport_block (SCHEME_OBJECT * block,
+			      unsigned long n_words,
+			      void * ctx)
+{
+  (void) ctx;
+  if (!code_tospace_available_p (n_words))
+    signal_error_from_primitive (ERR_FASDUMP_OBJECT_TOO_LARGE);
+  add_fixup (block);
+  (void) gc_transport_words_to_code_tospace (block, n_words, false);
+}
+
+static void
+cleanup_band_compact (void * p)
+{
+  band_compact_ctx_t * ctx = p;
+  close_stage_tospace ();
+  discard_code_tospace ();
+  if ((ctx->const_buf) != 0)
+    {
+      OS_free (ctx->const_buf);
+      (ctx->const_buf) = 0;
+    }
+  if ((ctx->heap_buf) != 0)
+    {
+      OS_free (ctx->heap_buf);
+      (ctx->heap_buf) = 0;
+    }
+}
+
+static bool
+write_compacted_band_file (const char * filename,
+			   SCHEME_OBJECT * prim_table_start,
+			   SCHEME_OBJECT * c_code_table_start)
+{
+  band_compact_ctx_t * ctx;
+  unsigned long heap_words = (FASLHDR_HEAP_SIZE (fh));
+  unsigned long const_words = (FASLHDR_CONSTANT_SIZE (fh));
+  unsigned long live_words = (code_arena_live_words ());
+  fasl_file_handle_t handle;
+  bool ok;
+
+  transaction_begin ();
+  ctx = (dstack_alloc (sizeof (band_compact_ctx_t)));
+  (ctx->heap_buf) = 0;
+  (ctx->const_buf) = 0;
+  transaction_record_action (tat_always, cleanup_band_compact, ctx);
+
+  if (!open_code_tospace (live_words + 64))
+    {
+      transaction_commit ();
+      return (false);
+    }
+  initialize_fixups ();
+
+  code_arena_for_each_live_block (band_compact_transport_block, 0);
+  (FASLHDR_CODE_START (fh)) = (get_code_newspace_start ());
+  (FASLHDR_CODE_END (fh)) = (get_code_newspace_ptr ());
+
+  if ((compiler_utilities != SHARP_F) && (CC_BLOCK_P (compiler_utilities)))
+    {
+      SCHEME_OBJECT * uaddr = (object_address (compiler_utilities));
+      if ((code_address_p (uaddr)) && (BROKEN_HEART_P (*uaddr)))
+	(FASLHDR_UTILITIES_VECTOR (fh))
+	  = (object_new_address (compiler_utilities,
+				 (object_address (*uaddr))));
+    }
+  finalize_fasl_header (ephemeron_count);
+
+  if (heap_words > 0)
+    {
+      (ctx->heap_buf) = (OS_malloc (heap_words * SIZEOF_SCHEME_OBJECT));
+      memcpy ((ctx->heap_buf),
+	      (FASLHDR_HEAP_START (fh)),
+	      (heap_words * SIZEOF_SCHEME_OBJECT));
+      open_stage_tospace
+	((FASLHDR_HEAP_START (fh)), (ctx->heap_buf), heap_words);
+      current_gc_table = (band_compact_table ());
+      gc_scan_stage_tospace ();
+      close_stage_tospace ();
+    }
+
+  if (const_words > 0)
+    {
+      (ctx->const_buf) = (OS_malloc (const_words * SIZEOF_SCHEME_OBJECT));
+      memcpy ((ctx->const_buf),
+	      (FASLHDR_CONSTANT_START (fh)),
+	      (const_words * SIZEOF_SCHEME_OBJECT));
+      open_stage_tospace
+	((FASLHDR_CONSTANT_START (fh)), (ctx->const_buf), const_words);
+      current_gc_table = (band_compact_table ());
+      gc_scan_stage_tospace ();
+      close_stage_tospace ();
+    }
+
+  if ((FASLHDR_CODE_SIZE (fh)) > 0)
+    {
+      current_gc_table = (band_compact_table ());
+      gc_scan_code_tospace
+	((FASLHDR_CODE_START (fh)), (FASLHDR_CODE_END (fh)));
+    }
+
+  OS_file_remove_link (filename);
+  if (!open_fasl_output_file (filename, (&handle)))
+    error_bad_range_arg (2);
+
+  ok = ((write_fasl_header (fh, handle))
+	&& ((heap_words == 0)
+	    || (write_to_fasl_file ((ctx->heap_buf), heap_words, handle)))
+	&& ((const_words == 0)
+	    || (write_to_fasl_file ((ctx->const_buf), const_words, handle)))
+	&& (((FASLHDR_CODE_SIZE (fh)) == 0)
+	    || (write_to_fasl_file
+		((newspace_to_tospace (FASLHDR_CODE_START (fh))),
+		 (FASLHDR_CODE_SIZE (fh)),
+		 handle)))
+	&& (write_to_fasl_file (prim_table_start,
+				(FASLHDR_PRIMITIVE_TABLE_SIZE (fh)),
+				handle))
+	&& (write_to_fasl_file (c_code_table_start,
+				(FASLHDR_C_CODE_TABLE_SIZE (fh)),
+				handle)));
+
+  if (!close_fasl_output_file (handle))
+    OS_file_remove (filename);
+  transaction_commit ();
+  return (ok);
+}
+
 DEFINE_PRIMITIVE ("DUMP-BAND*", Prim_band_dump, 2, 2,
 		  "(PROCEDURE NAMESTRING)\n\
 Saves an image of the current world to the file NAMESTRING.\n\
@@ -557,7 +883,7 @@ When the file is reloaded, PROCEDURE is called with an argument of #F.")
     result = false;
   else
     {
-      fasl_file_handle_t handle;
+      unsigned long nonempty = (code_arena_nonempty_chunk_count ());
 
       export_primitive_table (prim_table_start);
 #ifdef CC_IS_C
@@ -568,17 +894,35 @@ When the file is reloaded, PROCEDURE is called with an argument of #F.")
       (FASLHDR_HEAP_END (fh)) = prim_table_start;
       (FASLHDR_CONSTANT_START (fh)) = constant_start;
       (FASLHDR_CONSTANT_END (fh)) = constant_alloc_next;
-      finalize_fasl_header (ephemeron_count);
 
-      OS_file_remove_link (filename);
-      if (!open_fasl_output_file (filename, (&handle)))
-	error_bad_range_arg (2);
+      if ((nonempty == 0)
+	  || ((nonempty == 1)
+	      && (code_start != 0)
+	      && (code_alloc_next > code_start)))
+	{
+	  fasl_file_handle_t handle;
 
-      result
-	= (write_fasl_file (prim_table_start, c_code_table_start, handle));
+	  if ((code_start != 0) && (code_alloc_next > code_start))
+	    {
+	      (FASLHDR_CODE_START (fh)) = code_start;
+	      (FASLHDR_CODE_END (fh)) = code_alloc_next;
+	    }
+	  finalize_fasl_header (ephemeron_count);
 
-      if (!close_fasl_output_file (handle))
-	OS_file_remove (filename);
+	  OS_file_remove_link (filename);
+	  if (!open_fasl_output_file (filename, (&handle)))
+	    error_bad_range_arg (2);
+
+	  result
+	    = (write_fasl_file (prim_table_start, c_code_table_start, handle));
+
+	  if (!close_fasl_output_file (handle))
+	    OS_file_remove (filename);
+	}
+      else
+	result
+	  = (write_compacted_band_file
+	     (filename, prim_table_start, c_code_table_start));
     }
   PRIMITIVE_RETURN (BOOLEAN_TO_OBJECT (result));
 }
@@ -620,16 +964,44 @@ initialize_fasl_header (bool cc_p, bool band_p)
     }
   (FASLHDR_N_C_CODE_BLOCKS (fh)) = 0;
   (FASLHDR_C_CODE_TABLE_SIZE (fh)) = 0;
+  (FASLHDR_EPHEMERON_COUNT (fh)) = 0;
+  (FASLHDR_CODE_START (fh)) = 0;
+  (FASLHDR_CODE_END (fh)) = 0;
 }
 
 static void
 finalize_fasl_header (unsigned long ephemeron_count)
 {
-  if (ephemeron_count != 0)
+  (FASLHDR_EPHEMERON_COUNT (fh)) = ephemeron_count;
+  if ((FASLHDR_CODE_SIZE (fh)) != 0)
+    (FASLHDR_VERSION (fh)) = FASL_VERSION_CODE_SPACE;
+  else if (ephemeron_count != 0)
+    (FASLHDR_VERSION (fh)) = FASL_VERSION_EPHEMERONS;
+}
+
+/* Stage file writes through an ordinary stack buffer so kernel copyin()
+   never reads directly from a MAP_JIT VMA.  */
+static bool
+write_code_to_fasl_file (const SCHEME_OBJECT * src,
+			 size_t n_words,
+			 fasl_file_handle_t handle)
+{
+  SCHEME_OBJECT buf [512];
+  size_t remaining = n_words;
+
+  while (remaining > 0)
     {
-      (FASLHDR_VERSION (fh)) = FASL_VERSION_EPHEMERONS;
-      (FASLHDR_EPHEMERON_COUNT (fh)) = ephemeron_count;
+      size_t chunk
+	= ((remaining > ((sizeof (buf)) / SIZEOF_SCHEME_OBJECT))
+	   ? ((sizeof (buf)) / SIZEOF_SCHEME_OBJECT)
+	   : remaining);
+      memcpy (buf, src, (chunk * SIZEOF_SCHEME_OBJECT));
+      if (!write_to_fasl_file (buf, chunk, handle))
+	return (false);
+      src += chunk;
+      remaining -= chunk;
     }
+  return (true);
 }
 
 static bool
@@ -645,6 +1017,10 @@ write_fasl_file (SCHEME_OBJECT * prim_table_start,
      && (write_to_fasl_file ((FASLHDR_CONSTANT_START (fh)),
 			     (FASLHDR_CONSTANT_SIZE (fh)),
 			     handle))
+     && (((FASLHDR_CODE_SIZE (fh)) == 0)
+	 || (write_code_to_fasl_file ((FASLHDR_CODE_START (fh)),
+				      (FASLHDR_CODE_SIZE (fh)),
+				      handle)))
      && (write_to_fasl_file (prim_table_start,
 			     (FASLHDR_PRIMITIVE_TABLE_SIZE (fh)),
 			     handle))
