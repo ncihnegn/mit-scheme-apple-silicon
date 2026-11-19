@@ -1,3 +1,41 @@
+# _MIT_SCHEME_NORMALIZE_SVM(VAR)
+# ------------------------------
+AC_DEFUN([_MIT_SCHEME_NORMALIZE_SVM],[
+case ${$1} in
+svm1|svm1-be|svm1-le)
+    case ${ac_cv_sizeof_unsigned_long} in
+    4)
+	_mit_scheme_svm_wordsize=32
+	;;
+    8)
+	_mit_scheme_svm_wordsize=64
+	;;
+    *)
+	AC_MSG_ERROR([Unknown host word size])
+	;;
+    esac
+    ;;
+svm1-32|svm1-32le|svm1-32be)
+    _mit_scheme_svm_wordsize=32
+    ;;
+svm1-64|svm1-64le|svm1-64be)
+    _mit_scheme_svm_wordsize=64
+    ;;
+esac
+case ${$1} in
+svm1|svm1-32|svm1-64)
+    _mit_scheme_svm_byteorder="${mit_scheme_host_byteorder}"
+    ;;
+svm1-be|svm1-32be|svm1-64be)
+    _mit_scheme_svm_byteorder=be
+    ;;
+svm1-le|svm1-32le|svm1-64le)
+    _mit_scheme_svm_byteorder=le
+    ;;
+esac
+$1=svm1-${_mit_scheme_svm_wordsize}${_mit_scheme_svm_byteorder}
+])
+
 # MIT_SCHEME_NATIVE_CODE(SPEC, HOST_CPU)
 # --------------------------------------
 AC_DEFUN([MIT_SCHEME_NATIVE_CODE],[
@@ -21,6 +59,11 @@ yes)
 		      [_mit_scheme_native_code_host_cpu=x86_64],
 		      [_mit_scheme_native_code_host_cpu=i386])
 	;;
+    arm|arm64|aarch64*)
+	AC_CHECK_DECL([__aarch64__],
+		      [_mit_scheme_native_code_host_cpu=aarch64],
+		      [])
+	;;
     esac
     ;;
 esac
@@ -33,6 +76,9 @@ yes)
 	;;
     x86_64)
 	mit_scheme_native_code=x86-64
+	;;
+    aarch64)
+	mit_scheme_native_code=aarch64${mit_scheme_host_byteorder}
 	;;
     *)
 	AC_MSG_ERROR([unable to determine host architecture])
@@ -52,39 +98,7 @@ c)
     AC_MSG_RESULT([yes, using portable C code])
     ;;
 svm1|svm1-32|svm1-64|svm1-be|svm1-le|svm1-32be|svm1-32le|svm1-64be|svm1-64le)
-    case ${mit_scheme_native_code} in
-    svm1|svm1-be|svm1-le)
-	case ${ac_cv_sizeof_unsigned_long} in
-	4)
-	    mit_scheme_svm_wordsize=32
-	    ;;
-	8)
-	    mit_scheme_svm_wordsize=64
-	    ;;
-	*)
-	    AC_MSG_ERROR([Unknown host word size])
-	    ;;
-	esac
-	;;
-    svm1-32le|svm1-32be)
-	mit_scheme_svm_wordsize=32
-	;;
-    svm1-64le|svm1-64be)
-	mit_scheme_svm_wordsize=64
-	;;
-    esac
-    case ${mit_scheme_native_code} in
-    svm1|svm1-32|svm1-64)
-	mit_scheme_svm_byteorder="${mit_scheme_host_byteorder}"
-	;;
-    svm1-32be|svm1-64be)
-	mit_scheme_svm_byteorder=be
-	;;
-    svm1-32le|svm1-64le)
-	mit_scheme_svm_byteorder=le
-	;;
-    esac
-    mit_scheme_native_code=svm1-${mit_scheme_svm_wordsize}${mit_scheme_svm_byteorder}
+    _MIT_SCHEME_NORMALIZE_SVM([mit_scheme_native_code])
     AC_MSG_RESULT([yes, using portable SVM code])
     ;;
 *)
@@ -111,13 +125,19 @@ yes)
 esac
 
 case ${mit_scheme_compiler_target} in
+svm1|svm1-32|svm1-64|svm1-be|svm1-le|svm1-32be|svm1-32le|svm1-64be|svm1-64le)
+    _MIT_SCHEME_NORMALIZE_SVM([mit_scheme_compiler_target])
+    ;;
+esac
+
+case ${mit_scheme_compiler_target} in
 none)
     AC_MSG_RESULT([none])
     ;;
 c)
     AC_MSG_RESULT([yes, using portable C code])
     ;;
-svm1)
+svm1-32be|svm1-32le|svm1-64be|svm1-64le)
     AC_MSG_RESULT([yes, using portable SVM code])
     ;;
 *)
@@ -138,7 +158,7 @@ yes|YES|y|Y)
 c|C)
     mit_scheme_architecture=c
     ;;
-svm1-32be|svm1-32le|svm1-64be|svm1-64le)
+svm1|svm1-32|svm1-64|svm1-be|svm1-le|svm1-32be|svm1-32le|svm1-64be|svm1-64le)
     mit_scheme_architecture=${_mit_scheme_architecture_spec}
     ;;
 no|NO|none|NONE|n|N)
@@ -149,6 +169,12 @@ i?86|x86)
     ;;
 x86-64|x86_64|amd64)
     mit_scheme_architecture=x86-64
+    ;;
+arm64)
+    mit_scheme_architecture=aarch64le
+    ;;
+aarch64)
+    mit_scheme_architecture=aarch64${mit_scheme_host_byteorder:-le}
     ;;
 aarch64le|aarch64be)
     mit_scheme_architecture=${_mit_scheme_architecture_spec}

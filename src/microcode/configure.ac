@@ -379,6 +379,10 @@ darwin*)
 	MACOS_CFLAGS="-arch x86_64 ${MACOS_CFLAGS}"
 	AS_FLAGS="-arch x86_64 ${AS_FLAGS}"
     	;;
+    aarch64le)
+	MACOS_CFLAGS="-arch arm64 ${MACOS_CFLAGS}"
+	AS_FLAGS="-arch arm64 ${AS_FLAGS}"
+	;;
     esac
     if ! cc --version | grep -q clang; then
         dnl -frounding-math not supported by clang.
@@ -439,8 +443,8 @@ AC_HEADER_STDBOOL
 AC_HEADER_SYS_WAIT
 AC_CHECK_HEADERS_ONCE([sys/time.h])
 
-AC_CHECK_HEADERS([bsdtty.h dlfcn.h fcntl.h fenv.h ieeefp.h malloc.h netdb.h])
-AC_CHECK_HEADERS([poll.h sgtty.h stdint.h stropts.h])
+AC_CHECK_HEADERS([bsdtty.h dlfcn.h fcntl.h fenv.h ieeefp.h libkern/OSCacheControl.h])
+AC_CHECK_HEADERS([malloc.h netdb.h poll.h pthread.h sgtty.h stdint.h stropts.h])
 AC_CHECK_HEADERS([sys/file.h sys/ioctl.h sys/mman.h sys/mount.h sys/param.h])
 AC_CHECK_HEADERS([sys/ptyio.h sys/socket.h sys/timex.h sys/un.h sys/utsname.h])
 AC_CHECK_HEADERS([sys/vfs.h])
@@ -737,14 +741,34 @@ AC_CHECK_FUNCS([lgamma_r log1p])
 AC_CHECK_FUNCS([madvise memcpy mkdir mktime modf])
 AC_CHECK_FUNCS([nice ntp_adjtime ntp_gettime])
 AC_CHECK_FUNCS([openpty])
-AC_CHECK_FUNCS([poll pollts ppoll posix_madvise posix_openpt])
+AC_CHECK_FUNCS([poll pollts ppoll posix_madvise posix_openpt pthread_jit_write_protect_np])
 AC_CHECK_FUNCS([rename rmdir])
 AC_CHECK_FUNCS([pselect select setitimer setpgrp setpgrp2 sigaction])
 AC_CHECK_FUNCS([sighold sigsuspend socket statfs strchr strerror])
-AC_CHECK_FUNCS([strtoul symlink sync_file_range sysconf])
+AC_CHECK_FUNCS([strtoul symlink sync_file_range sys_icache_invalidate sysconf])
 AC_CHECK_FUNCS([times truncate])
 AC_CHECK_FUNCS([utime])
 AC_CHECK_FUNCS([waitpid])
+
+AC_CHECK_DECL([MAP_JIT],
+    [AC_DEFINE([HAVE_MAP_JIT], [1],
+	[Define to 1 if <sys/mman.h> defines MAP_JIT.])],
+    [],
+    [
+    #ifdef HAVE_SYS_MMAN_H
+    #  include <sys/mman.h>
+    #endif
+    ])
+case ${host_os} in
+darwin*)
+    if test "x${ac_cv_have_decl_MAP_JIT}" = xyes \
+       && test "x${ac_cv_func_pthread_jit_write_protect_np}" = xyes \
+       && test "x${ac_cv_func_sys_icache_invalidate}" = xyes; then
+	AC_DEFINE([SCM_JIT_APPLE], [1],
+	    [Define to 1 to use Apple Silicon MAP_JIT W^X support.])
+    fi
+    ;;
+esac
 
 dnl Checks for system characteristics.
 AC_PATH_X
