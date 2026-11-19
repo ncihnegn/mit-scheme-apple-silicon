@@ -497,8 +497,8 @@ first-class code-arena segment (`FASL_OFFSET_CODE_SIZE = 19`,
   (`regs[28]` / `regs[20]`) in `src/microcode/uxtrap.h` so trap recovery and
   `"(code space)"` frame reporting match Darwin on Linux/aarch64.
 - Documented `--code` and `MITSCHEME_CODE_SIZE` in `doc/user-manual/user.texinfo`.
-- Added `.github/workflows/aarch64.yml` (`macos-latest` arm64 job with Stage 2
-  bootstrap caching) and
+- Added `.github/workflows/aarch64.yml` (`macos-latest` arm64 and `ubuntu-24.04-arm`
+  Linux aarch64 jobs with Stage 2 bootstrap caching) and
   `.github/workflows/release-macos-dmg.yml` (tag/dispatch macOS DMG packaging and
   GitHub Release publishing) backed by reusable verification scripts in
   `tests/ci/` (`bootstrap-and-test.sh`, `run-microcode-smoke.sh`,
