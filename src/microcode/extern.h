@@ -345,7 +345,7 @@ extern unsigned char * lookup_external_string (SCHEME_OBJECT, unsigned long *);
 extern bool object_in_constant_space_p (SCHEME_OBJECT);
 extern SCHEME_OBJECT * copy_to_constant_space (SCHEME_OBJECT *, unsigned long);
 
-extern void setup_memory (unsigned long, unsigned long, unsigned long);
+extern void setup_memory (unsigned long, unsigned long, unsigned long, unsigned long);
 extern void reset_memory (void);
 
 /* Utilities for primitives */

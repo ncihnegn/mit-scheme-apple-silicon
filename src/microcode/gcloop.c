@@ -69,6 +69,7 @@ USA.
 
 /* For memory advice.  */
 #include "ostop.h"
+#include "code_arena.h"
 
 static SCHEME_OBJECT ** p_fromspace_start;
 static SCHEME_OBJECT ** p_fromspace_end;
@@ -89,6 +90,9 @@ static SCHEME_OBJECT current_object;
 #define ADDRESS_IN_FROMSPACE_P(addr)					\
   ((((void *) (addr)) >= ((void *) (*p_fromspace_start)))		\
    && (((void *) (addr)) < ((void *) (*p_fromspace_end))))
+
+#define ADDRESS_COLLECTABLE_P(addr)					\
+  ((ADDRESS_IN_FROMSPACE_P (addr)) || (code_address_p (addr)))
 
 #define TOSPACE_TO_NEWSPACE(p) (((p) - tospace_start) + newspace_start)
 #define NEWSPACE_TO_TOSPACE(p) (((p) - newspace_start) + tospace_start)
@@ -415,6 +419,32 @@ gc_scan_tospace (SCHEME_OBJECT * scan, SCHEME_OBJECT * end)
     }
 }
 
+void
+gc_drain_tospace_and_code_arena (SCHEME_OBJECT * scan_to)
+{
+  while ((scan_to < newspace_next) || (!code_arena_mark_stack_empty_p ()))
+    {
+      if (scan_to < newspace_next)
+	{
+	  SCHEME_OBJECT * target = newspace_next;
+	  gc_scan_tospace (scan_to, target);
+	  scan_to = target;
+	}
+      if (!code_arena_mark_stack_empty_p ())
+	{
+	  code_arena_write_begin ();
+	  while (!code_arena_mark_stack_empty_p ())
+	    {
+	      SCHEME_OBJECT * block = (code_arena_pop_mark_stack ());
+	      assert ((object_type (block[1])) == TC_MANIFEST_NM_VECTOR);
+	      gc_scan_oldspace ((block + 2 + (object_datum (block[1]))),
+				(block + 1 + (object_datum (block[0]))));
+	    }
+	  code_arena_write_end ();
+	}
+    }
+}
+
 static void
 run_gc_loop (SCHEME_OBJECT * scan, SCHEME_OBJECT ** pend)
 {
@@ -508,6 +538,15 @@ DEFINE_GC_PRECHECK_FROM (gc_precheck_from)
     std_gc_death ("out of range pointer: %#lx", ((unsigned long) from));
 #endif
 #endif
+  if (code_address_p (from))
+    {
+      if (code_arena_mark_block (from))
+	{
+	  if (scanning_ephemerons_p)
+	    queue_ephemerons_for_key (from);
+	}
+      return (from);
+    }
   if (!ADDRESS_IN_FROMSPACE_P (from))
     return (from);
   if (BROKEN_HEART_P (*from))
@@ -853,6 +892,8 @@ weak_referent_forward (SCHEME_OBJECT object, SCHEME_OBJECT collected)
     {
     case GC_POINTER_NORMAL:
       addr = (object_address (object));
+      if (code_address_p (addr))
+	return ((code_arena_marked_p (addr)) ? object : collected);
       if (BROKEN_HEART_P (*addr))
 	return (make_object_from_objects (object, (*addr)));
       return (collected);
@@ -860,6 +901,8 @@ weak_referent_forward (SCHEME_OBJECT object, SCHEME_OBJECT collected)
     case GC_POINTER_COMPILED_ENTRY:
 #ifdef CC_SUPPORT_P
       addr = (cc_entry_address_to_block_address (CC_ENTRY_ADDRESS (object)));
+      if (code_address_p (addr))
+	return ((code_arena_marked_p (addr)) ? object : collected);
       if (BROKEN_HEART_P (*addr))
 	return (CC_ENTRY_NEW_BLOCK (object, (object_address (*addr)), addr));
 #else
@@ -870,6 +913,8 @@ weak_referent_forward (SCHEME_OBJECT object, SCHEME_OBJECT collected)
     case GC_POINTER_COMPILED_RETURN:
 #ifdef CC_SUPPORT_P
       addr = (cc_return_address_to_block_address (CC_RETURN_ADDRESS (object)));
+      if (code_address_p (addr))
+	return ((code_arena_marked_p (addr)) ? object : collected);
       if (BROKEN_HEART_P (*addr))
 	return (CC_RETURN_NEW_BLOCK (object, (object_address (*addr)), addr));
 #else
@@ -896,7 +941,7 @@ queue_ephemerons_for_key (SCHEME_OBJECT * addr)
   if (!scanning_ephemerons_p)
     std_gc_death ("queue_ephemerons_for_key while not scanning ephemerons");
 
-  if (!ADDRESS_IN_FROMSPACE_P (addr))
+  if (!ADDRESS_COLLECTABLE_P (addr))
     std_gc_death ("Queueing ephemerons for key with non-fromspace address.");
 #endif
 
@@ -925,7 +970,7 @@ gc_transport_weak_pair (SCHEME_OBJECT pair)
   SCHEME_OBJECT old_car = (READ_TOSPACE (new_addr));
   SCHEME_OBJECT * caddr = (weak_referent_address (old_car));
 
-  if ((caddr != 0) && (ADDRESS_IN_FROMSPACE_P (caddr)))
+  if ((caddr != 0) && (ADDRESS_COLLECTABLE_P (caddr)))
     {
       WRITE_TOSPACE (new_addr, (object_new_type (TC_FALSE, old_car)));
       (old_addr[1])
@@ -958,7 +1003,7 @@ gc_transport_ephemeron (SCHEME_OBJECT old_ephemeron)
      broken, so leave a marked vector manifest to make the GC will scan
      its contents, including the datum.  */
   if ((old_key_addr == 0)
-      || (!ADDRESS_IN_FROMSPACE_P (old_key_addr))
+      || (!ADDRESS_COLLECTABLE_P (old_key_addr))
       || (SHARP_F != (weak_referent_forward (old_key, SHARP_F))))
     {
       WRITE_TOSPACE (new_addr, MARKED_EPHEMERON_MANIFEST);
@@ -1045,7 +1090,7 @@ scan_ephemerons (void)
       ephemeron_queue = (READ_TOSPACE (ephemeron_addr + EPHEMERON_NEXT));
       saved_newspace_next = newspace_next;
       scan_newspace_addr (ephemeron_addr + EPHEMERON_DATUM);
-      gc_scan_tospace (saved_newspace_next, 0);
+      gc_drain_tospace_and_code_arena (saved_newspace_next);
     }
   scanning_ephemerons_p = false;
 }
@@ -1053,6 +1098,7 @@ scan_ephemerons (void)
 void
 initialize_weak_chain (void)
 {
+  code_arena_mark_begin ();
   weak_chain = 0;
 #ifdef ENABLE_GC_DEBUGGING_TOOLS
   weak_chain_length = 0;

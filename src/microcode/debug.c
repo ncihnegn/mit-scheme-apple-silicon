@@ -31,6 +31,7 @@ USA.
 #include "prims.h"
 #include "trap.h"
 #include "lookup.h"
+#include "code_arena.h"
 
 #ifdef CC_SUPPORT_P
    static SCHEME_OBJECT compiled_entry_debug_filename (SCHEME_OBJECT);
@@ -1024,6 +1025,7 @@ verify_object (SCHEME_OBJECT object)
 
 #define VALID_ADDRESS_P(address)					\
   ((ADDRESS_IN_CONSTANT_P (address))					\
+   || (code_address_p (address))					\
    || ((heap_start <= (address)) && ((address) < Free)))
 
 static bool

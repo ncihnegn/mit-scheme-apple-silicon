@@ -30,6 +30,7 @@ USA.
 #include "cmpint.h"
 #include "prims.h"
 #include "jit.h"
+#include "code_arena.h"
 
 extern void * tospace_to_newspace (void *);
 extern void * newspace_to_tospace (void *);
@@ -350,6 +351,9 @@ aarch64_flush_i_cache_region (SCHEME_OBJECT * start, size_t nwords)
 void
 aarch64_flush_i_cache (void)
 {
-  /* Can't do `ic iallu' because that's privileged.  */
-  aarch64_flush_i_cache_region (constant_start, Free - constant_start);
+  code_arena_flush_icache ();
+#ifndef SCM_JIT_APPLE
+  if ((constant_start != 0) && (Free > constant_start))
+    aarch64_flush_i_cache_region (constant_start, Free - constant_start);
+#endif
 }

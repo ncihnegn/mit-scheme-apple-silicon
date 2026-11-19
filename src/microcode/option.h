@@ -55,6 +55,7 @@ extern const char * option_fasl_file;
 extern unsigned long option_heap_size;
 extern unsigned long option_constant_size;
 extern unsigned long option_stack_size;
+extern unsigned long option_code_size;
 
 extern void read_command_line_options (int argc, const char ** argv);
 

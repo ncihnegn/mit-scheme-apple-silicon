@@ -31,6 +31,7 @@ USA.
 #include "prims.h"
 #include "history.h"
 #include "gccode.h"
+#include "code_arena.h"
 #include "osscheme.h"
 #include "ostop.h"
 
@@ -110,7 +111,8 @@ oo
 void
 setup_memory (unsigned long heap_size,
 	      unsigned long stack_size,
-	      unsigned long constant_size)
+	      unsigned long constant_size,
+	      unsigned long code_size)
 {
   ALLOCATE_REGISTERS ();
 
@@ -154,12 +156,14 @@ setup_memory (unsigned long heap_size,
   saved_constant_size = constant_size;
   saved_heap_size = heap_size;
   reset_allocator_parameters (0, 0);
+  code_arena_setup (code_size);
   initialize_gc (heap_size, (&heap_start), (&Free), allocate_tospace, abort_gc);
 }
 
 void
 reset_memory (void)
 {
+  code_arena_teardown ();
   HEAP_FREE (memory_block_start);
   DEALLOCATE_REGISTERS ();
 }
@@ -314,9 +318,14 @@ std_gc_pt1 (void)
     (make_pointer_object (TC_HISTORY_UNMARKED, history_register));
 
   current_gc_table = (std_gc_table ());
+#ifdef CC_SUPPORT_P
+  if ((compiler_utilities != SHARP_F)
+      && (code_address_p (object_address (compiler_utilities))))
+    (void) code_arena_mark_block (object_address (compiler_utilities));
+#endif
   gc_scan_oldspace (stack_pointer, stack_end);
   gc_scan_oldspace (constant_start, constant_alloc_next);
-  gc_scan_tospace (saved_to, 0);
+  gc_drain_tospace_and_code_arena (saved_to);
 
 #ifdef ENABLE_GC_DEBUGGING_TOOLS
   finalize_gc_object_references ();
@@ -358,6 +367,7 @@ std_gc_pt2 (void)
     ephemeron_request_hard_p = false;
   }
 
+  code_arena_sweep ();
   CC_TRANSPORT_END ();
   CLEAR_INTERRUPT (INT_GC);
 }

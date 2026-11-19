@@ -217,6 +217,7 @@ extern void update_weak_pointers (void);
 extern gc_table_t * std_gc_table (void);
 extern void gc_scan_oldspace (SCHEME_OBJECT *, SCHEME_OBJECT *);
 extern void gc_scan_tospace (SCHEME_OBJECT *, SCHEME_OBJECT *);
+extern void gc_drain_tospace_and_code_arena (SCHEME_OBJECT *);
 
 extern void std_gc_death (const char *, ...)
   NORETURN

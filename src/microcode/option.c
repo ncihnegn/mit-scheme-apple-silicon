@@ -92,6 +92,7 @@ static const char * option_raw_band;
 static const char * option_raw_heap;
 static const char * option_raw_constant;
 static const char * option_raw_stack;
+static const char * option_raw_code;
 static const char * option_raw_prepend;
 
 /* Command-line arguments */
@@ -120,6 +121,7 @@ const char * option_fasl_file = 0;
 unsigned long option_heap_size;
 unsigned long option_constant_size;
 unsigned long option_stack_size;
+unsigned long option_code_size;
 
 #ifndef LIBRARY_PATH_VARIABLE
 #  define LIBRARY_PATH_VARIABLE "MITSCHEME_LIBRARY_PATH"
@@ -181,6 +183,10 @@ for the band.\n\
 --stack BLOCKS\n\
   Specifies the size of the stack in 1024-word blocks.  Overrides any\n\
   default.\n\
+\n\
+--code BLOCKS\n\
+  Specifies the size of compiled code space in 1024-word blocks.\n\
+  Overrides any default.\n\
 \n\
 --option-summary\n\
   Causes Scheme to write option values to standard error.\n\
@@ -253,6 +259,18 @@ for the band.\n\
 
 #ifndef STACK_SIZE_VARIABLE
 #  define STACK_SIZE_VARIABLE "MITSCHEME_STACK_SIZE"
+#endif
+
+#ifndef DEFAULT_CODE_SIZE
+#  if SIZEOF_UNSIGNED_LONG == 8
+#    define DEFAULT_CODE_SIZE 8192
+#  else
+#    define DEFAULT_CODE_SIZE 4096
+#  endif
+#endif
+
+#ifndef CODE_SIZE_VARIABLE
+#  define CODE_SIZE_VARIABLE "MITSCHEME_CODE_SIZE"
 #endif
 
 static int
@@ -483,6 +501,7 @@ parse_standard_options (int argc, const char ** argv)
 {
   option_argument ("band", true, (&option_raw_band));
   option_argument ("batch-mode", false, (&option_batch_mode));
+  option_argument ("code", true, (&option_raw_code));
   option_argument ("constant", true, (&option_raw_constant));
   option_argument ("emacs", false, (&option_emacs_subprocess));
   option_argument ("fasl", true, (&option_fasl_file));
@@ -878,6 +897,7 @@ describe_options (void)
   describe_size_option ("heap", option_heap_size);
   describe_size_option ("constant-space", option_constant_size);
   describe_size_option ("stack", option_stack_size);
+  describe_size_option ("code-space", option_code_size);
   describe_path_option ("library path", option_library_path);
   if (option_fasl_file != 0)
     describe_string_option ("FASL file", option_fasl_file);
@@ -1005,6 +1025,11 @@ read_command_line_options (int argc, const char ** argv)
 				option_raw_stack,
 				STACK_SIZE_VARIABLE,
 				DEFAULT_STACK_SIZE));
+  option_code_size
+    = (standard_numeric_option ("code",
+				option_raw_code,
+				CODE_SIZE_VARIABLE,
+				DEFAULT_CODE_SIZE));
   if (option_show_version)
     {
       outf_console ("%s\n", PACKAGE_STRING);

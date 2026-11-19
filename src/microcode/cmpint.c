@@ -37,6 +37,7 @@ USA.
 #include "trap.h"
 #include "history.h"
 #include "cmpgc.h"
+#include "code_arena.h"
 
 /* Two special classes of procedures are used in this file:
 
@@ -2063,7 +2064,8 @@ plausible_cc_block_p (SCHEME_OBJECT * block)
     return
       ((((HEAP_ADDRESS_P (block)) && (HEAP_ADDRESS_P (block_end)))
 	|| ((ADDRESS_IN_CONSTANT_P (block))
-	    && (ADDRESS_IN_CONSTANT_P (block_end))))
+	    && (ADDRESS_IN_CONSTANT_P (block_end)))
+	|| ((code_address_p (block)) && (code_address_p (block_end))))
        && (ENVIRONMENT_P (*block_end)));
   }
 }

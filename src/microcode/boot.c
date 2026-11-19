@@ -111,7 +111,8 @@ main_name (int argc, const char ** argv)
 
   setup_memory ((BLOCKS_TO_WORDS (option_heap_size)),
 		(BLOCKS_TO_WORDS (option_stack_size)),
-		(BLOCKS_TO_WORDS (option_constant_size)));
+		(BLOCKS_TO_WORDS (option_constant_size)),
+		(BLOCKS_TO_WORDS (option_code_size)));
 
   initialize_primitives ();
   compiler_initialize (option_fasl_file != 0);
