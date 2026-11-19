@@ -373,7 +373,7 @@ first-class code-arena segment (`FASL_OFFSET_CODE_SIZE = 19`,
 
 ## Phases and Current Status
 
-### Phase 0: configure and platform detection (Prototype complete / Pending integration)
+### Phase 0: configure and platform detection (Implemented)
 
 - `src/microcode/aclocal.m4`: Resolve `arm`/`arm64`/`aarch64` on Darwin to
   `aarch64le` when `--enable-native-code=yes`, accept `arm64` as a compiler
@@ -391,7 +391,7 @@ first-class code-arena segment (`FASL_OFFSET_CODE_SIZE = 19`,
   `--enable-native-code=svm1` (portable SVM bytecode) or `--enable-native-code=c`
   (LIARC), **not** `--disable-native-code`.
 
-### Phase 1: JIT primitive layer (Prototype validated / Pending integration)
+### Phase 1: JIT primitive layer (Implemented)
 
 - Add `src/microcode/jit.c` + `jit.h` (`code_space_map`,
   `code_space_write_begin/end`, `code_space_execute_begin`, `code_space_flush`,
@@ -405,108 +405,95 @@ first-class code-arena segment (`FASL_OFFSET_CODE_SIZE = 19`,
   Hardened Runtime / notarized binaries require
   `com.apple.security.cs.allow-jit`.
 
-### Phase 2: Immovable Code Arena, Memory Management, and FASL Segment
+### Phase 2: Immovable Code Arena, Memory Management, and FASL Segment (Implemented)
 
-**Validated in SVM1 prototype (on prototype branch; not yet in `master`)**:
-- `code_arena.c` + `code_arena.h`: bump allocator, nested write brackets,
-  bounds checks (`code_start`, `code_alloc_next`, `code_end`), and
-  `arena-smoke.c`.
+- `code_arena.c` + `code_arena.h`: mark-sweep reclamation with chained `MAP_JIT`
+  overflow chunks, external RW `mark_bits` bitmap + `code_mark_stack` worklist,
+  and `TC_MANIFEST_NM_VECTOR` self-describing swept free holes; tested via
+  `tests/microcode/arena-smoke.c` and `tests/microcode/gc-arena-smoke.c`.
 - `setup_memory` / `reset_memory` (`src/microcode/memmag.c`),
-  `INSTALL-COMPILED-CODE-BLOCK` wired into `assemble` (`src/compiler/back/bittop.scm`)
-  and `cross-link/finish-assembly` (`src/compiler/base/crsend.scm`).
-- Bracketing `fasdump_transport_words` / `run_fixups` (`src/microcode/fasdump.c`),
-  `declare_compiled_code_block` / `write_variable_cache` / `write_uuo_link` /
-  `link_section` (`src/microcode/cmpint.c`), and `svm1-interp.c` self-modifying
-  bytecode stores (SVM1-specific).
-
-**Required for native AArch64 completion**:
-- Upgrade `code_arena` from bump-only root scanning to **mark-sweep reclamation**
-  with chained `MAP_JIT` overflow chunks, an external RW `mark_bits` bitmap +
-  `code_mark_stack` worklist, `TC_MANIFEST_NM_VECTOR` self-describing free
-  holes, and skipped permanent arena installation for `compile-file` output
-  blocks.
-- Integrate `code_arena` liveness into weak/ephemeron GC (`src/microcode/gcloop.c`):
-  replace `ADDRESS_IN_FROMSPACE_P` with `ADDRESS_COLLECTABLE_P` in
-  `gc_transport_weak_pair`, `gc_transport_ephemeron`, and `queue_ephemerons_for_key`,
-  handle `code_address_p` in `weak_referent_forward`, and drain both
-  `gc_scan_tospace` and `code_mark_stack` inside `scan_ephemerons`.
-- Bump `fasl_version_t` in `src/microcode/fasl.h` to `FASL_VERSION_CODE_SPACE`
-  (keeping `OLDEST_INPUT_FASL_VERSION = FASL_VERSION_C_CODE`), fix
-  `faslhdr_utilities_end` (`src/microcode/fasl.c`), implement two-tospace
-  (`heap_tospace` + `code_tospace`) `Prim_prim_fasdump` and direct
-  `Prim_band_dump` code-segment writing in `fasdump.c`, and update `fasload.c`
-  (`load_file` / `read_band_file` / `relocate_address`) so both `.com` files and
-  bands load and relocate compiled code directly in the arena.
-- Move `compiler_utilities` (`make_compiler_utilities`) into `code_arena`;
-  keep dynamic `make_trampoline` objects in the heap formatted as 1-entry
+  `INSTALL-COMPILED-CODE-BLOCK` wired into `assemble-objects`
+  (`src/compiler/back/bittop.scm`), `cross-link/finish-assembly`
+  (`src/compiler/base/crsend.scm`), and `%copy-compiled-code-block`
+  (`src/runtime/prgcop.scm`).
+- Mark-sweep `code_arena` liveness integrated into weak/ephemeron GC
+  (`src/microcode/gcloop.c`: `ADDRESS_COLLECTABLE_P`, `weak_referent_forward`,
+  and alternating `gc_scan_tospace` / `code_mark_stack` drain in
+  `scan_ephemerons`).
+- `fasl_version_t` in `src/microcode/fasl.h` bumped to
+  `FASL_VERSION_CODE_SPACE` (13) while keeping `OLDEST_INPUT_FASL_VERSION =
+  FASL_VERSION_C_CODE`, `faslhdr_utilities_end` fixed (`src/microcode/fasl.c`),
+  two-tospace (`heap_tospace` + `code_tospace`) `Prim_prim_fasdump` and direct
+  / compacted `Prim_band_dump` in `fasdump.c`, and single-pass `fasload.c`
+  code-segment loading and relocation; tested via
+  `tests/microcode/fasl-code-smoke.c`.
+- `compiler_utilities` (`make_compiler_utilities`) moved into `code_arena`;
+  dynamic `make_trampoline` objects live in the heap as 1-entry
   `TC_MANIFEST_CLOSURE`s targeting `trampoline_to_interface` (Entry 2 of
   `compiler_utilities`).
-- Replace general `VECTOR_SET_PRIMITIVE` bracketing with a dedicated
-  debugging-info setter primitive for `set-compiled-code-block/debugging-info!`.
-- Update `read_band_sizes` and startup sizing (`src/microcode/option.c`) to read
-  `FASLHDR_CODE_SIZE(&h)` and reserve runtime code-arena headroom (adding
-  `--code` / `MITSCHEME_CODE_SIZE` while keeping `--constant` for `constant_space`).
-- Update GC/fasdump debugging checks to include `[code_start, code_alloc_next)`:
-  `VALID_ADDRESS_P` in `src/microcode/debug.c` and `compute_memory_checksum` in
-  `src/microcode/fasdump.c`.
+- Dedicated `SET-COMPILED-CODE-BLOCK/DEBUGGING-INFO!` primitive used by
+  `set-compiled-code-block/debugging-info!` (`src/runtime/microcode-data.scm`),
+  leaving general `VECTOR_SET_PRIMITIVE` unbracketed.
+- `read_band_sizes` and startup sizing (`src/microcode/option.c`) read
+  `FASLHDR_CODE_SIZE(&h)` and reserve runtime code-arena headroom
+  (`--code` / `MITSCHEME_CODE_SIZE`), while keeping `--constant` for
+  `constant_space`.
+- GC/fasdump checks (`VALID_ADDRESS_P` in `src/microcode/debug.c`,
+  `compute_memory_checksum` in `src/microcode/fasdump.c`) updated for
+  `[code_start, code_alloc_next)` and active chunks.
 
-### Phase 3: Native AArch64 Write Bracketing and Backend Fixes
+### Phase 3: Native AArch64 Write Bracketing and Backend Fixes (Implemented)
 
-- Remove inline environment `STR` stores from `generate/quotation-header`,
+- Removed inline environment `STR` stores from `generate/quotation-header`,
   `generate/remote-link`, and `generate/remote-links` in
-  `src/compiler/machines/aarch64/rules3.scm`, and write
+  `src/compiler/machines/aarch64/rules3.scm`, and wrote
   `CC_BLOCK_ADDR_END(block_addr)[-1] = GET_ENV` in `comutil_link`
   (`src/microcode/cmpint.c`) inside a write bracket **before** calling
-  `link_remaining_sections(&s)` (and never inside `comp_link_caches_restart`).
-- Emit `trampoline_to_interface` as Entry 2 of `compiler_utilities`
-  (`src/microcode/cmpint.c`, `store_trampoline_insns` in
-  `src/microcode/cmpintmd/aarch64.c`), format dynamic `make_trampoline`
-  blocks as 1-entry `TC_MANIFEST_CLOSURE`s in the heap, and update
-  `trampoline_storage` (`src/microcode/cmpint.c`) for `TC_MANIFEST_CLOSURE`
-  trampoline headers.
-- Fix `write_uuo_target` (`br x1` for far targets, removing the broken `ADRP`
-  assertions), `aarch64_cache_line_sizes` (`4U << dsize` / `4U << isize`), and
-  `FLUSH_I_CACHE` / `FLUSH_I_CACHE_REGION` (`sys_icache_invalidate`) in
-  `src/microcode/cmpintmd/aarch64.c`.
-- Replace `ADRP-ADD` with the 2-instruction `ADR` + `ADD`/`SUB` (`LSL #12`)
-  sequence and tighten outer `VARIABLE-WIDTH` bounds in
-  `src/compiler/machines/aarch64/instr1.scm` / `instrf.scm`, and fix the four
-  pre-existing assembler bugs (`TBZ`/`TBNZ` `SIGNED` offset, `(B (@PCO (* 4 4)))`,
-  backward-branch `(* 4 (- offset 1))`, and `(LDR.V ,size ,Vt ,temp)`).
-- Wire `dstack` write-bracket cleanup and unconditional RX restoration in
+  `link_remaining_sections(&s)`.
+- Emitted `trampoline_to_interface` as Entry 2 of `compiler_utilities`
+  (`src/microcode/cmpint.c`, `store_trampoline_to_interface_insns` in
+  `src/microcode/cmpintmd/aarch64.c`), formatted dynamic `make_trampoline`
+  blocks as 1-entry `TC_MANIFEST_CLOSURE`s in the heap, and updated
+  `trampoline_storage` (`src/microcode/cmpint.c`); verified via
+  `tests/microcode/trampoline-smoke.c`.
+- Fixed `write_uuo_target` (`br x1` for far targets), `aarch64_cache_line_sizes`
+  (`4U << dsize` / `4U << isize`), `FLUSH_I_CACHE` / `FLUSH_I_CACHE_REGION`
+  (`sys_icache_invalidate`), and `plausible_cc_block_p` (`+ CC_ENTRY_PADDING_SIZE`).
+- Replaced `ADRP-ADD` with the 2-instruction `ADR` + `ADD`/`SUB` (`LSL #12`)
+  sequence and tightened `VARIABLE-WIDTH` bounds in
+  `src/compiler/machines/aarch64/{insutl,instr1,instrf}.scm`, alongside
+  fixing `TBZ`/`TBNZ` `SIGNED` offset + `(&U ,bit)` + `(B (@PCO (* 4 4)))`,
+  backward-branch `(* 4 (- offset 1))`, `(LDRS X W ...)` / `(LDRS W X ...)`,
+  and `(LDR.V ,size ,Vt ,temp)`.
+- Wired `dstack` write-bracket cleanup and unconditional RX restoration in
   `abort_to_interpreter` (`src/microcode/interp.c`), `trap_recover`
-  (`src/microcode/uxtrap.c`), and `C_to_interface`
-  (`src/microcode/cmpauxmd/aarch64.m4`).
-- Measure protection-toggle cost on UUO linking and cache-miss paths.
+  (`src/microcode/uxtrap.c`), `exit_interruption_extent` (`src/microcode/intext.c`),
+  and `C_to_interface` (`src/microcode/cmpauxmd/aarch64.m4`, guarded by a
+  `jit_write_depth != 0` fast-path check after profiling showed unconditional
+  `pthread_jit_write_protect_np(1)` added ~45% non-GC runtime overhead).
 
-### Phase 4: GC Cleanup, Trap Handling, and Runtime Tools
+### Phase 4: GC Cleanup, Trap Handling, and Runtime Tools (Implemented)
 
-- Remove `TC_COMPILED_CODE_BLOCK` from copying GC once FASL/band code segments
-  place all code blocks in the arena, and assert every `TC_COMPILED_CODE_BLOCK`
-  satisfies `code_address_p`.
-- Add Darwin arm64 `HAVE_SIGCONTEXT` definitions in `src/microcode/uxtrap.h`:
-  - `SIGCONTEXT_FIRST_REG(scp)`: `&((scp)->uc_mcontext->__ss)`
-  - `SIGCONTEXT_NREGS`: sized over `_STRUCT_ARM_THREAD_STATE64`
-  - `SIGCONTEXT_PC(scp)`: `((scp)->uc_mcontext->__ss.__pc)` (stripping/handling PAC bits if applicable)
-  - `SIGCONTEXT_SP(scp)`: `((scp)->uc_mcontext->__ss.__sp)` (C stack)
-  - `SIGCONTEXT_SCHSP(scp)`: `((scp)->uc_mcontext->__ss.__x[28])` (Scheme `SSP`, separate from C `sp`!)
-  - `SIGCONTEXT_RFREE(scp)`: `((scp)->uc_mcontext->__ss.__x[20])` (`FREE` register `x20`)
-- Unify PC classification in `src/microcode/uxtrap.c` (`find_code_address` /
-  `pcl_arena`, validating published bounds against the arena so corrupt bounds
-  fail closed), expose `CODE-SPACE-BOUNDS` / `CODE-ADDRESS?` in
-  `src/runtime/microcode-data.scm`, and annotate code-area PCs in hardware-trap
-  reporting (`src/runtime/continuation-parser.scm`).
+- Runtime GC guards in `src/microcode/gcloop.c` assert every non-closure
+  `TC_COMPILED_CODE_BLOCK` / return address resides in `code_arena` on
+  native Apple silicon builds (`SCM_JIT_APPLE && CC_IS_NATIVE`).
+- Added Darwin arm64 `HAVE_SIGCONTEXT` definitions in `src/microcode/uxtrap.h`
+  (`SIGCONTEXT_FIRST_REG`, `SIGCONTEXT_NREGS`, `SIGCONTEXT_PC`, `SIGCONTEXT_SP`,
+  `SIGCONTEXT_SCHSP` = `__x[28]`, `SIGCONTEXT_RFREE` = `__x[20]`).
+- Unified PC classification in `src/microcode/uxtrap.c` (`find_code_address` /
+  `pcl_code` using `code_arena_find_block`), exposed `CODE-SPACE-BOUNDS` and
+  `CODE-ADDRESS?` in `src/runtime/microcode-data.scm`, and annotated
+  code-arena trap frames with `"(code space)"` in
+  `src/runtime/continuation-parser.scm`.
 
-### Phase 5: Packaging, CI, and Documentation
+### Phase 5: Packaging, CI, and Documentation (Implemented except CI workflows)
 
-- `dist/make-macosx-app` calls `src/etc/macosx/make-app.sh` from
-  `${ARCH_BASE}/src`. Update both scripts to support `arm64`, apply
-  `com.apple.security.cs.allow-jit` entitlements, and sign
-  `Contents/Resources/mit-scheme` (the binary launched by
-  `Contents/MacOS/macosx-starter`) as well as the app bundle.
-- Add CI jobs for `macos-14` (arm64) and Linux/aarch64 once build and test
-  suites are green.
-- Document Apple silicon native support in `doc/user-manual/user.texinfo`.
+- Updated `dist/make-macosx-app` and `src/etc/macosx/make-app.sh` (with
+  `src/etc/macosx/entitlements.plist`) for `aarch64le` (`arm64`) and code
+  signing with `com.apple.security.cs.allow-jit`.
+- Documented `--code` and `MITSCHEME_CODE_SIZE` in `doc/user-manual/user.texinfo`.
+- CI workflow additions for `macos-14` (arm64) and Linux/aarch64 remain to be
+  added in the repository's CI configuration.
 
 ## Verification
 
@@ -599,9 +586,39 @@ dereferences `(vector-ref object 0)` in compiled code. Replacing
 in `src/runtime/continuation-parser.scm`) and confirm whether the faulting PC
 was classified inside the code area, constant space, or heap.
 
-## Interim Guidance
+### XNU `MAP_JIT` Syscall `EFAULT` on Direct Code-Arena I/O
 
-Until native Apple silicon support is complete, build with:
+On macOS `arm64`, `pthread_jit_write_protect_np(0)` switches the userspace
+thread's `APRR_EL0` permission register, but XNU's `copyout()`/`copyin()` for
+`read(2)` and `write(2)` rejects `MAP_JIT` virtual addresses once `fread`/`fwrite`
+bypasses `stdio`'s `BUFSIZ` (`>= 4096` bytes), failing large `.com` or band code
+segments with `EFAULT`. `read_code_from_file` (`src/microcode/fasload.c`) and
+`write_code_to_fasl_file` (`src/microcode/fasdump.c`) avoid this by staging code
+segment I/O through a 512-word (`4096`-byte) userspace stack buffer.
+
+### Observed Native AArch64 Verification Summary
+
+- Clean cross-bootstrap (`svm1` -> native `aarch64le`) followed by a full
+  self-hosted native `./configure && make` rebuild completed and dumped/reloaded
+  `lib/runtime.com` and `lib/all.com`.
+- All 5 C microcode test suites (`jit-smoke`, `arena-smoke`, `gc-arena-smoke`,
+  `fasl-code-smoke`, `trampoline-smoke`) passed.
+- `FAST=y make check` passed 101/102 suites (with `microcode/test-flonum-except`
+  reporting only macOS's expected missing `untrap-float-exceptions` /
+  `feenableexcept`).
+- `vmmap` confirmed `rw-/rwx` (NX) `heap`, `constant_space`, and `stack`, with
+  `MAP_JIT` `code_arena` as the sole anonymous executable region.
+- Runtime verification exercised dynamic `eval`/`compile-procedure`, closures,
+  lexprs, `apply` and primitive trampolines, unbound operator lookup traps +
+  restarts, a 146.9 MB (>128 MiB) far UUO link, 0-byte arena growth across a
+  50-iteration compile+GC loop, weak pairs and ephemerons keyed by compiled
+  procedures, `copy-program`, and hardware `SIGSEGV` trap recovery (`SSP=x28`,
+  `Free=x20`, `APRR_EL0` restoration, and `"(code space)"` frame reporting).
+
+## Building on Apple Silicon
+
+Plain `./configure && make` now auto-detects Apple silicon (`arm64`) as
+`aarch64le`. Portable alternatives remain available via:
 
 ```sh
 ./configure --enable-native-code=svm1

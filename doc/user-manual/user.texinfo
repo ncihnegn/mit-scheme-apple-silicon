@@ -561,8 +561,18 @@ consumed by the band.
 @item --constant @var{blocks}
 @opindex --constant
 Specifies the size of constant space in 1024-word blocks.  Overrides any
-default.  Constant space holds the compiled code for the runtime system
-and other subsystems.
+default.  Constant space holds immutable data for the runtime system
+and other subsystems (as well as compiled code on platforms without a
+separate code arena).
+
+@item --code @var{blocks}
+@opindex --code
+Specifies the initial size of the code arena in 1024-word blocks, or
+runtime headroom added to any loaded band's code segment.  Overrides any
+default.  On platforms with a dedicated W^X code arena (such as Apple
+silicon @code{arm64}), compiled-code blocks are stored here separately
+from constant space and the data heap and are reclaimed by mark-sweep
+garbage collection.
 
 @item --stack @var{blocks}
 @opindex --stack
@@ -804,6 +814,12 @@ On unix systems the list is colon-separated, with the default
 The size of constant space, in 1024-word blocks; overridden by
 @option{--constant}.  The default value is computed to be the correct
 size for the band being loaded.
+
+@item MITSCHEME_CODE_SIZE
+@nvindex MITSCHEME_CODE_SIZE
+The size of the code arena (or runtime headroom above a band's code
+segment), in 1024-word blocks; overridden by @option{--code}.  If unset,
+a platform default is used.
 
 @item MITSCHEME_HEAP_SIZE
 @nvindex MITSCHEME_HEAP_SIZE

@@ -37,7 +37,7 @@ system_usage ()
 {
     echo "usage: ${PROGRAM} TYPE ARCH [OPTIONS]"
     standard_args_usage
-    echo "  ARCH must be 'i386' or 'x86-64'"
+    echo "  ARCH must be 'i386', 'x86-64', or 'aarch64le' ('arm64')"
     echo "  OPTIONS are passed to the configure script"
 }
 USAGE_FUNCTION=system_usage

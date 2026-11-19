@@ -114,3 +114,23 @@ cat > mit-scheme.app/Contents/Info.plist <<EOF
   </dict>
 </plist>
 EOF
+
+# Sign the embedded runtime binary with allow-jit entitlements (required for
+# MAP_JIT on Apple silicon / Hardened Runtime), any loadable plugins, and the
+# enclosing application bundle.
+: ${CODESIGN_IDENTITY=-}
+CODESIGN_FLAGS=(--force --sign "${CODESIGN_IDENTITY}")
+if [[ ${CODESIGN_IDENTITY} != - ]]; then
+    CODESIGN_FLAGS+=(--options runtime)
+fi
+if command -v codesign >/dev/null 2>&1; then
+    while IFS= read -r -d '' SO_FILE; do
+        codesign "${CODESIGN_FLAGS[@]}" "${SO_FILE}"
+    done < <(find mit-scheme.app/Contents/Resources -name '*.so' -print0)
+    codesign "${CODESIGN_FLAGS[@]}" \
+        --entitlements etc/macosx/entitlements.plist \
+        mit-scheme.app/Contents/Resources/mit-scheme
+    codesign "${CODESIGN_FLAGS[@]}" \
+        --entitlements etc/macosx/entitlements.plist \
+        mit-scheme.app
+fi
