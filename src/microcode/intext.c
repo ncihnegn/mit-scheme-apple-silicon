@@ -26,6 +26,7 @@ USA.
 */
 
 #include "intext.h"
+#include "jit.h"
 
 extern void preserve_signal_mask (void);
 
@@ -83,5 +84,6 @@ enter_interruption_extent (void)
 void
 exit_interruption_extent (void)
 {
+  jit_force_execute_mode ();
   longjmp ((current_interruptable_extent -> control_point), 1);
 }

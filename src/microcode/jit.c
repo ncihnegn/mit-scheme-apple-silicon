@@ -48,7 +48,7 @@ USA.
 #  define MAP_FAILED ((void *) (-1))
 #endif
 
-static unsigned int jit_write_depth = 0;
+unsigned int jit_write_depth = 0;
 
 bool
 jit_available_p (void)

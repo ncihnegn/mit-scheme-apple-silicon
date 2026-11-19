@@ -37,6 +37,8 @@ extern size_t jit_page_size (void);
 extern void * jit_map_code_space (size_t byte_length);
 extern void jit_unmap_code_space (void * addr, size_t byte_length);
 
+extern unsigned int jit_write_depth;
+
 extern void jit_write_begin (void);
 extern void jit_write_end (void);
 extern unsigned int jit_write_nesting_depth (void);
