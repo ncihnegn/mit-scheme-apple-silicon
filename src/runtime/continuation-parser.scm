@@ -890,6 +890,8 @@ USA.
 	    ((2)				; compiled code
 	     (write-string " at offset " port)
 	     (write-hex pc-info-2 port)
+	     (if (code-address? pc-info-1)
+		 (write-string " (code space)" port))
 	     (newline port)
 	     (write-string "within " port)
 	     (let ((block pc-info-1))

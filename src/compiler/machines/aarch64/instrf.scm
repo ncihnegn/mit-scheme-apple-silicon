@@ -290,7 +290,7 @@ USA.
     ;; LDR PC-relative literal, SIMD&FP (C7.2.177)
     (((? opc ldr-literal-simd/fp-size)
       (? Vt vregister)
-      (@PCO (? offset signed-19)))
+      (@PCO (* 4 (? offset signed-19))))
      (BITS (2 opc)
            (3 #b011)
            (1 1)                        ;SIMD/FP
@@ -301,9 +301,9 @@ USA.
      (VARIABLE-WIDTH offset `(/ (- ,label *PC*) 4)
        ((#x-40000 #x3ffff)
         (MACRO 32 (LDR.V ,size ,Vt (@PCO (* 4 ,offset)))))
-       ((#x-100000000 #xffffffff)
+       ((#x-43fc00 #x43fbff)
         (MACRO 64 (ADRP-ADD X ,temp (@PCO ,(* 4 offset)))) ;(*)
-        (MACRO 32 (LDR.V X ,Vt ,temp)))))))
+        (MACRO 32 (LDR.V ,size ,Vt ,temp)))))))
 
 (let-syntax
     ((define-aes-instruction

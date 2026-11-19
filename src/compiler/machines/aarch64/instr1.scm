@@ -70,7 +70,7 @@ USA.
      ;; Preserve forward or backward branches to preserve static branch
      ;; predictions.  The PC relative to which we compute the target
      ;; address is marked with (*) to explain the curious bounds.
-     ((0 #x100000001)
+     ((0 #x43fc01)
       ;; Forward branch.
       (MACRO 32 (B. ,condition (@PCO (* 4 2)))) ;1f
       (MACRO 32 (B (@PCO (* 4 4))))             ;2f
@@ -79,11 +79,11 @@ USA.
       (MACRO 32 (BR ,temp))
       ;; 2:
       )
-     ((#x-fffffffe -1)
+     ((#x-43fbff -1)
       ;; Backward branch.
       (MACRO 32 (B (@PCO (* 4 4))))             ;1f
       ;; 2:
-      (MACRO 64 (ADRP-ADD X ,temp (@PCO ,(* 4 (- offset 2))))) ;(*)
+      (MACRO 64 (ADRP-ADD X ,temp (@PCO ,(* 4 (- offset 1))))) ;(*)
       (MACRO 32 (BR ,temp))
       ;; 1:
       (MACRO 32 (B. ,condition (@PCO (* 4 -3)))) ;2b
@@ -108,7 +108,7 @@ USA.
                (VARIABLE-WIDTH offset `(/ (- ,target *PC*) 4)
                  ((#x-40000 #x3ffff)
                   (MACRO 32 (,mnemonic ,',sf ,',Rt (@PCO (* 4 ,',offset)))))
-                 ((0 #x40000001)
+                 ((0 #x43fc01)
                   ;; Forward branch.
                   (MACRO 32 (,mnemonic ,',sf ,',Rt (@PCO (* 4 2)))) ;1f
                   (MACRO 32 (B (@PCO (* 4 4)))) ;2f
@@ -118,12 +118,12 @@ USA.
                   (MACRO 32 (BR ,',temp))
                   ;; 2:
                   )
-                 ((#x-3ffffffe -1)
+                 ((#x-43fbff -1)
                   ;; Backward branch.
                   (MACRO 32 (B (@PCO (* 4 4)))) ;1f
                   ;; 2:
                   (MACRO 64 (ADRP-ADD X ,',temp
-                                      (@PCO ,',(* 4 (- offset 2))))) ;(*)
+                                      (@PCO ,',(* 4 (- offset 1))))) ;(*)
                   (MACRO 32 (BR ,',temp))
                   ;; 1:
                   (MACRO 32 (,mnemonic ,',sf ,',Rt (@PCO (* 4 -3)))) ;2b
@@ -142,21 +142,21 @@ USA.
            `(define-instruction ,mnemonic
               ((W (? Rt register-31=z)
                   (&U (? bit unsigned-5))
-                  (@PCO (* 4 (? offset))))
+                  (@PCO (* 4 (? offset signed-14))))
                (BITS (1 0)              ;b5, fifth bit of bit index
                      (6 #b011011)
                      (1 ,op)
                      (5 bit)
-                     (14 offset)
+                     (14 offset SIGNED)
                      (5 Rt)))
               ((X (? Rt register-31=z)
                   (&U (? bit unsigned-6))
-                  (@PCO (* 4 (? offset))))
+                  (@PCO (* 4 (? offset signed-14))))
                (BITS (1 (shift-right bit 5))
                      (6 #b011011)
                      (1 ,op)
                      (5 (bitwise-and bit #b11111))
-                     (14 offset)
+                     (14 offset SIGNED)
                      (5 Rt)))
               (((? sf)
                 (? Rt)
@@ -167,26 +167,27 @@ USA.
                   (MACRO 32
                          (,mnemonic ,',sf ,',Rt (&U ,',bit)
                                     (@PCO (* 4 ,',offset)))))
-                 ((0 #x100000001)
+                 ((0 #x43fc01)
                   ;; Forward branch.
                   (MACRO 32 (,mnemonic ,',sf ,',Rt (&U ,',bit)
                                        (@PCO (* 4 2)))) ;1f
-                  (MACRO 32 (B (@PCO 4))) ;2f
+                  (MACRO 32 (B (@PCO (* 4 4)))) ;2f
                   ;; 1:
                   (MACRO 64 (ADRP-ADD X ,',temp
                                       (@PCO ,',(* 4 (- offset 2))))) ;(*)
                   (MACRO 32 (BR ,',temp))
                   ;; 2:
                   )
-                 ((#x-fffffffe -1)
+                 ((#x-43fbff -1)
                   ;; Backward branch.
                   (MACRO 32 (B (@PCO (* 4 4)))) ;1f
                   ;; 2:
                   (MACRO 64 (ADRP-ADD X ,',temp
-                                      (@PCO ,',(* 4 (- offset 2))))) ;(*)
+                                      (@PCO ,',(* 4 (- offset 1))))) ;(*)
                   (MACRO 32 (BR ,',temp))
                   ;; 1:
-                  (MACRO 32 (,mnemonic ,',sf ,',Rt (@PCO (* 4 -3)))) ;2b
+                  (MACRO 32 (,mnemonic ,',sf ,',Rt (&U ,',bit)
+                                       (@PCO (* 4 -3)))) ;2b
                   )))))))))
   ;; Test and branch if zero
   (define-test&branch-instruction TBZ 0)
@@ -205,32 +206,23 @@ USA.
   (((@PCR (? target) (? temp register<31)))
    (VARIABLE-WIDTH offset `(/ (- ,target *PC*) 4)
      ((#x-2000000 #x1ffffff)
-      (MACRO 32 (B (@PCO (* 4 ,offset)))))
-     ((#x-100000000 #xffffffff)
-      (MACRO 64 (ADRP-ADD X ,temp (@PCO ,(* 4 offset)))) ;(*)
-      (MACRO 32 (BR ,temp)))))
+      (MACRO 32 (B (@PCO (* 4 ,offset)))))))
   (((@PCR (+ (? target) (* 4 (? addend))) (? temp register<31)))
    (VARIABLE-WIDTH offset `(+ (/ (- ,target *PC*) 4) ,addend)
      ((#x-2000000 #x1ffffff)
-      (MACRO 32 (B (@PCO (* 4 ,offset)))))
-     ((#x-100000000 #xffffffff)
-      (MACRO 64 (ADRP-ADD X ,temp (@PCO ,(* 4 offset)))) ;(*)
-      (MACRO 32 (BR ,temp))))))
+      (MACRO 32 (B (@PCO (* 4 ,offset))))))))
 
 ;; Branch and link unconditional to PC-relative
 
 (define-instruction BL
-  (((@PCO (* 4 (? offset))))
+  (((@PCO (* 4 (? offset signed-26))))
    (BITS (1 1)                          ;link
          (5 #b00101)
          (26 offset SIGNED)))
   (((@PCR (? target) (? temp register<31)))
    (VARIABLE-WIDTH offset `(/ (- ,target *PC*) 4)
      ((#x-2000000 #x1ffffff)
-      (MACRO 32 (BL (@PCO (* 4 ,offset)))))
-     ((#x-100000000 #xffffffff)
-      (MACRO 64 (ADRP-ADD X ,temp (@PCO ,(* 4 offset)))) ;(*)
-      (MACRO 32 (BLR ,temp))))))
+      (MACRO 32 (BL (@PCO (* 4 ,offset))))))))
 
 ;;; C.3.1.3 Unconditional branch (register)
 
@@ -741,12 +733,12 @@ USA.
      (VARIABLE-WIDTH offset `(/ (- ,label *PC*) 4)
        ((#x-40000 #x3ffff)
         (MACRO 32 (LDR ,size ,Rt (@PCO (* 4 ,offset)))))
-       ((#x-100000000 #xffffffff)
+       ((#x-43fc00 #x43fbff)
         ;; Could maybe use ADRP and LDR with unsigned 8-byte offset,
         ;; but only if the offset is or this instruction is aligned,
         ;; which the assembler can't handle easily.
         (MACRO 64 (ADRP-ADD X ,temp (@PCO ,(* 4 offset)))) ;(*)
-        (MACRO 32 (LDR X ,Rt ,temp)))))))
+        (MACRO 32 (LDR ,size ,Rt ,temp)))))))
 
 ;;; C3.2.2 Load/Store register (unscaled offset)
 
@@ -1009,10 +1001,10 @@ USA.
   ((X W (? Rt register-31=z) (@PCR (? label) (? temp register<31)))
    (VARIABLE-WIDTH offset `(/ (- ,label *PC*) 4)
      ((#x-40000 #x3ffff)
-      (MACRO 32 (LDRS ,Rt (@PCO (* 4 ,offset)))))
-     ((#x-100000000 #xffffffff)
+      (MACRO 32 (LDRS X W ,Rt (@PCO (* 4 ,offset)))))
+     ((#x-43fc00 #x43fbff)
       (MACRO 64 (ADRP-ADD X ,temp (@PCO ,(* 4 offset)))) ;(*)
-      (MACRO 32 (LDRS ,Rt ,temp))))))
+      (MACRO 32 (LDRS W X ,Rt ,temp))))))
 
 ;;; C3.3 and C3.4: Data processing - immediate and register
 
@@ -1077,7 +1069,7 @@ USA.
    (VARIABLE-WIDTH offset `(- ,label *PC*)
      ((#x-100000 #xfffff)               ;21-bit signed _byte_ offset
       (MACRO 32 (ADR X ,Rd (@PCO ,offset))))
-     ((#x-100000000 #xffffffff)         ;33-bit signed _byte_ offset
+     ((#x-10ff000 #x10fefff)           ;ADR +/-1MiB + shifted ADD/SUB 16MiB
       (MACRO 64 (ADRP-ADD X ,Rd (@PCO ,offset)))))))
 
 (define-instruction ADRP
@@ -1093,25 +1085,18 @@ USA.
 
 ;; Macro used for assembling variable-width instructions which can't
 ;; just defer to the variable-width ADR because we prohibit variable
-;; width within variable width.
-;;
-;; XXX OOPS!  This doesn't actually work, because ADRP actually
-;; computes PC - (PC mod 2^12) + 2^12*offset, not PC + 2^12*offset.
-;; Either we need to know where we are in a page (which can change from
-;; GC to GC because compiled blocks are only float-aligned, not
-;; page-aligned), or we need to generate extra code to find and add PC
-;; mod 2^12, which looks like it'll require another temporary register.
-;; Ugh!
-;;
-;; The way that assemblers usually get around this is either by always
-;; relying on relocations or by always aligning code on page boundaries
-;; so that we know PC mod 2^12 anyway.
+;; width within variable width.  Because compiled-code blocks are
+;; 8-byte aligned (not page-aligned), ADRP cannot be used for
+;; PC-relative offsets inside a block; ADR + shifted ADD/SUB covers
+;; [-#x10ff000, #x10fefff] (~+/-17 MiB) regardless of page alignment.
 
-#;
 (define-instruction ADRP-ADD
-  ((X (? Rd) (@PCO (? offset signed-33)))
-   (MACRO 32 (ADRP X ,Rd (@PCO (LSL ,(shift-right offset 12) 12)))) ;(*)
-   (MACRO 32 (ADD X ,Rd ,Rd (&U ,(bitwise-and offset #xfff))))))
+  ((X (? Rd register<31) (@PCO (? offset adrp-add-nonneg)))
+   (MACRO 32 (ADR X ,Rd (@PCO ,(adrp-add-nonneg-lo offset)))) ;(*)
+   (MACRO 32 (ADD X ,Rd ,Rd (LSL (&U ,(adrp-add-nonneg-hi offset)) 12))))
+  ((X (? Rd register<31) (@PCO (? offset adrp-add-neg)))
+   (MACRO 32 (ADR X ,Rd (@PCO ,(adrp-add-neg-lo offset)))) ;(*)
+   (MACRO 32 (SUB X ,Rd ,Rd (LSL (&U ,(adrp-add-neg-hi offset)) 12)))))
 
 ;;; C3.3.2 Logical (immediate) and C3.4.5 Logical (shifted register)
 

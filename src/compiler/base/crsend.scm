@@ -227,10 +227,13 @@ USA.
     ;; After header just inserted.
     (write-bits! output-block (* scheme-object-width 2) code-block)
     (insert-objects! output-block objects (+ bl 1))
-    (let ((compiled-block
-	   (object-new-type (ucode-type compiled-code-block) output-block)))
-      ((ucode-primitive declare-compiled-code-block 1) compiled-block)
-      compiled-block)))
+    (if (implemented-primitive-procedure?
+	 (ucode-primitive install-compiled-code-block 1))
+	((ucode-primitive install-compiled-code-block 1) output-block)
+	(let ((compiled-block
+	       (object-new-type (ucode-type compiled-code-block) output-block)))
+	  ((ucode-primitive declare-compiled-code-block 1) compiled-block)
+	  compiled-block))))
 
 (define (insert-objects! v objects where)
   (let ((end (vector-length v)))

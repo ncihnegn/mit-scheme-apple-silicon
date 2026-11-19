@@ -988,6 +988,8 @@ USA.
   (files "microcode-data")
   (parent (runtime))
   (export ()
+	  code-address?
+	  code-space-bounds
 	  compiled-code-address->block
 	  compiled-code-address->offset
 	  compiled-code-address?
@@ -1015,6 +1017,7 @@ USA.
 	  environment-extension-parent
 	  environment-extension-procedure
 	  environment-extension?
+	  install-compiled-code-block
 	  make-return-address
 	  microcode-error
 	  microcode-return

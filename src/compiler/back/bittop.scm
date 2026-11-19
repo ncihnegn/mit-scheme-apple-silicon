@@ -133,34 +133,50 @@ USA.
 	       (non-pointer-length
 		((ucode-primitive make-non-pointer-object) bl))
 	       (objects-length (length objects))
-	       (total-length (fix:+ 1 (fix:+ objects-length bl)))
-	       (flo-length
-		(let ((flo-size (fix:quotient float-width scheme-datum-width)))
-		  (fix:quotient (fix:+ total-length (fix:- flo-size 1))
-				flo-size)))
-	       (output-block
-		(object-new-type (ucode-type compiled-code-block)
-				 (flo:vector-cons flo-length))))
-	  (with-absolutely-no-interrupts
-	    (lambda ()
-	      (let ((ob (object-new-type (ucode-type vector) output-block)))
-		(subvector-fill! ob
-				 (fix:+ bl 1)
-				 (system-vector-length ob)
-				 #f)
-		(vector-set! ob 0
-			     ((ucode-primitive primitive-object-set-type)
-			      (ucode-type manifest-nm-vector)
-			      non-pointer-length)))))
-	  (write-bits! output-block
-		       ;; After header just inserted.
-		       (* scheme-object-width 2)
-		       code-block)
-	  ((ucode-primitive primitive-object-set! 3)
-	   output-block 0
-	   (object-new-type (ucode-type manifest-vector) total-length))
-	  (insert-objects! output-block objects (fix:+ bl 1))
-	  output-block))))
+	       (total-length (fix:+ 1 (fix:+ objects-length bl))))
+	  (if (implemented-primitive-procedure?
+	       (ucode-primitive install-compiled-code-block 1))
+	      (let ((ob (make-vector total-length #f)))
+		(with-absolutely-no-interrupts
+		  (lambda ()
+		    (vector-set! ob 0
+				 ((ucode-primitive primitive-object-set-type)
+				  (ucode-type manifest-nm-vector)
+				  non-pointer-length))))
+		(write-bits! ob
+			     ;; After header just inserted.
+			     (* scheme-object-width 2)
+			     code-block)
+		(insert-objects! ob objects (fix:+ bl 1))
+		((ucode-primitive install-compiled-code-block 1) ob))
+	      (let* ((flo-length
+		      (let ((flo-size (fix:quotient float-width
+						    scheme-datum-width)))
+			(fix:quotient (fix:+ total-length (fix:- flo-size 1))
+				      flo-size)))
+		     (output-block
+		      (object-new-type (ucode-type compiled-code-block)
+				       (flo:vector-cons flo-length))))
+		(with-absolutely-no-interrupts
+		  (lambda ()
+		    (let ((ob (object-new-type (ucode-type vector) output-block)))
+		      (subvector-fill! ob
+				       (fix:+ bl 1)
+				       (system-vector-length ob)
+				       #f)
+		      (vector-set! ob 0
+				   ((ucode-primitive primitive-object-set-type)
+				    (ucode-type manifest-nm-vector)
+				    non-pointer-length)))))
+		(write-bits! output-block
+			     ;; After header just inserted.
+			     (* scheme-object-width 2)
+			     code-block)
+		((ucode-primitive primitive-object-set! 3)
+		 output-block 0
+		 (object-new-type (ucode-type manifest-vector) total-length))
+		(insert-objects! output-block objects (fix:+ bl 1))
+		output-block))))))
 
 (define (assemble-an-object object)
   (case (car object)

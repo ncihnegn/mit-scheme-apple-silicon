@@ -861,12 +861,8 @@ USA.
 
 (define (generate/quotation-header environment-label free-ref-label n-sections)
   (let ((continuation-label (generate-label 'LINKED)))
-    (assert (not (= r0 regnum:scratch-0)))
-    (assert (not (= r1 regnum:scratch-0)))
-    (LAP (LDR X ,r0 ,reg:environment)
-         (ADR X ,r1 (@PCR ,environment-label ,regnum:scratch-0))
-         (STR X ,r0 ,r1)
-         (ADR X ,regnum:utility-arg2 (@PCR ,*block-label* ,regnum:scratch-0))
+    environment-label                   ;Assigned by comutil_link.
+    (LAP (ADR X ,regnum:utility-arg2 (@PCR ,*block-label* ,regnum:scratch-0))
          (ADR X ,regnum:utility-arg3 (@PCR ,free-ref-label ,regnum:scratch-0))
          ,@(load-unsigned-immediate regnum:utility-arg4 n-sections)
          ,@(invoke-interface/call code:compiler-link continuation-label)
@@ -880,25 +876,16 @@ USA.
   ;; These are byte offsets.
   (assert (zero? (remainder environment-offset 8)))
   (assert (zero? (remainder free-ref-offset 8)))
-  (let ((environment-index (quotient environment-offset 8))
-        (continuation-label (generate-label 'LINKED))
+  (let ((continuation-label (generate-label 'LINKED))
         ;; arg1 will be the return address.
         (arg2 regnum:utility-arg2)
         (arg3 regnum:utility-arg3)
         (arg4 regnum:utility-arg4)
-        (temp r5)
-        (temp1 r6))
+        (temp r5))
     (assert (not (memv temp (list regnum:utility-arg1 arg2 arg3 arg4))))
-    (assert (not (memv temp1 (list regnum:utility-arg1 arg2 arg3 arg4))))
-    (LAP (LDR X ,temp ,reg:environment)
-         ;; arg2 := block address
+    (LAP ;; arg2 := block address (comutil_link assigns block environment)
          ,@(load-pc-relative arg2 code-block-label)
          ,@(object->address arg2 arg2)
-         ;; Set this block's environment.
-         ,@(if (fits-in-unsigned-12? environment-index)
-               (LAP (STR X ,temp (+ ,arg2 (&U (* 8 ,environment-index)))))
-               (LAP ,@(load-signed-immediate temp1 (* 8 environment-index))
-                    (STR X ,temp (+ ,arg2 ,temp1))))
          ;; arg3 := constants address
          ,@(add-immediate arg3 arg2 free-ref-offset (lambda () temp))
          ;; arg4 := n sections
@@ -906,7 +893,7 @@ USA.
          ,@(invoke-interface/call code:compiler-link continuation-label)
          ,@(make-external-label (continuation-code-word #f)
                                 continuation-label))))
-
+
 (define (generate/remote-links n-blocks vector-label nsects)
   (if (zero? n-blocks)
       (LAP)
@@ -916,7 +903,6 @@ USA.
              (continuation-label (generate-label 'LINKED))
              (counter r24)              ;unallocated, callee-saves
              (temp1 r5)                 ;unallocated
-             (temp2 r6)                 ;unallocated
              ;; arg1 will be return address.
              (arg2 regnum:utility-arg2)
              (arg3 regnum:utility-arg3)
@@ -924,8 +910,8 @@ USA.
         (assert (not (= counter regnum:scratch-0)))
         (assert (not (= counter regnum:utility-arg1)))
         (assert
-         (null? (eqv-set-intersection (list counter temp1 temp2)
-                                      (list arg2 arg3 arg3))))
+         (null? (eqv-set-intersection (list counter temp1)
+                                      (list arg2 arg3 arg4))))
         (LAP ,@(load-unsigned-immediate counter n-blocks)
             (LABEL ,loop-label)
              ,@(load-pc-relative arg2 vector-label)     ;arg2 := vector
@@ -933,15 +919,11 @@ USA.
              ;; effectively it is 1-based indexing.
              ,@(object->address arg2 arg2)              ;arg2 := vector addr
              (LDR X ,arg2 (+ ,arg2 (LSL ,counter 3)))   ;arg2 := vector[ctr-1]
-             ,@(object->address arg2 arg2)              ;arg2 := block addr
-             (LDR X ,temp1 ,reg:environment)            ;temp1 := environment
-             (LDR X ,temp2 ,arg2)                       ;temp2 := manifest
-             ,@(object->datum temp2 temp2)              ;temp2 := block length
-             (STR X ,temp1 (+ ,arg2 (LSL ,temp2 3)))    ;set block environment
+             ,@(object->address arg2 arg2)              ;arg2 := block addr (comutil_link assigns env)
              (LDR X ,temp1 (+ ,arg2 (&U (* 8 1))))      ;temp1 := manifest-nmv
              ,@(object->datum temp1 temp1)              ;temp1 := unmarked size
              (ADD X ,temp1 ,temp1 (&U 2))               ;move past 2 manifests
-             (ADD X ,arg3 ,arg2 (LSL ,temp1 3))         ;temp1 := consts addr
+             (ADD X ,arg3 ,arg2 (LSL ,temp1 3))         ;arg3 := consts addr
              (SUB X ,counter ,counter (&U 1))           ;ctr := ctr - 1
              (ADR X ,arg4                               ;arg4 := nsects
                   (@PCR ,nsects-label ,regnum:scratch-0))

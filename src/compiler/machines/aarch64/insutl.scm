@@ -39,6 +39,11 @@ USA.
        (<= #x-200 x #x1ff)
        x))
 
+(define (signed-14 x)
+  (and (exact-integer? x)
+       (<= #x-2000 x #x1fff)
+       x))
+
 (define (signed-19 x)
   (and (exact-integer? x)
        (<= #x-40000 x #x3ffff)
@@ -51,13 +56,35 @@ USA.
 
 (define (signed-26 x)
   (and (exact-integer? x)
-       (<= #x-04000000 x #x03ffffff)
+       (<= #x-02000000 x #x01ffffff)
        x))
 
 (define (signed-33 x)
   (and (exact-integer? x)
        (<= #x-100000000 x #xffffffff)
        x))
+
+(define (adrp-add-nonneg x)
+  (and (exact-integer? x)
+       (<= 0 x #x10fefff)
+       x))
+
+(define (adrp-add-neg x)
+  (and (exact-integer? x)
+       (<= #x-10ff000 x -1)
+       x))
+
+(define (adrp-add-nonneg-hi x)
+  (min #xfff (quotient x #x1000)))
+
+(define (adrp-add-nonneg-lo x)
+  (- x (* (adrp-add-nonneg-hi x) #x1000)))
+
+(define (adrp-add-neg-hi x)
+  (min #xfff (quotient (- x) #x1000)))
+
+(define (adrp-add-neg-lo x)
+  (+ x (* (adrp-add-neg-hi x) #x1000)))
 
 (define (unsigned-2 x)
   (and (exact-nonnegative-integer? x)

@@ -210,7 +210,33 @@ contains constants derived from the source program.
   (system-vector-ref block (- (system-vector-length block) 2)))
 
 (define (set-compiled-code-block/debugging-info! block info)
-  (system-vector-set! block (- (system-vector-length block) 2) info))
+  (let ((prim (ucode-primitive set-compiled-code-block/debugging-info! 2)))
+    (if (implemented-primitive-procedure? prim)
+	(prim block info)
+	(system-vector-set! block (- (system-vector-length block) 2) info))))
+
+(define (install-compiled-code-block block)
+  (let ((prim (ucode-primitive install-compiled-code-block 1)))
+    (if (implemented-primitive-procedure? prim)
+	(prim block)
+	(let ((compiled-block
+	       (if (compiled-code-block? block)
+		   block
+		   (object-new-type (ucode-type compiled-code-block) block))))
+	  ((ucode-primitive declare-compiled-code-block 1) compiled-block)
+	  compiled-block))))
+
+(define (code-space-bounds)
+  (let ((prim (ucode-primitive code-space-bounds 0)))
+    (if (implemented-primitive-procedure? prim)
+	(prim)
+	(cons 0 0))))
+
+(define (code-address? object)
+  (let ((prim (ucode-primitive code-address? 1)))
+    (if (implemented-primitive-procedure? prim)
+	(prim object)
+	#f)))
 
 (define (compiled-code-block/environment block)
   (system-vector-ref block (-1+ (system-vector-length block))))

@@ -96,7 +96,7 @@ USA.
   (cond ((compiled-code-address? obj)
 	 (%copy-compiled-code-address obj))
 	((compiled-code-block? obj)
-	 (%copy-compiled-code-block obj))
+	 (copy-compiled-code-block obj))
 	((not (*copy-constants?*))
 	 obj)
 	(else
@@ -144,14 +144,13 @@ USA.
 
 (define (%copy-compiled-code-block obj)
   (let* ((new (vector-copy (object-new-type (ucode-type vector) obj)))
-	 (typed (object-new-type (ucode-type compiled-code-block) new))
 	 (len (vector-length new)))
-    ((ucode-primitive declare-compiled-code-block 1) typed)
-    (add-association! obj typed)
     (do ((i (fix:+ (object-datum (vector-ref new 0)) 1) (fix:+ 1 i)))
 	((not (fix:< i len)))
       (vector-set! new i (copy-object (vector-ref new i))))
-    typed))
+    (let ((installed (install-compiled-code-block new)))
+      (add-association! obj installed)
+      installed)))
 
 (define ((%copy-pair type) obj)
   (%%copy-pair type obj))
