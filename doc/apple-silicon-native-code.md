@@ -486,14 +486,20 @@ first-class code-arena segment (`FASL_OFFSET_CODE_SIZE = 19`,
   code-arena trap frames with `"(code space)"` in
   `src/runtime/continuation-parser.scm`.
 
-### Phase 5: Packaging, CI, and Documentation (Implemented except CI workflows)
+### Phase 5: Packaging, CI, and Documentation (Implemented)
 
 - Updated `dist/make-macosx-app` and `src/etc/macosx/make-app.sh` (with
   `src/etc/macosx/entitlements.plist`) for `aarch64le` (`arm64`) and code
   signing with `com.apple.security.cs.allow-jit`.
+- Added Linux `aarch64` `HAVE_SIGCONTEXT` register/PC/SP definitions
+  (`regs[28]` / `regs[20]`) in `src/microcode/uxtrap.h` so trap recovery and
+  `"(code space)"` frame reporting match Darwin on Linux/aarch64.
 - Documented `--code` and `MITSCHEME_CODE_SIZE` in `doc/user-manual/user.texinfo`.
-- CI workflow additions for `macos-14` (arm64) and Linux/aarch64 remain to be
-  added in the repository's CI configuration.
+- Added `.github/workflows/aarch64.yml` (`macos-14` arm64 and `ubuntu-24.04-arm`
+  Linux aarch64 jobs with Stage 2 bootstrap caching) backed by reusable
+  verification scripts in `tests/ci/` (`bootstrap-and-test.sh`,
+  `run-microcode-smoke.sh`, `check-results.py`, `verify-native-aarch64.scm`,
+  `verify-trap.scm`, `verify-wx-mappings.sh`, and `verify-macos-app.sh`).
 
 ## Verification
 

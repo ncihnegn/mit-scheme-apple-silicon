@@ -1,0 +1,170 @@
+name: AArch64 Native CI
+
+on:
+  push:
+    branches:
+      - master
+      - apple-silicon
+  pull_request:
+    branches:
+      - master
+      - apple-silicon
+  workflow_dispatch:
+    inputs:
+      force_full_bootstrap:
+        description: Force clean full bootstrap (skip Stage 2 cache)
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aarch64-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  macos-arm64:
+    name: macOS arm64 (Apple Silicon)
+    runs-on: macos-14
+    timeout-minutes: 120
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Homebrew build dependencies
+        run: brew install autoconf automake libtool mit-scheme
+
+      - name: Cache Stage 2 native aarch64le host
+        id: stage2-cache
+        if: ${{ inputs.force_full_bootstrap != true }}
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/mit-scheme-stage2-native
+          key: >-
+            macos-arm64-stage2-${{
+              hashFiles(
+                'src/microcode/*.h',
+                'src/microcode/cmpintmd/aarch64*',
+                'src/compiler/**',
+                'src/runtime/**',
+                'src/sf/**',
+                'src/cref/**',
+                'src/sos/**'
+              )
+            }}
+
+      - name: Bootstrap, build, and verify native aarch64le on macOS
+        run: |
+          STAGE2_BIN="${{ runner.temp }}/mit-scheme-stage2-native/bin/mit-scheme"
+          if [ "${{ steps.stage2-cache.outputs.cache-hit }}" = "true" ] && [ -x "${STAGE2_BIN}" ]; then
+            ./tests/ci/bootstrap-and-test.sh \
+              --native-host "${STAGE2_BIN}"
+          else
+            ./tests/ci/bootstrap-and-test.sh \
+              --stage2-prefix "${{ runner.temp }}/mit-scheme-stage2-native"
+          fi
+
+  linux-aarch64:
+    name: Linux aarch64 (Ubuntu 24.04 ARM)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install APT build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential autoconf automake libtool m4 \
+            libncurses-dev libssl-dev curl ca-certificates python3
+
+      - name: Cache MIT/GNU Scheme 12.1 bootstrap host
+        id: host-12-1-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/mit-scheme-host-12.1
+          key: linux-aarch64-host-12.1-v1
+
+      - name: Build patched MIT/GNU Scheme 12.1 bootstrap host
+        if: ${{ steps.host-12-1-cache.outputs.cache-hit != 'true' }}
+        run: |
+          HOST_TMP=$(mktemp -d)
+          trap 'rm -rf "${HOST_TMP}"' EXIT
+          curl -fL \
+            https://ftp.gnu.org/gnu/mit-scheme/stable.pkg/12.1/mit-scheme-12.1-aarch64le.tar.gz \
+            -o "${HOST_TMP}/mit-scheme-12.1-aarch64le.tar.gz"
+          tar -xzf "${HOST_TMP}/mit-scheme-12.1-aarch64le.tar.gz" -C "${HOST_TMP}"
+          python3 - "${HOST_TMP}/mit-scheme-12.1/src/microcode/fasdump.c" <<'PY'
+          import sys
+
+          path = sys.argv[1]
+          with open(path, "r", encoding="utf-8") as f:
+              src = f.read()
+
+          decl_target = "  unsigned long prim_table_length;\n"
+          decl_repl = "  unsigned long prim_table_length;\n  unsigned long n_primitives;\n"
+          commit_target = (
+              "  export_renumbered_primitives\n"
+              "    ((newspace_to_tospace (prim_table_start)), current_pr);\n"
+          )
+          commit_repl = (
+              commit_target
+              + "  n_primitives = (current_pr->next_code);\n"
+              + "  current_pr = 0;\n"
+          )
+          use_target = "  (FASLHDR_N_PRIMITIVES (fh)) = (current_pr->next_code);\n"
+          use_repl = "  (FASLHDR_N_PRIMITIVES (fh)) = n_primitives;\n"
+
+          for target in (decl_target, commit_target, use_target):
+              if target not in src:
+                  raise RuntimeError(f"Expected snippet not found in {path}: {target!r}")
+
+          src = src.replace(decl_target, decl_repl, 1)
+          src = src.replace(commit_target, commit_repl, 1)
+          src = src.replace(use_target, use_repl, 1)
+
+          with open(path, "w", encoding="utf-8") as f:
+              f.write(src)
+          PY
+          cd "${HOST_TMP}/mit-scheme-12.1/src"
+          ./configure --prefix="${{ runner.temp }}/mit-scheme-host-12.1"
+          sed -i 's/ -Werror//g' microcode/Makefile
+          make -j"$(nproc)"
+          make install
+
+      - name: Cache Stage 2 native aarch64le host
+        id: stage2-cache
+        if: ${{ inputs.force_full_bootstrap != true }}
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/mit-scheme-stage2-native
+          key: >-
+            linux-aarch64-stage2-${{
+              hashFiles(
+                'src/microcode/*.h',
+                'src/microcode/cmpintmd/aarch64*',
+                'src/compiler/**',
+                'src/runtime/**',
+                'src/sf/**',
+                'src/cref/**',
+                'src/sos/**'
+              )
+            }}
+
+      - name: Bootstrap, build, and verify native aarch64le on Linux
+        run: |
+          STAGE2_BIN="${{ runner.temp }}/mit-scheme-stage2-native/bin/mit-scheme"
+          if [ "${{ steps.stage2-cache.outputs.cache-hit }}" = "true" ] && [ -x "${STAGE2_BIN}" ]; then
+            ./tests/ci/bootstrap-and-test.sh \
+              --native-host "${STAGE2_BIN}"
+          else
+            HOST_PREFIX="${{ runner.temp }}/mit-scheme-host-12.1"
+            HOST_LIB=$(ls -d "${HOST_PREFIX}"/lib/mit-scheme-* | head -n 1)
+            ./tests/ci/bootstrap-and-test.sh \
+              --host-scheme "${HOST_PREFIX}/bin/mit-scheme" \
+              --host-lib "${HOST_LIB}" \
+              --stage2-prefix "${{ runner.temp }}/mit-scheme-stage2-native"
+          fi
