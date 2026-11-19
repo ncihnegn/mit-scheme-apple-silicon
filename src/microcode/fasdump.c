@@ -127,6 +127,7 @@ at by compiled code are ignored (and discarded).")
   SCHEME_OBJECT * new_heap_start;
   SCHEME_OBJECT * prim_table_start;
   unsigned long prim_table_length;
+  unsigned long n_primitives;
   bool ok;
   PRIMITIVE_HEADER (3);
 
@@ -166,6 +167,8 @@ at by compiled code are ignored (and discarded).")
   increment_tospace_ptr (prim_table_length);
   export_renumbered_primitives
     ((newspace_to_tospace (prim_table_start)), current_pr);
+  n_primitives = (current_pr->next_code);
+  current_pr = 0;
 
   transaction_commit ();	/* 2 */
 
@@ -175,7 +178,7 @@ at by compiled code are ignored (and discarded).")
   (FASLHDR_HEAP_START (fh)) = new_heap_start;
   (FASLHDR_HEAP_END (fh)) = prim_table_start;
   (FASLHDR_ROOT_POINTER (fh)) = new_heap_start;
-  (FASLHDR_N_PRIMITIVES (fh)) = (current_pr->next_code);
+  (FASLHDR_N_PRIMITIVES (fh)) = n_primitives;
   (FASLHDR_PRIMITIVE_TABLE_SIZE (fh)) = prim_table_length;
   finalize_fasl_header (dumped_ephemeron_count);
 
