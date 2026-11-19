@@ -30,8 +30,9 @@ USA.
 #include "scheme.h"
 #include "jit.h"
 
-#include <sys/wait.h>
-#include <unistd.h>
+#ifdef SCM_JIT_APPLE
+#  include <pthread.h>
+#endif
 
 #define CHECK(cond) do							\
 {									\
@@ -122,33 +123,40 @@ sigusr1_handler (int signo)
   sigusr1_seen = 1;
   siglongjmp (sigusr1_env, 1);
 }
-#endif
 
-#if defined(SCM_JIT_APPLE) && defined(CC_IS_NATIVE)
-static bool
-child_faults_writing (volatile uint32_t * target)
+static sigjmp_buf rx_fault_env;
+static volatile sig_atomic_t rx_fault_seen = 0;
+
+static void
+rx_fault_handler (int signo)
 {
-  pid_t pid;
-  int status = 0;
+  (void) signo;
+  rx_fault_seen = 1;
+  siglongjmp (rx_fault_env, 1);
+}
 
-  fflush (0);
-  pid = (fork ());
-  if (pid < 0)
-    {
-      perror ("fork");
-      abort ();
-    }
-  if (pid == 0)
+static bool
+rx_write_faults (volatile uint32_t * target)
+{
+  struct sigaction sa;
+  struct sigaction old_bus;
+  struct sigaction old_segv;
+
+  memset ((&sa), 0, (sizeof (sa)));
+  sa.sa_handler = rx_fault_handler;
+  sigemptyset (&sa.sa_mask);
+  CHECK ((sigaction (SIGBUS, (&sa), (&old_bus))) == 0);
+  CHECK ((sigaction (SIGSEGV, (&sa), (&old_segv))) == 0);
+
+  rx_fault_seen = 0;
+  if ((sigsetjmp (rx_fault_env, 1)) == 0)
     {
       *target = 0U;
-      _exit (0);
     }
-  if ((waitpid (pid, (&status), 0)) != pid)
-    {
-      perror ("waitpid");
-      abort ();
-    }
-  return (WIFSIGNALED (status));
+
+  CHECK ((sigaction (SIGBUS, (&old_bus), 0)) == 0);
+  CHECK ((sigaction (SIGSEGV, (&old_segv), 0)) == 0);
+  return (rx_fault_seen != 0);
 }
 #endif
 
@@ -209,36 +217,49 @@ main (void)
 	    JIT_SMOKE_TOTAL);
 
 #ifdef SCM_JIT_APPLE
-    /* 4. Confirm RX enforcement via child write fault in RX mode. */
-    CHECK (child_faults_writing (&insns[2]));
-    printf ("[4/%d] RX hardware write fault verified in child\n",
-	    JIT_SMOKE_TOTAL);
-
-    /* 5. Recover from siglongjmp inside an open write bracket. */
     {
-      struct sigaction sa;
-      struct sigaction old_sa;
-      memset ((&sa), 0, (sizeof (sa)));
-      sa.sa_handler = sigusr1_handler;
-      sigemptyset (&sa.sa_mask);
-      CHECK ((sigaction (SIGUSR1, (&sa), (&old_sa))) == 0);
+      int jit_wp_supported = (pthread_jit_write_protect_supported_np ());
 
-      if ((sigsetjmp (sigusr1_env, 1)) == 0)
+      /* 4. Confirm RX enforcement via hardware fault in RX mode (when APRR/SPRR is supported). */
+      if (jit_wp_supported != 0)
 	{
-	  jit_write_begin ();
-	  CHECK ((jit_write_nesting_depth ()) == 1);
-	  raise (SIGUSR1);
-	  abort ();
+	  CHECK (rx_write_faults (&insns[2]));
+	  printf ("[4/%d] RX hardware write fault verified\n",
+		  JIT_SMOKE_TOTAL);
 	}
-      CHECK (sigusr1_seen == 1);
-      CHECK ((jit_write_nesting_depth ()) == 1);
-      jit_force_execute_mode ();
-      CHECK ((jit_write_nesting_depth ()) == 0);
-      CHECK ((fn (10)) == 110);
-      CHECK (child_faults_writing (&insns[2]));
-      CHECK ((sigaction (SIGUSR1, (&old_sa), 0)) == 0);
-      printf ("[5/%d] siglongjmp APRR_EL0 / jit_force_execute_mode recovery OK\n",
-	      JIT_SMOKE_TOTAL);
+      else
+	{
+	  printf ("[4/%d] skipped RX hardware write fault (pthread_jit_write_protect_supported_np() == 0)\n",
+		  JIT_SMOKE_TOTAL);
+	}
+
+      /* 5. Recover from siglongjmp inside an open write bracket. */
+      {
+	struct sigaction sa;
+	struct sigaction old_sa;
+	memset ((&sa), 0, (sizeof (sa)));
+	sa.sa_handler = sigusr1_handler;
+	sigemptyset (&sa.sa_mask);
+	CHECK ((sigaction (SIGUSR1, (&sa), (&old_sa))) == 0);
+
+	if ((sigsetjmp (sigusr1_env, 1)) == 0)
+	  {
+	    jit_write_begin ();
+	    CHECK ((jit_write_nesting_depth ()) == 1);
+	    raise (SIGUSR1);
+	    abort ();
+	  }
+	CHECK (sigusr1_seen == 1);
+	CHECK ((jit_write_nesting_depth ()) == 1);
+	jit_force_execute_mode ();
+	CHECK ((jit_write_nesting_depth ()) == 0);
+	CHECK ((fn (10)) == 110);
+	if (jit_wp_supported != 0)
+	  CHECK (rx_write_faults (&insns[2]));
+	CHECK ((sigaction (SIGUSR1, (&old_sa), 0)) == 0);
+	printf ("[5/%d] siglongjmp APRR_EL0 / jit_force_execute_mode recovery OK\n",
+		JIT_SMOKE_TOTAL);
+      }
     }
 #else
     printf ("[4/%d] skipped RX child fault test (non-SCM_JIT_APPLE)\n",

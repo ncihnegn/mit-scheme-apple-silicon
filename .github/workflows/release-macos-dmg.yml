@@ -50,10 +50,10 @@ jobs:
           echo "${TEXINFO_BIN}" >> "$GITHUB_PATH"
           "${TEXINFO_BIN}/makeinfo" --version | head -n 1
 
-      - name: Cache Stage 2 native aarch64le host
+      - name: Restore Stage 2 native aarch64le host cache
         id: stage2-cache
         if: ${{ inputs.force_full_bootstrap != true }}
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/mit-scheme-stage2-native
           key: >-
@@ -69,18 +69,25 @@ jobs:
               )
             }}
 
-      - name: Bootstrap, build, and verify native aarch64le
+      - name: Build Stage 2 native aarch64le host
+        if: ${{ steps.stage2-cache.outputs.cache-hit != 'true' }}
         run: |
-          STAGE2_BIN="${{ runner.temp }}/mit-scheme-stage2-native/bin/mit-scheme"
-          if [ "${{ steps.stage2-cache.outputs.cache-hit }}" = "true" ] && [ -x "${STAGE2_BIN}" ]; then
-            ./tests/ci/bootstrap-and-test.sh \
-              --skip-macos-app \
-              --native-host "${STAGE2_BIN}"
-          else
-            ./tests/ci/bootstrap-and-test.sh \
-              --skip-macos-app \
-              --stage2-prefix "${{ runner.temp }}/mit-scheme-stage2-native"
-          fi
+          ./tests/ci/bootstrap-and-test.sh \
+            --stage2-only \
+            --stage2-prefix "${{ runner.temp }}/mit-scheme-stage2-native"
+
+      - name: Save Stage 2 native aarch64le host cache
+        if: ${{ inputs.force_full_bootstrap != true && steps.stage2-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/mit-scheme-stage2-native
+          key: ${{ steps.stage2-cache.outputs.cache-primary-key }}
+
+      - name: Build and verify native aarch64le (Stage 3)
+        run: |
+          ./tests/ci/bootstrap-and-test.sh \
+            --skip-macos-app \
+            --native-host "${{ runner.temp }}/mit-scheme-stage2-native/bin/mit-scheme"
 
       - name: Build, package, and verify macOS DMG
         env:

@@ -17,6 +17,7 @@ JOBS=""
 SKIP_BUILD=0
 SKIP_CHECK=0
 SKIP_MACOS_APP=0
+STAGE2_ONLY=0
 CLEAN_AFTER=0
 
 usage() {
@@ -24,6 +25,7 @@ usage() {
 Usage: $0 [OPTIONS]
   --native-host PATH     Existing 13.x native aarch64le mit-scheme binary (skips Stage 1 & Stage 2)
   --stage2-prefix PATH   Install prefix for Stage 2 native host (default: temp dir)
+  --stage2-only          Bootstrap and install Stage 2 native host only, then exit
   --host-scheme PATH     Bootstrap host scheme binary (12.1 svm1 or patched 12.1 aarch64le)
   --host-lib PATH        Bootstrap host library directory
   --jobs N               Parallel make jobs (default: CPU count)
@@ -71,6 +73,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --skip-macos-app)
             SKIP_MACOS_APP=1
+            shift
+            ;;
+        --stage2-only)
+            STAGE2_ONLY=1
             shift
             ;;
         --clean-after)
@@ -406,6 +412,12 @@ run_verifications() {
         "${SCRIPT_DIR}/verify-macos-app.sh" --src-dir "${SRC_DIR}" --clean
     fi
 }
+
+if [ "${STAGE2_ONLY}" -eq 1 ]; then
+    build_stage2
+    echo "STAGE2_ONLY_OK"
+    exit 0
+fi
 
 if [ "${SKIP_BUILD}" -eq 0 ]; then
     if [ -n "${NATIVE_HOST}" ]; then
