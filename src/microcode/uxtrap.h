@@ -558,6 +558,16 @@ struct full_sigcontext
 #    define SIGCONTEXT_PC(scp) (__SIGCONTEXT_REG (scp, REG_RIP))
 #    define SIGCONTEXT_RFREE(scp) (__SIGCONTEXT_REG (scp, REG_RDI))
 #  endif /* __x86_64__ */
+
+#  ifdef __aarch64__
+#    define HAVE_SIGCONTEXT
+#    define SIGCONTEXT_NREGS 31
+#    define SIGCONTEXT_FIRST_REG(scp) (& ((((scp) -> uc_mcontext) . regs) [0]))
+#    define SIGCONTEXT_SP(scp) ((unsigned long) (((scp) -> uc_mcontext) . sp))
+#    define SIGCONTEXT_PC(scp) ((unsigned long) (((scp) -> uc_mcontext) . pc))
+#    define SIGCONTEXT_SCHSP(scp) ((unsigned long) ((((scp) -> uc_mcontext) . regs) [28]))
+#    define SIGCONTEXT_RFREE(scp) ((unsigned long) ((((scp) -> uc_mcontext) . regs) [20]))
+#  endif /* __aarch64__ */
 
 #  else /* not _POSIX_REALTIME_SIGNALS */
 
