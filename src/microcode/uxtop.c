@@ -38,7 +38,6 @@ USA.
 
 #ifdef __APPLE__
 #  include <CoreServices/CoreServices.h>
-   extern const char * OS_current_user_home_directory (void);
    static CFURLRef macosx_default_band_url (void);
 #endif
 
@@ -104,11 +103,20 @@ OS_initialize (void)
 #endif
 #ifdef __APPLE__
   /* If in MacOS X application bundle, force working directory to
-     user's home directory.  */
+     user's home directory without aborting into an uninitialized
+     interpreter if getlogin() points to an inaccessible directory
+     (e.g., under non-login CI daemons where getlogin() returns root).  */
   if (macosx_in_app_p ())
     {
-      const char * home_dir = OS_current_user_home_directory ();
-      if (home_dir != 0)
+      const char * home_dir = (UX_getenv ("HOME"));
+      if ((home_dir == 0) || (home_dir[0] == '\0'))
+	{
+	  struct passwd * entry = (UX_getpwuid (UX_getuid ()));
+	  if (entry != 0)
+	    home_dir = (entry -> pw_dir);
+	}
+      if ((home_dir != 0) && (home_dir[0] != '\0')
+	  && ((UX_chdir (home_dir)) == 0))
 	OS_set_working_dir_pathname (home_dir);
     }
 #endif
