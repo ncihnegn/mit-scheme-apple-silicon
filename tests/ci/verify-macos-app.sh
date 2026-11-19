@@ -90,11 +90,10 @@ fi
 
 echo "=== Executing signed bundle binary ==="
 OUT=$("${BUNDLE_BIN}" \
-    --library "${BUNDLE_RES}" \
-    --band all.com \
+    --macosx-application \
     --batch-mode \
     --no-init-file \
-    --eval '(begin (let ((f (compile-procedure (lambda (x) (* x x))))) (if (not (= (f 9) 81)) (error "bundle check failed")) (display "MACOS_APP_BUNDLE_OK\n")) (%exit))' \
+    --eval '(begin (load-option (quote edwin)) (load-option (quote imail)) (let ((f (compile-procedure (lambda (x) (* x x))))) (if (not (= (f 9) 81)) (error "bundle check failed")) (display "MACOS_APP_BUNDLE_OK\n")) (%exit))' \
     </dev/null)
 printf '%s\n' "${OUT}"
 if ! printf '%s\n' "${OUT}" | grep -q 'MACOS_APP_BUNDLE_OK'; then

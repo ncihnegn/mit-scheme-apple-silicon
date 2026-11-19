@@ -143,12 +143,16 @@ cleanup() {
 trap cleanup EXIT
 
 clean_tree() {
+    if [ -f "${SRC_DIR}/imail/Makefile" ]; then
+        make -C "${SRC_DIR}/imail" distclean || true
+    fi
     if [ -f "${SRC_DIR}/Makefile" ]; then
         make -C "${SRC_DIR}" distclean || true
     fi
     if [ -f "${SRC_DIR}/microcode/Makefile" ]; then
         make -C "${SRC_DIR}/microcode" distclean || true
     fi
+    rm -f "${SRC_DIR}/edwin/stamp-scheme" "${SRC_DIR}/imail/stamp-scheme"
     if [ -f "${REPO_ROOT}/tests/ffi/Makefile" ]; then
         make -C "${REPO_ROOT}/tests/ffi" maintainer-clean || true
     fi

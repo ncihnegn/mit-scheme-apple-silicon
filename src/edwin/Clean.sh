@@ -36,4 +36,4 @@ fi
 ../etc/Clean.sh "${1}"
 . ../etc/functions.sh
 
-maybe_rm edwin.bld
+maybe_rm edwin.bld stamp-scheme
