@@ -573,7 +573,7 @@ apply_extended_procedure (SCHEME_OBJECT proc)
     = 1             // vector header
       + size
       // rest list:
-      + (nargs > nfixed) ? 2 * (nargs - nfixed) : 0;
+      + ((nargs > nfixed) ? 2 * (nargs - nfixed) : 0);
   if (GC_NEEDED_P (nwords))
     return apply_immediate_gc (nwords);
   increment_sp (1);             // discard apply-frame header

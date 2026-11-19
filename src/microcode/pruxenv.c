@@ -271,7 +271,7 @@ DEFINE_PRIMITIVE ("MACOSX-MAIN-BUNDLE-DIR",
 
     if (path == 0)
       PRIMITIVE_RETURN (SHARP_F);
-    n_words = (1 + (legacy_string_length_TO_GC_LENGTH (strlen (path))));
+    n_words = (1 + (legacy_string_length_to_gc_length (strlen (path))));
     if (GC_NEEDED_P (n_words))
       {
 	UX_free ((void *) path);
