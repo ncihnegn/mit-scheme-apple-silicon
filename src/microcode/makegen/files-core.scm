@@ -39,6 +39,7 @@ USA.
 "chacha20"
 "chacha8"
 "char"
+"code_arena"
 "daemon"
 "debug"
 "dfloat"
