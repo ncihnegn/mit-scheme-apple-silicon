@@ -132,6 +132,13 @@ GLOBAL(C_to_interface)
 	stp	x25, x26, [sp,#64]
 	stp	x27, x28, [sp,#80]
 
+	// Preserve arguments across the C call to restore W^X execute
+	// mode before entering JIT-mapped Scheme code.  Use x21/x22 so
+	// setting REGS (x19) and HOOKS (x23) cannot clobber them.
+	mov	x21, x0
+	mov	x22, x1
+	bl	SYMBOL(jit_force_execute_mode)
+
 	// Set up Scheme registers:
 	// - interpreter registers
 	// - hook table
@@ -141,10 +148,9 @@ GLOBAL(C_to_interface)
 	ADRL(HOOKS,hooks)		// address of hook table
 
 	// Set parameters for interface_to_scheme.  Note
-	// APPLICAND_PC=x17, APPLICAND=x1, so ordering is important
-	// here.
-	mov	APPLICAND_PC, x1
-	mov	APPLICAND, x0
+	// APPLICAND_PC=x17, APPLICAND=x1.
+	mov	APPLICAND_PC, x22
+	mov	APPLICAND, x21
 
 	b	SYMBOL(interface_to_scheme)
 END(C_to_interface)

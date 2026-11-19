@@ -29,6 +29,7 @@ USA.
 
 #include "cmpint.h"
 #include "prims.h"
+#include "jit.h"
 
 extern void * tospace_to_newspace (void *);
 extern void * newspace_to_tospace (void *);
@@ -285,33 +286,9 @@ write_uuo_target (insn_t * target, SCHEME_OBJECT * saddr)
 	  (iaddr[1]) = (0x14000000UL | imm26);
 	}
       else
-	{
-	  /* ADRP computes PC - (PC mod 2^12) + 2^12*offset.  We know
-	     target - PC, and we want target.  First we add the page
-	     offset; then we add target's location in its page.  */
-	  uintptr_t from_pg = (((uintptr_t) from_pc) >> 12);
-	  uintptr_t to_pg = (((uintptr_t) to_pc) >> 12);
-	  ptrdiff_t pgoff = (((intptr_t) to_pg) - ((intptr_t) from_pg));
-	  if ((-0x00100000 <= pgoff) && (pgoff <= 0x000fffff))
-	    {
-	      unsigned lo12 =
-		(((uintptr_t) to_pc) - (((uintptr_t) to_pg) << 12));
-	      unsigned pglo2 = (pgoff & 3);
-	      unsigned pghi19 = ((pgoff & 0x001fffff) >> 2);
-	      assert (to_pc == ((char *) (to_pg + lo12)));
-	      assert
-		(to_pg == (from_pg + (((unsigned long) pghi19 << 2) | pglo2)));
-	      /* adrp x17, target */
-	      (iaddr[1]) = (0x90000011UL | (pglo2 << 29) | (pghi19 << 5));
-	      /* add x17, x17, #off */
-	      (iaddr[2]) = (0x91000231UL | (lo12 << 10));
-	      /* br x17 */
-	      (iaddr[3]) = 0xd61f0220UL;
-	    }
-	  else
-	    /* You have too much memory.  */
-	    error_external_return ();
-	}
+	/* br x1 (target is already loaded in x1; ADRP cannot reach
+	   across separate MAP_JIT/heap mappings beyond +/-4 GiB).  */
+	(iaddr[1]) = 0xd61f0020UL;
     }
   else
     {
@@ -361,49 +338,13 @@ store_trampoline_insns (insn_t * entry, uint8_t code)
 void
 aarch64_reset_hook (void)
 {
-  /* XXX Make sure we're mapped write and execute.  (Such is the state...)  */
-}
-
-static inline void
-aarch64_cache_line_sizes (unsigned *dsizep, unsigned *isizep)
-{
-  uint64_t ctr_el0, dsize, isize;
-
-  asm volatile ("\n\
-    mrs %0, ctr_el0\n\
-    ubfx %1, %0, #16, #4\n\
-    ubfx %2, %0, #0, #4\n\
-  " : "=r"(ctr_el0), "=r"(dsize), "=r"(isize));
-  (*dsizep) = dsize;
-  (*isizep) = isize;
+  jit_force_execute_mode ();
 }
 
 void
 aarch64_flush_i_cache_region (SCHEME_OBJECT * start, size_t nwords)
 {
-  unsigned dsize, isize;
-  size_t nbytes = (nwords * (sizeof (SCHEME_OBJECT)));
-  char * p;
-  size_t n;
-
-  /* Get the cache line sizes.  */
-  aarch64_cache_line_sizes ((&dsize), (&isize));
-
-  /* Flush the data cache lines.  */
-  n = ((nbytes + (dsize - 1)) / dsize);
-  for (p = ((char *) start); n --> 0; p += dsize)
-    asm volatile ("dc cvau, %0" : : "r"(p));
-
-  /* All data writes must complete before any following data reads.  */
-  asm volatile ("dsb ish");
-
-  /* Flush the instruction cache lines.  */
-  n = ((nbytes + (isize - 1)) / isize);
-  for (p = ((char *) start); n --> 0; p += isize)
-    asm volatile ("ic ivau, %0" : : "r"(p));
-
-  /* All cache flushes happen before any following instruction fetches.  */
-  asm volatile ("isb");
+  jit_flush_icache (start, (nwords * (sizeof (SCHEME_OBJECT))));
 }
 
 void

@@ -33,6 +33,7 @@ USA.
 #include "option.h"
 #include "ostop.h"
 #include "gccode.h"
+#include "jit.h"
 
 #ifdef HAVE_SIGCONTEXT
 #  define ENABLE_TRAP_RECOVERY 1
@@ -786,6 +787,7 @@ trap_dump_core (void)
 static void
 trap_recover (void)
 {
+  jit_force_execute_mode ();
   if (WITHIN_CRITICAL_SECTION_P ())
     {
       CLEAR_CRITICAL_SECTION_HOOK ();

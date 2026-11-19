@@ -760,6 +760,28 @@ typedef struct
 #    define SIGCONTEXT_RFREE(scp) (((scp) -> uc_mcontext -> __ss) . __rdi)
 #  endif /* __x86_64__ */
 
+#  ifdef __aarch64__
+#    define HAVE_SIGCONTEXT
+#    define SIGCONTEXT_FIRST_REG(scp) (& ((scp) -> uc_mcontext -> __ss))
+#    define SIGCONTEXT_NREGS						\
+  (((sizeof (_STRUCT_ARM_THREAD_STATE64)) + (SIZEOF_UNSIGNED_LONG - 1))	\
+   / SIZEOF_UNSIGNED_LONG)
+#    ifdef __darwin_arm_thread_state64_get_sp
+#      define SIGCONTEXT_SP(scp)					\
+  ((unsigned long) (__darwin_arm_thread_state64_get_sp (((scp) -> uc_mcontext) -> __ss)))
+#    else
+#      define SIGCONTEXT_SP(scp) (((scp) -> uc_mcontext -> __ss) . __sp)
+#    endif
+#    ifdef __darwin_arm_thread_state64_get_pc
+#      define SIGCONTEXT_PC(scp)					\
+  ((unsigned long) (__darwin_arm_thread_state64_get_pc (((scp) -> uc_mcontext) -> __ss)))
+#    else
+#      define SIGCONTEXT_PC(scp) (((scp) -> uc_mcontext -> __ss) . __pc)
+#    endif
+#    define SIGCONTEXT_SCHSP(scp) (((scp) -> uc_mcontext -> __ss) . __x[28])
+#    define SIGCONTEXT_RFREE(scp) (((scp) -> uc_mcontext -> __ss) . __x[20])
+#  endif /* __aarch64__ */
+
 #  define INITIALIZE_UX_SIGNAL_CODES() do				\
 {									\
   DECLARE_UX_SIGNAL_CODE						\

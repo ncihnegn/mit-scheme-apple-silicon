@@ -31,6 +31,7 @@ USA.
 #include "trap.h"
 #include "lookup.h"
 #include "history.h"
+#include "jit.h"
 
 extern void * obstack_chunk_alloc (size_t);
 #define obstack_chunk_free free
@@ -124,6 +125,7 @@ abort_to_interpreter (int argument)
   unsigned long old_mask = GET_INT_MASK;
   SET_INTERRUPT_MASK (0);
   dstack_set_position (interpreter_state->dstack_position);
+  jit_force_execute_mode ();
   SET_INTERRUPT_MASK (old_mask);
   obstack_free (&scratch_obstack, 0);
   obstack_init (&scratch_obstack);

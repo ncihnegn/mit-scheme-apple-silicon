@@ -52,10 +52,8 @@ uuo	0x0c	4 ldr x1, target		; Load entry address.
 target	0x00	8 <entry address>
 	0x08	4 <frame size>
 uuo	0x0c	4 ldr x1, target		; Load entry address.
-	0x10	4 adrp x17, target_pc		; Load PC-relative page addr.
-	0x14	4 add x17, x17, #page_offset	: Add page offset.
-	0x18	4 br x17
-	0x1c	4 (padding)
+	0x10	4 br x1				; Branch to target.
+	0x14	12 (padding)
 	0x20
 
 	(after linking, pointing to closure)
@@ -87,10 +85,8 @@ uuo	0x08	4 ldr x1, target		; Load entry address.
 	(after linking, pointing to far open procedure)
 target	0x00	8 <entry address>
 uuo	0x08	4 ldr x1, target		; Load entry address.
-	0x0c	4 adrp x17, target_pc		; Load PC-relative page addr.
-	0x10	4 add x17, x17, #page_offset	; Add page offset.
-	0x14	4 br x17
-	0x18	4 (padding)
+	0x0c	4 br x1				; Branch to target.
+	0x10	12 (padding)
 	0x1c	4 <frame size>
 	0x20
 
