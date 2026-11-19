@@ -58,6 +58,7 @@ USA.
 "intern"
 "interp"
 "intprm"
+"jit"
 "keccak"
 "list"
 "lookprm"

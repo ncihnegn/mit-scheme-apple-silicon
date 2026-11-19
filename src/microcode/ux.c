@@ -745,7 +745,7 @@ mmap_heap_malloc (unsigned long requested_length)
 	  outf_error ("unable to unmap heap: %lx bytes at %p", request, addr);
     }
 
-#ifdef CC_IS_NATIVE
+#if defined(CC_IS_NATIVE) && !defined(SCM_JIT_APPLE)
   outf_error
     ("unable to mmap executable heap -- native code will probably fail");
 #endif
@@ -761,7 +761,7 @@ mmap_heap_malloc_try (unsigned long address, unsigned long request, int flags)
 {
   assert ((address == 0) || ((flags & (MAP_TRYFIXED | MAP_FIXED)) != 0));
   int prot = (PROT_READ | PROT_WRITE);
-#ifdef CC_IS_NATIVE
+#if defined(CC_IS_NATIVE) && !defined(SCM_JIT_APPLE)
   prot |= PROT_EXEC;
 #endif
   flags |= (MAP_PRIVATE | MAP_ANONYMOUS);
