@@ -498,10 +498,12 @@ first-class code-arena segment (`FASL_OFFSET_CODE_SIZE = 19`,
   `"(code space)"` frame reporting match Darwin on Linux/aarch64.
 - Documented `--code` and `MITSCHEME_CODE_SIZE` in `doc/user-manual/user.texinfo`.
 - Added `.github/workflows/aarch64.yml` (`macos-14` arm64 and `ubuntu-24.04-arm`
-  Linux aarch64 jobs with Stage 2 bootstrap caching) backed by reusable
-  verification scripts in `tests/ci/` (`bootstrap-and-test.sh`,
-  `run-microcode-smoke.sh`, `check-results.py`, `verify-native-aarch64.scm`,
-  `verify-trap.scm`, `verify-wx-mappings.sh`, and `verify-macos-app.sh`).
+  Linux aarch64 jobs with Stage 2 bootstrap caching) and
+  `.github/workflows/release-macos-dmg.yml` (tag/dispatch macOS DMG packaging and
+  GitHub Release publishing) backed by reusable verification scripts in
+  `tests/ci/` (`bootstrap-and-test.sh`, `run-microcode-smoke.sh`,
+  `check-results.py`, `verify-native-aarch64.scm`, `verify-trap.scm`,
+  `verify-wx-mappings.sh`, `verify-macos-app.sh`, and `build-macos-dmg.sh`).
 
 ## Verification
 
