@@ -25,8 +25,30 @@ file named COPYING.  Among other things, the copyright notice
 and this notice must be preserved on all copies.  */
 
 #include "config.h"
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
 
-extern char * tparm (const char *, ...);
+#if defined(HAVE_NCURSES_H) || defined(HAVE_CURSES_H)
+#  undef false
+#  undef true
+#  ifdef HAVE_TERMIOS_H
+#    include <termios.h>
+#  endif
+#  if defined(HAVE_NCURSES_H)
+#    include <ncurses.h>
+#  elif defined(HAVE_CURSES_H)
+#    include <curses.h>
+#  endif
+#endif
+
+#if defined(HAVE_TERM_H)
+#  include <term.h>
+#else
+   extern char * tparm (const char *, ...);
+#endif
+
+extern char * tparam (const char *, char *, int, ...);
 
 /* Interface to curses/terminfo library.
    Turns out that all of the terminfo-level routines look
@@ -35,22 +57,32 @@ extern char * tparm (const char *, ...);
    format is different too.  */
 
 char *
-tparam (const char * string,
-       char * outstring,
-       int len,
-       int arg1,
-       int arg2,
-       int arg3,
-       int arg4,
-       int arg5,
-       int arg6,
-       int arg7,
-       int arg8,
-       int arg9)
+tparam (const char * string, char * outstring, int len, ...)
 {
-  char * temp = (tparm (string, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9));
-  if (outstring == 0)
-    outstring = ((char *) (malloc ((strlen (temp)) + 1)));
-  strcpy (outstring, temp);
+  va_list ap;
+  long arg1, arg2, arg3, arg4;
+  char * temp;
+  size_t needed;
+
+  va_start (ap, len);
+  arg1 = (va_arg (ap, int));
+  arg2 = (va_arg (ap, int));
+  arg3 = (va_arg (ap, int));
+  arg4 = (va_arg (ap, int));
+  va_end (ap);
+
+  /* NCURSES_CONST expands to empty on macOS SDK headers, so cast away const. */
+  temp = (tparm (((char *) string),
+		 arg1, arg2, arg3, arg4, 0L, 0L, 0L, 0L, 0L));
+  if (temp == 0)
+    return (0);
+  needed = ((strlen (temp)) + 1);
+  if ((outstring == 0) || (len <= 0) || (needed > ((size_t) len)))
+    {
+      outstring = ((char *) (malloc (needed)));
+      if (outstring == 0)
+	return (0);
+    }
+  memcpy (outstring, temp, needed);
   return (outstring);
 }

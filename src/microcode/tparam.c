@@ -117,10 +117,11 @@ what you give them.   Help stamp out software-hoarding!  */
 #define NO_ARG_ARRAY
 #endif
 
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 
-extern char * tparam (char *, char *, int, int, int, int, int);
+extern char * tparam (const char *, char *, int, ...);
 extern char * tgoto (char *, int, int);
 
 /* Assuming STRING is the value of a termcap string entry
@@ -135,23 +136,21 @@ extern char * tgoto (char *, int, int);
 
    The fourth and following args to tparam serve as the parameter values.  */
 
-char * tparam1 (char *, char *, int, char *, char *, int *);
+char * tparam1 (const char *, char *, int, char *, char *, int *);
 
 /* VARARGS 2 */
 char *
-tparam (char *string, char *outstring, int len,
-	int arg0, int arg1, int arg2, int arg3)
+tparam (const char *string, char *outstring, int len, ...)
 {
-#ifdef NO_ARG_ARRAY
   int arg[4];
-  arg[0] = arg0;
-  arg[1] = arg1;
-  arg[2] = arg2;
-  arg[3] = arg3;
+  va_list ap;
+  va_start (ap, len);
+  arg[0] = va_arg (ap, int);
+  arg[1] = va_arg (ap, int);
+  arg[2] = va_arg (ap, int);
+  arg[3] = va_arg (ap, int);
+  va_end (ap);
   return tparam1 (string, outstring, len, 0, 0, arg);
-#else
-  return tparam1 (string, outstring, len, 0, 0, &arg0);
-#endif
 }
 
 char *BC;
@@ -171,11 +170,11 @@ tgoto (char *cm, int hpos, int vpos)
 }
 
 char *
-tparam1 (char *string, char *outstring, int len, char *up, char *left,
+tparam1 (const char *string, char *outstring, int len, char *up, char *left,
 	 int *argp)
 {
   int c;
-  char *p = string;
+  const char *p = string;
   char *op = outstring;
   char *outend;
   int outlen = 0;

@@ -69,7 +69,7 @@ USA.
    extern speed_t ospeed;
 #endif
 
-extern char * tparam (const char *, void *, int, ...);
+extern char * tparam (const char *, char *, int, ...);
 
 #ifndef TERMCAP_BUFFER_SIZE
 #define TERMCAP_BUFFER_SIZE 2048
@@ -153,10 +153,10 @@ DEFINE_PRIMITIVE ("TERMCAP-PARAM-STRING", Prim_termcap_param_string, 5, 5, 0)
     dstack_protect ((&protect_tc), (&env));
     (env . string_pointer)
       = (tparam ((STRING_ARG (1)), string_buffer, (sizeof (string_buffer)),
-		 (arg_nonnegative_integer (2)),
-		 (arg_nonnegative_integer (3)),
-		 (arg_nonnegative_integer (4)),
-		 (arg_nonnegative_integer (5))));
+		 ((int) (arg_nonnegative_integer (2))),
+		 ((int) (arg_nonnegative_integer (3))),
+		 ((int) (arg_nonnegative_integer (4))),
+		 ((int) (arg_nonnegative_integer (5)))));
     if ((env . string_pointer) == 0)
       error_external_return ();
     string = (char_pointer_to_string (env . string_pointer));
