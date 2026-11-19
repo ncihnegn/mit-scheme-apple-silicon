@@ -27,7 +27,7 @@ concurrency:
 jobs:
   macos-arm64:
     name: macOS arm64 (Apple Silicon)
-    runs-on: macos-14
+    runs-on: macos-latest
     timeout-minutes: 120
     steps:
       - name: Checkout repository

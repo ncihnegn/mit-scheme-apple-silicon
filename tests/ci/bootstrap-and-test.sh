@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # End-to-end AArch64 native bootstrap, build, and verification driver.
-# Supports macOS Apple silicon (macos-14 arm64) and Linux aarch64.
+# Supports macOS Apple silicon (macos-latest arm64) and Linux aarch64.
 
 set -euo pipefail
 
