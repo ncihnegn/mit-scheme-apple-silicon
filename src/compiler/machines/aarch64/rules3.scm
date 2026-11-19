@@ -438,7 +438,7 @@ USA.
     (LAP (CMP X ,address ,dynamic-link)
          ;; Pick the lower of the two addresses, i.e. the one
          ;; representing the most elements on the stack.
-         (CSEL X LE ,address ,address ,dynamic-link)
+         (CSEL X LS ,address ,address ,dynamic-link)
          ,@(generate/move-frame-up frame-size address))))
 
 (define (generate/move-frame-up frame-size address)
