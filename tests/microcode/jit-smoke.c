@@ -111,6 +111,7 @@ encode_old_style_format_word (cc_entry_type_t * cet, unsigned short * fwp)
 }
 #endif /* __aarch64__ && CC_IS_NATIVE */
 
+#if defined(__aarch64__) && defined(CC_IS_NATIVE) && defined(SCM_JIT_APPLE)
 static sigjmp_buf sigusr1_env;
 static volatile sig_atomic_t sigusr1_seen = 0;
 
@@ -121,8 +122,9 @@ sigusr1_handler (int signo)
   sigusr1_seen = 1;
   siglongjmp (sigusr1_env, 1);
 }
+#endif
 
-#ifdef SCM_JIT_APPLE
+#if defined(SCM_JIT_APPLE) && defined(CC_IS_NATIVE)
 static bool
 child_faults_writing (volatile uint32_t * target)
 {
@@ -167,14 +169,14 @@ main (void)
   CHECK (jit_available_p ());
   CHECK ((jit_page_size ()) >= 4096);
 
-  /* 1. Map MAP_JIT code space in RX steady state. */
+  /* 1. Map code space. */
   code = (jit_map_code_space (region_size));
   CHECK (code != 0);
   CHECK ((jit_write_nesting_depth ()) == 0);
   printf ("[1/%d] jit_map_code_space OK (%p, page=%zu)\n",
 	  JIT_SMOKE_TOTAL, code, (jit_page_size ()));
 
-#ifdef __aarch64__
+#if defined(__aarch64__) && defined(CC_IS_NATIVE)
   {
     typedef int (* add_fn_t) (int);
     volatile uint32_t * insns = ((volatile uint32_t *) code);
@@ -383,7 +385,42 @@ main (void)
 #endif /* CC_IS_NATIVE */
   }
 #else
-  printf ("[2-6/6] skipped aarch64 instruction checks (non-aarch64 host)\n");
+  {
+    volatile uint32_t * rw = ((volatile uint32_t *) code);
+    void * s1;
+    void * s2;
+    void * outer;
+
+    jit_write_begin ();
+    CHECK ((jit_write_nesting_depth ()) == 1);
+    jit_write_begin ();
+    CHECK ((jit_write_nesting_depth ()) == 2);
+    rw[0] = 0x12345678U;
+    jit_flush_icache (code, (sizeof (uint32_t)));
+    jit_write_end ();
+    CHECK ((jit_write_nesting_depth ()) == 1);
+    jit_write_end ();
+    CHECK ((jit_write_nesting_depth ()) == 0);
+    CHECK (rw[0] == 0x12345678U);
+    printf ("[2-5/%d] non-native RW code_arena write OK\n", JIT_SMOKE_TOTAL);
+
+    s1 = (jit_write_scope_begin ());
+    s2 = (jit_write_scope_begin ());
+    CHECK ((jit_write_nesting_depth ()) == 2);
+    jit_write_scope_end (s2);
+    CHECK ((jit_write_nesting_depth ()) == 1);
+    jit_write_scope_end (s1);
+    CHECK ((jit_write_nesting_depth ()) == 0);
+
+    outer = dstack_position;
+    (void) jit_write_scope_begin ();
+    CHECK ((jit_write_nesting_depth ()) == 1);
+    jit_force_execute_mode ();
+    CHECK ((jit_write_nesting_depth ()) == 0);
+    dstack_set_position (outer);
+    CHECK ((jit_write_nesting_depth ()) == 0);
+    printf ("[6/%d] dstack write-scope unwind OK\n", JIT_SMOKE_TOTAL);
+  }
 #endif
 
   jit_unmap_code_space (code, region_size);

@@ -53,7 +53,7 @@ static unsigned int jit_write_depth = 0;
 bool
 jit_available_p (void)
 {
-#if defined(SCM_JIT_APPLE) || defined(HAVE_MMAP)
+#if (defined(SCM_JIT_APPLE) && defined(CC_IS_NATIVE)) || defined(HAVE_MMAP)
   return (true);
 #else
   return (false);
@@ -99,7 +99,7 @@ jit_map_code_space (size_t byte_length)
   if (size == 0)
     return (0);
 
-#ifdef SCM_JIT_APPLE
+#if defined(SCM_JIT_APPLE) && defined(CC_IS_NATIVE)
   {
     void * addr
       = (mmap (0, size, (PROT_READ | PROT_WRITE | PROT_EXEC),
@@ -112,9 +112,13 @@ jit_map_code_space (size_t byte_length)
   }
 #elif defined(HAVE_MMAP)
   {
+#ifdef CC_IS_NATIVE
+    int prot = (PROT_READ | PROT_WRITE | PROT_EXEC);
+#else
+    int prot = (PROT_READ | PROT_WRITE);
+#endif
     void * addr
-      = (mmap (0, size, (PROT_READ | PROT_WRITE | PROT_EXEC),
-	       (MAP_PRIVATE | MAP_ANONYMOUS), -1, 0));
+      = (mmap (0, size, prot, (MAP_PRIVATE | MAP_ANONYMOUS), -1, 0));
     return ((addr == MAP_FAILED) ? 0 : addr);
   }
 #else
@@ -127,7 +131,7 @@ jit_unmap_code_space (void * addr, size_t byte_length)
 {
   if (addr == 0)
     return;
-#if defined(SCM_JIT_APPLE) || defined(HAVE_MMAP)
+#if (defined(SCM_JIT_APPLE) && defined(CC_IS_NATIVE)) || defined(HAVE_MMAP)
   {
     size_t size = (jit_round_up_pages (byte_length));
     if (size != 0)
@@ -150,7 +154,7 @@ jit_write_begin (void)
     }
   if (jit_write_depth == 0)
     {
-#ifdef SCM_JIT_APPLE
+#if defined(SCM_JIT_APPLE) && defined(CC_IS_NATIVE)
       pthread_jit_write_protect_np (0);
 #endif
     }
@@ -169,7 +173,7 @@ jit_write_end (void)
   jit_write_depth -= 1;
   if (jit_write_depth == 0)
     {
-#ifdef SCM_JIT_APPLE
+#if defined(SCM_JIT_APPLE) && defined(CC_IS_NATIVE)
       pthread_jit_write_protect_np (1);
 #endif
     }
@@ -208,7 +212,7 @@ void
 jit_force_execute_mode (void)
 {
   jit_write_depth = 0;
-#ifdef SCM_JIT_APPLE
+#if defined(SCM_JIT_APPLE) && defined(CC_IS_NATIVE)
   pthread_jit_write_protect_np (1);
 #endif
 }
