@@ -34,8 +34,28 @@ set -e
 : ${bindir=/usr/local/bin}
 : ${libdir=/usr/local/lib}
 
+: ${USE_SWIFTUI_APP=1}
+USE_SWIFTUI=0
+if [[ ${USE_SWIFTUI_APP} != 0 ]] \
+   && command -v swift >/dev/null 2>&1 \
+   && [[ -f etc/macosx/app/Package.swift ]]; then
+    USE_SWIFTUI=1
+fi
+
 MACOSX_VERSION=$(sw_vers | grep ^ProductVersion: | grep -E -o '[0-9]+\.[0-9]+')
-: ${MACOSX_MIN_VERSION=${MACOSX_VERSION}}
+if [[ ${USE_SWIFTUI} -eq 1 ]]; then
+    : ${MACOSX_MIN_VERSION=13.0}
+else
+    : ${MACOSX_MIN_VERSION=${MACOSX_VERSION}}
+fi
+
+SWIFT_BUILD_DIR=
+cleanup_build_dirs() {
+    if [[ -n ${SWIFT_BUILD_DIR} ]]; then
+        rm -rf "${SWIFT_BUILD_DIR}"
+    fi
+}
+trap cleanup_build_dirs EXIT
 
 rm -rf tmp mit-scheme.app
 
@@ -67,7 +87,25 @@ if [[ -z ${AUXDIR} ]]; then
 fi
 mv tmp"${bindir}"/"${MIT_SCHEME_EXE}" \
     mit-scheme.app/Contents/Resources/mit-scheme
-mv tmp"${AUXDIR}"/macosx-starter mit-scheme.app/Contents/MacOS/.
+if [[ ${USE_SWIFTUI} -eq 1 ]]; then
+    rm -f tmp"${AUXDIR}"/macosx-starter
+    SWIFT_BUILD_DIR=$(mktemp -d)
+    SWIFT_BUILD_FLAGS=(
+        --package-path etc/macosx/app
+        --scratch-path "${SWIFT_BUILD_DIR}"
+        -c release
+        --arch "$(uname -m)"
+    )
+    swift build "${SWIFT_BUILD_FLAGS[@]}"
+    SWIFT_BIN_DIR=$(swift build "${SWIFT_BUILD_FLAGS[@]}" --show-bin-path)
+    cp -p "${SWIFT_BIN_DIR}/MITSchemeApp" \
+        mit-scheme.app/Contents/MacOS/MITSchemeApp
+    chmod 755 mit-scheme.app/Contents/MacOS/MITSchemeApp
+    BUNDLE_EXECUTABLE=MITSchemeApp
+else
+    mv tmp"${AUXDIR}"/macosx-starter mit-scheme.app/Contents/MacOS/.
+    BUNDLE_EXECUTABLE=macosx-starter
+fi
 rm -f tmp"${AUXDIR}"/runtime.com
 mv tmp"${AUXDIR}"/* mit-scheme.app/Contents/Resources/.
 rm -rf tmp
@@ -94,7 +132,7 @@ cat > mit-scheme.app/Contents/Info.plist <<EOF
     <key>CFBundleSignature</key>
     <string>mgsc</string>
     <key>CFBundleExecutable</key>
-    <string>macosx-starter</string>
+    <string>${BUNDLE_EXECUTABLE}</string>
 
     <key>CFBundleShortVersionString</key>
     <string>${VERSION_STRING}</string>
@@ -111,6 +149,29 @@ cat > mit-scheme.app/Contents/Info.plist <<EOF
     <false/>
     <key>CFBundleIconFile</key>
     <string>appIcon.icns</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSSupportsAutomaticGraphicsSwitching</key>
+    <true/>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+      <dict>
+        <key>CFBundleTypeExtensions</key>
+        <array>
+          <string>scm</string>
+          <string>sld</string>
+          <string>ss</string>
+        </array>
+        <key>CFBundleTypeName</key>
+        <string>Scheme Source</string>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+        <key>LSHandlerRank</key>
+        <string>Alternate</string>
+      </dict>
+    </array>
   </dict>
 </plist>
 EOF
@@ -131,6 +192,7 @@ if command -v codesign >/dev/null 2>&1; then
         --entitlements etc/macosx/entitlements.plist \
         mit-scheme.app/Contents/Resources/mit-scheme
     codesign "${CODESIGN_FLAGS[@]}" \
-        --entitlements etc/macosx/entitlements.plist \
+        "mit-scheme.app/Contents/MacOS/${BUNDLE_EXECUTABLE}"
+    codesign "${CODESIGN_FLAGS[@]}" \
         mit-scheme.app
 fi

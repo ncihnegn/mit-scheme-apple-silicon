@@ -489,8 +489,10 @@ first-class code-arena segment (`FASL_OFFSET_CODE_SIZE = 19`,
 ### Phase 5: Packaging, CI, and Documentation (Implemented)
 
 - Updated `dist/make-macosx-app` and `src/etc/macosx/make-app.sh` (with
-  `src/etc/macosx/entitlements.plist`) for `aarch64le` (`arm64`) and code
-  signing with `com.apple.security.cs.allow-jit`.
+  `src/etc/macosx/entitlements.plist` and the native SwiftUI workbench port in
+  `src/etc/macosx/app/`, falling back to `macosx-starter` when `swift` is
+  unavailable) for `aarch64le` (`arm64`) and code signing with
+  `com.apple.security.cs.allow-jit`.
 - Added Linux `aarch64` `HAVE_SIGCONTEXT` register/PC/SP definitions
   (`regs[28]` / `regs[20]`) in `src/microcode/uxtrap.h` so trap recovery and
   `"(code space)"` frame reporting match Darwin on Linux/aarch64.

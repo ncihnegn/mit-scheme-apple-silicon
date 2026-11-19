@@ -79,6 +79,17 @@ if [ ! -x "${BUNDLE_BIN}" ]; then
     exit 1
 fi
 
+plutil -lint "${APP_DIR}/Contents/Info.plist"
+if command -v swift >/dev/null 2>&1 \
+   && [ -f "${SRC_DIR}/etc/macosx/app/Package.swift" ] \
+   && [ "${USE_SWIFTUI_APP:-1}" != "0" ]; then
+    SWIFTUI_BIN="${APP_DIR}/Contents/MacOS/MITSchemeApp"
+    if [ ! -x "${SWIFTUI_BIN}" ]; then
+        echo "error: SwiftUI bundle executable missing at ${SWIFTUI_BIN}" >&2
+        exit 1
+    fi
+fi
+
 echo "=== Verifying codesign signature & entitlements ==="
 codesign --verify --deep --strict --verbose=2 "${APP_DIR}"
 ENTITLEMENTS=$(codesign -d --entitlements :- "${BUNDLE_BIN}" 2>&1)
@@ -99,6 +110,16 @@ printf '%s\n' "${OUT}"
 if ! printf '%s\n' "${OUT}" | grep -q 'MACOS_APP_BUNDLE_OK'; then
     echo "error: bundle smoke check did not print MACOS_APP_BUNDLE_OK" >&2
     exit 1
+fi
+
+if command -v swift >/dev/null 2>&1 \
+   && [ -f "${SRC_DIR}/etc/macosx/app/Package.swift" ]; then
+    echo "=== Running SwiftUI workbench unit and live PTY integration tests ==="
+    env -u MIT_SCHEME_APP_LIBRARY -u MIT_SCHEME_APP_BAND \
+        MIT_SCHEME_APP_EXE="${BUNDLE_BIN}" \
+        swift test \
+        --package-path "${SRC_DIR}/etc/macosx/app" \
+        --scratch-path "${TMP_DIR}/swift-test"
 fi
 
 echo "VERIFY_MACOS_APP_OK"
