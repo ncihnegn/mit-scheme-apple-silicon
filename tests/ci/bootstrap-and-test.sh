@@ -243,7 +243,7 @@ prepare_stage1_host() {
     echo "=== Bootstrap host: ${HOST_SCHEME} (arch=${host_arch}, lib=${HOST_LIB:-default}) ==="
 
     local wrapper="${WORK_TMP}/stage1-host-scheme"
-    if [ "${host_arch}" = "svm" ]; then
+    if [ "${host_arch}" = "svm" ] || [ "${host_arch}" = "svm1" ]; then
         if [ -z "${HOST_LIB}" ] || [ ! -d "${HOST_LIB}" ]; then
             echo "error: svm1 host requires --host-lib pointing to its library directory" >&2
             exit 1
@@ -252,20 +252,24 @@ prepare_stage1_host() {
         if [ -f "${SRC_DIR}/microcode/Makefile" ]; then
             make -C "${SRC_DIR}/microcode" distclean || true
         fi
-        (cd "${SRC_DIR}/microcode" && ./Setup.sh && ./configure --enable-native-code=svm1)
+        (cd "${SRC_DIR}/microcode" && MIT_SCHEME_EXE="${HOST_SCHEME}" ./Setup.sh && ./configure --enable-native-code=svm1)
         make -C "${SRC_DIR}/microcode" -j"${JOBS}"
         cp "${SRC_DIR}/microcode/scheme" "${WORK_TMP}/svm1-scheme"
         chmod +x "${WORK_TMP}/svm1-scheme"
         make -C "${SRC_DIR}/microcode" distclean
         cat > "${wrapper}" <<EOF
 #!/bin/sh
-exec "${WORK_TMP}/svm1-scheme" --library "${HOST_LIB}" "\$@"
+: "\${MITSCHEME_LIBRARY_PATH:=${HOST_LIB}}"
+export MITSCHEME_LIBRARY_PATH
+exec "${WORK_TMP}/svm1-scheme" "\$@"
 EOF
     else
         if [ -n "${HOST_LIB}" ]; then
             cat > "${wrapper}" <<EOF
 #!/bin/sh
-exec "${HOST_SCHEME}" --library "${HOST_LIB}" "\$@"
+: "\${MITSCHEME_LIBRARY_PATH:=${HOST_LIB}}"
+export MITSCHEME_LIBRARY_PATH
+exec "${HOST_SCHEME}" "\$@"
 EOF
         else
             cat > "${wrapper}" <<EOF

@@ -143,7 +143,7 @@ TOOL_CROSS_HOST = $(TOOL_COMPILER) \
 @IF_CROSS@TOOLCHAIN = stamp_toolchain
 
 @IF_SVM_COMPILER@stamp_toolchain: compiler/machines/svm/svm1-defns.h
-stamp_toolchain: runtime/host-adapter.scm
+stamp_toolchain: runtime/host-adapter.scm runtime/generated-standard-libs
 	+$(MAKE) toolchain
 
 .PHONY: toolchain
