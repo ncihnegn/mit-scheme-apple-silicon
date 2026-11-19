@@ -38,6 +38,7 @@ USA.
 #include "history.h"
 #include "cmpgc.h"
 #include "code_arena.h"
+#include "jit.h"
 
 /* Two special classes of procedures are used in this file:
 
@@ -123,6 +124,9 @@ unsigned int compiler_interface_version;
 SCHEME_OBJECT compiler_utilities;
 SCHEME_OBJECT return_to_interpreter;
 SCHEME_OBJECT reflect_to_interface;
+#ifdef HAVE_TRAMPOLINE_TO_INTERFACE
+static insn_t * trampoline_to_interface = 0;
+#endif
 
 static bool linking_cc_block_p = 0;
 
@@ -348,14 +352,23 @@ compiler_initialize (bool fasl_p)
       /* Delay until after band-load, when compiler_reset will be invoked. */
       compiler_utilities = SHARP_F;
       return_to_interpreter = SHARP_F;
+#ifdef HAVE_TRAMPOLINE_TO_INTERFACE
+      trampoline_to_interface = 0;
+#endif
 #ifdef CC_ARCH_INITIALIZE
       CC_ARCH_INITIALIZE ();
 #endif
     }
 }
 
+#ifdef HAVE_TRAMPOLINE_TO_INTERFACE
+#  define COMPILER_UTILITIES_N_ENTRIES 3
+#else
+#  define COMPILER_UTILITIES_N_ENTRIES 2
+#endif
+
 #define COMPILER_UTILITIES_HEADERS(h1, h2, n)				\
-  make_trampoline_headers (2, 2, (h1), (h2), (n))
+  make_trampoline_headers (COMPILER_UTILITIES_N_ENTRIES, 2, (h1), (h2), (n))
 
 static SCHEME_OBJECT
 make_compiler_utilities (void)
@@ -364,17 +377,20 @@ make_compiler_utilities (void)
   SCHEME_OBJECT h2;
   unsigned long n_words;
   SCHEME_OBJECT * block;
+  void * write_scope;
 
   COMPILER_UTILITIES_HEADERS ((&h1), (&h2), (&n_words));
-  if (GC_NEEDED_P (n_words))
+  h1 = (object_new_type (TC_MANIFEST_VECTOR, h1));
+
+  block = (code_arena_alloc (n_words));
+  if (block == 0)
     {
       outf_fatal ("Can't allocate compiler_utilities.\n");
       Microcode_Termination (TERM_NO_SPACE);
     }
-  h1 = (object_new_type (TC_MANIFEST_VECTOR, h1));
 
-  block = Free;
-  Free += n_words;
+  write_scope = (code_arena_write_scope_begin ());
+  memset (block, 0, (n_words * SIZEOF_SCHEME_OBJECT));
   (block[0]) = h1;
   (block[1]) = h2;
 
@@ -389,6 +405,23 @@ make_compiler_utilities (void)
 	Microcode_Termination (TERM_COMPILER_DEATH);
 	/*NOTREACHED*/
       }
+#ifdef HAVE_TRAMPOLINE_TO_INTERFACE
+    make_cc_entry_type ((&cet), CET_TRAMPOLINE);
+    {
+      insn_t * addr = (trampoline_entry_addr (block, 2));
+      cc_entry_offset_t ceo;
+      (ceo.offset) = ((unsigned long) (addr - ((insn_t *) block)));
+      (ceo.continued_p) = false;
+      if ((write_cc_entry_type ((&cet), addr))
+	  || (write_cc_entry_offset ((&ceo), addr))
+	  || (store_trampoline_to_interface_insns (addr)))
+	{
+	  outf_fatal ("\nError in make_compiler_utilities\n");
+	  Microcode_Termination (TERM_COMPILER_DEATH);
+	  /*NOTREACHED*/
+	}
+    }
+#endif
   }
 
   /* These entries are no longer used, but are provided for
@@ -398,8 +431,9 @@ make_compiler_utilities (void)
     (store[0]) = ((trampoline_entry_addr (block, 0)) - ((insn_t *) block));
     (store[1]) = ((trampoline_entry_addr (block, 1)) - ((insn_t *) block));
   }
+  code_arena_write_scope_end (write_scope);
 
-  block = (copy_to_constant_space (block, n_words));
+  jit_flush_icache (block, (n_words * SIZEOF_SCHEME_OBJECT));
   return (MAKE_CC_BLOCK (block));
 }
 
@@ -428,6 +462,9 @@ compiler_reset (SCHEME_OBJECT new_block)
   compiler_utilities = new_block;
   return_to_interpreter = (MAKE_CC_RETURN (trampoline_return_addr (nbp, 0)));
   reflect_to_interface = (MAKE_CC_RETURN (trampoline_return_addr (nbp, 1)));
+#ifdef HAVE_TRAMPOLINE_TO_INTERFACE
+  trampoline_to_interface = (trampoline_entry_addr (nbp, 2));
+#endif
   SET_CLOSURE_FREE (0);
   SET_CLOSURE_SPACE (0);
   SET_REFLECTOR (reflect_to_interface);
@@ -857,6 +894,19 @@ DEFINE_SCHEME_UTILITY_4 (comutil_link,
   (s.n_sections) = n_sections;
   (s.n_linked_sections) = 0;
 
+  if (compiler_processor_type == COMPILER_AARCH64_TYPE)
+    {
+      SCHEME_OBJECT * env_slot = ((CC_BLOCK_ADDR_END (block_addr)) - 1);
+      if (code_address_p (block_addr))
+	{
+	  code_arena_write_begin ();
+	  (*env_slot) = GET_ENV;
+	  code_arena_write_end ();
+	}
+      else
+	(*env_slot) = GET_ENV;
+    }
+
   start_linking_cc_block ();
   {
     long result = (link_remaining_sections (&s));
@@ -1016,7 +1066,14 @@ link_section (link_cc_state_t * s)
      before START_OPERATOR_RELOCATION possibly changed it.  */
   (s->scan) = ((n_linked == 0) ? scan1 : scan);
   (s->n_linked_entries) = n_linked;
-  (* (s->scan0)) = (make_linkage_section_marker ((s->type), n_linked));
+  if (code_address_p (block_address))
+    {
+      code_arena_write_begin ();
+      (* (s->scan0)) = (make_linkage_section_marker ((s->type), n_linked));
+      code_arena_write_end ();
+    }
+  else
+    (* (s->scan0)) = (make_linkage_section_marker ((s->type), n_linked));
   if (result == PRIM_DONE)
     (s->n_linked_sections) += 1;
   else
@@ -2050,7 +2107,12 @@ int
 plausible_cc_block_p (SCHEME_OBJECT * block)
 {
   insn_t * zero = ((insn_t *) block);
-  insn_t * entry = (((insn_t *) (block + 2)) + CC_ENTRY_HEADER_SIZE);
+  insn_t * entry
+    = (((insn_t *) (block + 2))
+#ifdef CC_ENTRY_PADDING_SIZE
+       + CC_ENTRY_PADDING_SIZE
+#endif
+       + CC_ENTRY_HEADER_SIZE);
 
   if (!plausible_first_cc_entry_p (entry, zero))
     {
@@ -2200,7 +2262,15 @@ write_variable_cache (SCHEME_OBJECT cache,
 		      SCHEME_OBJECT block,
 		      unsigned long offset)
 {
-  memory_set (block, offset, ((SCHEME_OBJECT) (object_address (cache))));
+  SCHEME_OBJECT val = ((SCHEME_OBJECT) (object_address (cache)));
+  if (code_address_p (object_address (block)))
+    {
+      code_arena_write_begin ();
+      memory_set (block, offset, val);
+      code_arena_write_end ();
+    }
+  else
+    memory_set (block, offset, val);
 }
 
 /* Get a compiled procedure from a cached operator reference. */
@@ -2215,7 +2285,14 @@ read_uuo_link (SCHEME_OBJECT block, unsigned long offset)
 static void
 write_uuo_link (SCHEME_OBJECT target, SCHEME_OBJECT * cache_address)
 {
-  write_uuo_target ((CC_ENTRY_ADDRESS (target)), cache_address);
+  if (code_address_p (cache_address))
+    {
+      code_arena_write_begin ();
+      write_uuo_target ((CC_ENTRY_ADDRESS (target)), cache_address);
+      code_arena_write_end ();
+    }
+  else
+    write_uuo_target ((CC_ENTRY_ADDRESS (target)), cache_address);
 #ifdef FLUSH_I_CACHE_REGION
   if (!linking_cc_block_p)
     {
@@ -2814,6 +2891,56 @@ make_trampoline (SCHEME_OBJECT * slot,
 		 unsigned int n_values,
 		 ...)
 {
+#ifdef HAVE_TRAMPOLINE_TO_INTERFACE
+  unsigned long n_words = (5 + n_values);
+  SCHEME_OBJECT * block;
+  insn_t * start;
+  insn_t * entry0;
+
+  if (trampoline_to_interface == 0)
+    return (ERR_COMPILED_CODE_ERROR);
+  if (GC_NEEDED_P (n_words))
+    {
+      REQUEST_GC (n_words);
+      return (PRIM_INTERRUPT);
+    }
+  block = Free;
+  Free += n_words;
+  (block[0]) = (make_object (TC_MANIFEST_CLOSURE, (n_words - 1)));
+  (block[1]) = 0;
+  (* ((uint32_t *) (block + 1))) = 1;
+  (block[2]) = 0;
+
+  start = (compiled_closure_start (block + 1));
+  entry0 = (compiled_closure_entry (start));
+  if ((entry0 != ((insn_t *) (block + 3)))
+      || (write_cc_entry_type (cet, entry0)))
+    return (ERR_COMPILED_CODE_ERROR);
+  {
+    cc_entry_offset_t ceo;
+    (ceo.offset) = ((unsigned long) (entry0 - ((insn_t *) block)));
+    (ceo.continued_p) = false;
+    if (write_cc_entry_offset ((&ceo), entry0))
+      return (ERR_COMPILED_CODE_ERROR);
+  }
+  write_compiled_closure_target (trampoline_to_interface, start);
+  (block[3]) = (ULONG_TO_FIXNUM ((unsigned long) kind));
+  {
+    SCHEME_OBJECT * p = (block + 4);
+    va_list ap;
+
+    va_start (ap, n_values);
+    while (n_values > 0)
+      {
+	(*p++) = (va_arg (ap, SCHEME_OBJECT));
+	n_values -= 1;
+      }
+    va_end (ap);
+  }
+  (block[n_words - 1]) = (MAKE_CC_ENTRY (entry0));
+  (*slot) = (MAKE_CC_ENTRY (entry0));
+  return (PRIM_DONE);
+#else
   SCHEME_OBJECT h1;
   SCHEME_OBJECT h2;
   unsigned long n_words;
@@ -2845,6 +2972,7 @@ make_trampoline (SCHEME_OBJECT * slot,
   }
   (*slot) = (MAKE_CC_ENTRY (trampoline_entry_addr (block, 0)));
   return (PRIM_DONE);
+#endif
 }
 
 static void
@@ -2891,6 +3019,8 @@ fill_trampoline (SCHEME_OBJECT * block,
 SCHEME_OBJECT *
 trampoline_storage (SCHEME_OBJECT * block)
 {
+  if ((object_type (block[0])) == TC_MANIFEST_CLOSURE)
+    return (block + 4);
   return (block + 2 + (object_datum (block[1])));
 }
 

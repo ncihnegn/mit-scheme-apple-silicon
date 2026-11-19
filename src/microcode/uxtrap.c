@@ -34,6 +34,7 @@ USA.
 #include "ostop.h"
 #include "gccode.h"
 #include "jit.h"
+#include "code_arena.h"
 
 #ifdef HAVE_SIGCONTEXT
 #  define ENABLE_TRAP_RECOVERY 1
@@ -80,6 +81,7 @@ enum pc_location
 {
   pcl_heap,
   pcl_constant,
+  pcl_code,
   pcl_builtin,
   pcl_utility,
   pcl_primitive,
@@ -109,6 +111,7 @@ static void continue_from_trap
 #ifdef CC_SUPPORT_P
    static SCHEME_OBJECT * find_heap_address (unsigned long);
    static SCHEME_OBJECT * find_constant_address (unsigned long);
+   static SCHEME_OBJECT * find_code_address (unsigned long);
 #  ifdef ENABLE_TRAP_RECOVERY
      static SCHEME_OBJECT * find_block_address (unsigned long, SCHEME_OBJECT *);
 #  endif
@@ -368,6 +371,7 @@ continue_from_trap (int signo, SIGINFO_T info, SIGCONTEXT_T * scp)
 
     case pcl_heap:
     case pcl_constant:
+    case pcl_code:
 #ifdef CC_SUPPORT_P
 
 #  ifdef CC_IS_SVM
@@ -474,6 +478,13 @@ find_constant_address (unsigned long pc)
   return (find_block_address (pc, constant_start));
 }
 
+static SCHEME_OBJECT *
+find_code_address (unsigned long pc)
+{
+  SCHEME_OBJECT * block = (code_arena_find_block ((const void *) pc));
+  return (((block != 0) && (plausible_cc_block_p (block))) ? block : 0);
+}
+
 /* Find the compiled code block in area that contains `pc_value',
    by scanning sequentially the complete area.
    For the time being, skip over manifest closures and linkage sections.  */
@@ -573,6 +584,13 @@ find_heap_address (unsigned long pc)
 static SCHEME_OBJECT *
 find_constant_address (unsigned long pc)
 {
+  return (0);
+}
+
+static SCHEME_OBJECT *
+find_code_address (unsigned long pc)
+{
+  (void) pc;
   return (0);
 }
 
@@ -726,6 +744,15 @@ classify_pc (unsigned long pc,
 	  if (r_block_addr != 0)
 	    (*r_block_addr) = block_addr;
 	  return (pcl_constant);
+	}
+      if (code_address_p ((const void *) pc))
+	{
+	  SCHEME_OBJECT * block_addr = (find_code_address (pc));
+	  if (block_addr == 0)
+	    return (pcl_unknown);
+	  if (r_block_addr != 0)
+	    (*r_block_addr) = block_addr;
+	  return (pcl_code);
 	}
 #ifdef ADDRESS_UCODE_P
       if (ADDRESS_UCODE_P (pc))

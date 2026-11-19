@@ -277,6 +277,43 @@ code_range_valid_p (const SCHEME_OBJECT * start, const SCHEME_OBJECT * end)
   return (false);
 }
 
+SCHEME_OBJECT *
+code_arena_find_block (const void * addr)
+{
+  code_arena_chunk_t * c = (find_chunk_for_addr (addr));
+  const uint8_t * target = addr;
+  SCHEME_OBJECT * scan;
+
+  if (c == 0)
+    return (0);
+
+  scan = (c->start);
+  while (scan < (c->alloc_next))
+    {
+      SCHEME_OBJECT hdr = (*scan);
+      unsigned long hdr_type = (object_type (hdr));
+      unsigned long words = (1 + (object_datum (hdr)));
+      SCHEME_OBJECT * block_end;
+
+      if (((hdr_type != TC_MANIFEST_VECTOR)
+	   && (hdr_type != TC_MANIFEST_NM_VECTOR))
+	  || (words == 0)
+	  || (words > ((unsigned long) ((c->alloc_next) - scan))))
+	return (0);
+
+      block_end = (scan + words);
+      if (target < ((const uint8_t *) block_end))
+	{
+	  if ((hdr_type == TC_MANIFEST_VECTOR)
+	      && (target >= ((const uint8_t *) (scan + 2))))
+	    return (scan);
+	  return (0);
+	}
+      scan = block_end;
+    }
+  return (0);
+}
+
 unsigned long
 code_arena_chunk_count (void)
 {

@@ -656,7 +656,16 @@ DEFINE_GC_TUPLE_HANDLER (gc_tuple)
 DEFINE_GC_VECTOR_HANDLER (gc_vector)
 {
   SCHEME_OBJECT * from = (object_address (vector));
-  SCHEME_OBJECT * new_address = (GC_PRECHECK_FROM (from));
+  SCHEME_OBJECT * new_address;
+#if defined(SCM_JIT_APPLE) && defined(CC_IS_NATIVE)
+  if (((object_type (vector)) == TC_COMPILED_CODE_BLOCK)
+      && (! ((code_address_p (from))
+	     || (BROKEN_HEART_P (*from))
+	     || ((object_type (*from)) == TC_MANIFEST_CLOSURE))))
+    std_gc_death ("compiled code block outside code arena: %#lx",
+		  ((unsigned long) vector));
+#endif
+  new_address = (GC_PRECHECK_FROM (from));
   return
     (object_new_address (vector,
 			 ((new_address != 0)
@@ -670,6 +679,16 @@ DEFINE_GC_OBJECT_HANDLER (gc_cc_entry)
 {
 #ifdef CC_SUPPORT_P
   SCHEME_OBJECT old_block = (cc_entry_to_block (object));
+#if defined(SCM_JIT_APPLE) && defined(CC_IS_NATIVE)
+  {
+    SCHEME_OBJECT * old_addr = (object_address (old_block));
+    if (! ((code_address_p (old_addr))
+	   || (BROKEN_HEART_P (*old_addr))
+	   || ((object_type (*old_addr)) == TC_MANIFEST_CLOSURE)))
+      std_gc_death ("compiled entry outside code arena: %#lx",
+		    ((unsigned long) object));
+  }
+#endif
   SCHEME_OBJECT new_block = (GC_HANDLE_VECTOR (old_block, true));
   return (CC_ENTRY_NEW_BLOCK (object,
 			      (object_address (new_block)),
@@ -684,6 +703,11 @@ DEFINE_GC_OBJECT_HANDLER (gc_cc_return)
 {
 #ifdef CC_SUPPORT_P
   SCHEME_OBJECT old_block = (cc_return_to_block (object));
+#if defined(SCM_JIT_APPLE) && defined(CC_IS_NATIVE)
+  if (!code_address_p (object_address (old_block)))
+    std_gc_death ("compiled return outside code arena: %#lx",
+		  ((unsigned long) object));
+#endif
   SCHEME_OBJECT new_block = (GC_HANDLE_VECTOR (old_block, true));
   return (CC_RETURN_NEW_BLOCK (object,
 			       (object_address (new_block)),

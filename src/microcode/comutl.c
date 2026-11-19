@@ -30,6 +30,8 @@ USA.
 #include "scheme.h"
 #include "osscheme.h"
 #include "prims.h"
+#include "code_arena.h"
+#include "jit.h"
 
 #ifdef CC_IS_C
 extern unsigned long liarc_n_compiled_blocks (void);
@@ -259,6 +261,121 @@ DEFINE_PRIMITIVE ("DECLARE-COMPILED-CODE-BLOCK",
     declare_compiled_code_block (new_cc_block);
     PRIMITIVE_RETURN (SHARP_T);
   }
+}
+
+DEFINE_PRIMITIVE ("INSTALL-COMPILED-CODE-BLOCK",
+		  Prim_install_compiled_code_block, 1, 1,
+		  "(BLOCK)\n\
+Install a compiled-code block or staged vector into the executable code arena.")
+{
+  SCHEME_OBJECT arg;
+  SCHEME_OBJECT * src;
+  SCHEME_OBJECT * dst;
+  unsigned long n_words;
+  SCHEME_OBJECT result;
+  PRIMITIVE_HEADER (1);
+
+  arg = (ARG_REF (1));
+  if (CC_BLOCK_P (arg))
+    {
+      if (cc_block_closure_p (arg))
+	error_bad_range_arg (1);
+      src = (object_address (arg));
+      if (code_address_p (src))
+	{
+	  declare_compiled_code_block (arg);
+	  PRIMITIVE_RETURN (arg);
+	}
+    }
+  else if ((VECTOR_P (arg)) && ((vector_length (arg)) >= 1))
+    src = (object_address (arg));
+  else
+    error_wrong_type_arg (1);
+
+  n_words = (1 + (object_datum (src[0])));
+  if ((n_words < 2)
+      || ((object_type (src[1])) != TC_MANIFEST_NM_VECTOR)
+      || ((2 + (object_datum (src[1]))) > n_words))
+    error_bad_range_arg (1);
+
+  dst = (code_arena_alloc (n_words));
+  if (dst == 0)
+    error_bad_range_arg (1);
+
+  code_arena_write_begin ();
+  (dst[0]) = (make_object (TC_MANIFEST_VECTOR, (n_words - 1)));
+  memcpy ((dst + 1), (src + 1), ((n_words - 1) * SIZEOF_SCHEME_OBJECT));
+  code_arena_write_end ();
+
+  result = (MAKE_CC_BLOCK (dst));
+  declare_compiled_code_block (result);
+  jit_flush_icache (dst, (n_words * SIZEOF_SCHEME_OBJECT));
+  PRIMITIVE_RETURN (result);
+}
+
+DEFINE_PRIMITIVE ("SET-COMPILED-CODE-BLOCK/DEBUGGING-INFO!",
+		  Prim_set_cc_block_debugging_info, 2, 2,
+		  "(BLOCK INFO)\n\
+Store debugging INFO into compiled-code BLOCK.")
+{
+  SCHEME_OBJECT block;
+  unsigned long len;
+  PRIMITIVE_HEADER (2);
+
+  CHECK_ARG (1, CC_BLOCK_P);
+  block = (ARG_REF (1));
+  if (cc_block_closure_p (block))
+    error_bad_range_arg (1);
+  len = (vector_length (block));
+  if (len < 2)
+    error_bad_range_arg (1);
+
+  if (code_address_p (object_address (block)))
+    {
+      code_arena_write_begin ();
+      vector_set (block, (len - 2), (ARG_REF (2)));
+      code_arena_write_end ();
+    }
+  else
+    vector_set (block, (len - 2), (ARG_REF (2)));
+  PRIMITIVE_RETURN (UNSPECIFIC);
+}
+
+DEFINE_PRIMITIVE ("CODE-SPACE-BOUNDS", Prim_code_space_bounds, 0, 0,
+		  "()\n\
+Return a pair of exact integers (start . alloc-next) for the primary code arena.")
+{
+  SCHEME_OBJECT start_obj;
+  SCHEME_OBJECT end_obj;
+  PRIMITIVE_HEADER (0);
+
+  Primitive_GC_If_Needed (16);
+  start_obj = (ulong_to_integer ((unsigned long) ((uintptr_t) code_start)));
+  end_obj = (ulong_to_integer ((unsigned long) ((uintptr_t) code_alloc_next)));
+  PRIMITIVE_RETURN (cons (start_obj, end_obj));
+}
+
+DEFINE_PRIMITIVE ("CODE-ADDRESS?", Prim_code_address_p, 1, 1,
+		  "(OBJECT)\n\
+Return #T if OBJECT or its machine address lies inside the code arena.")
+{
+  SCHEME_OBJECT arg;
+  const void * addr = 0;
+  PRIMITIVE_HEADER (1);
+
+  arg = (ARG_REF (1));
+  if (CC_ENTRY_P (arg))
+    addr = (CC_ENTRY_ADDRESS (arg));
+  else if (CC_RETURN_P (arg))
+    addr = (CC_RETURN_ADDRESS (arg));
+  else if (CC_BLOCK_P (arg))
+    addr = (object_address (arg));
+  else if ((INTEGER_P (arg)) && (integer_to_ulong_p (arg)))
+    addr = ((const void *) ((uintptr_t) (integer_to_ulong (arg))));
+  else
+    PRIMITIVE_RETURN (SHARP_F);
+
+  PRIMITIVE_RETURN (BOOLEAN_TO_OBJECT (code_address_p (addr)));
 }
 
 DEFINE_PRIMITIVE ("LIARC-COMPILED-BLOCKS", Prim_liarc_compiled_code_blocks,

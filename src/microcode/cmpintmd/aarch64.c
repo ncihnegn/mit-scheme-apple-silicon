@@ -335,6 +335,22 @@ store_trampoline_insns (insn_t * entry, uint8_t code)
   (entry[2]) = 0xd61f02e0UL;
   return (false);		/* no error */
 }
+
+bool
+store_trampoline_to_interface_insns (insn_t * entry)
+{
+  (entry[-2]) = 0;		/* PC offset, first half */
+  (entry[-1]) = 0;		/* PC offset, other half */
+  /* and x1, x1, #0x03ffffffffffffff */
+  (entry[0]) = 0x9240e421UL;
+  /* ldr x17, [x1], #8 */
+  (entry[1]) = 0xf8408431UL;
+  /* and x17, x17, #0xff */
+  (entry[2]) = 0x92401e31UL;
+  /* br x23 */
+  (entry[3]) = 0xd61f02e0UL;
+  return (false);
+}
 
 void
 aarch64_reset_hook (void)

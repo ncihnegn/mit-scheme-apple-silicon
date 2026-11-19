@@ -248,4 +248,7 @@ insn_t * read_uuo_target (SCHEME_OBJECT *);
 void aarch64_flush_i_cache_region (SCHEME_OBJECT *, size_t);
 void aarch64_flush_i_cache (void);
 
+#define HAVE_TRAMPOLINE_TO_INTERFACE 1
+bool store_trampoline_to_interface_insns (insn_t *);
+
 #endif /* SCM_CMPINTMD_H_INCLUDED */

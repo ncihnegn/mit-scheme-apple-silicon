@@ -44,6 +44,7 @@ extern void code_arena_teardown (void);
 extern bool code_address_p (const void * addr);
 extern bool code_range_valid_p (const SCHEME_OBJECT * start,
 				const SCHEME_OBJECT * end);
+extern SCHEME_OBJECT * code_arena_find_block (const void * addr);
 extern unsigned long code_arena_chunk_count (void);
 extern unsigned long code_arena_nonempty_chunk_count (void);
 extern unsigned long code_arena_live_words (void);
