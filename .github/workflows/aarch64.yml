@@ -81,7 +81,7 @@ jobs:
   linux-aarch64:
     name: Linux aarch64 (Ubuntu 24.04 ARM)
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -118,51 +118,19 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/mit-scheme-host-12.1
-          key: linux-aarch64-host-12.1-v1
+          key: linux-aarch64-host-12.1-svm1-v1
 
-      - name: Build patched MIT/GNU Scheme 12.1 bootstrap host
+      - name: Build MIT/GNU Scheme 12.1 svm1 bootstrap host
         if: ${{ steps.stage2-cache.outputs.cache-hit != 'true' && steps.host-12-1-cache.outputs.cache-hit != 'true' }}
         run: |
           HOST_TMP=$(mktemp -d)
           trap 'rm -rf "${HOST_TMP}"' EXIT
           curl -fL \
-            https://ftp.gnu.org/gnu/mit-scheme/stable.pkg/12.1/mit-scheme-12.1-aarch64le.tar.gz \
-            -o "${HOST_TMP}/mit-scheme-12.1-aarch64le.tar.gz"
-          tar -xzf "${HOST_TMP}/mit-scheme-12.1-aarch64le.tar.gz" -C "${HOST_TMP}"
-          python3 - "${HOST_TMP}/mit-scheme-12.1/src/microcode/fasdump.c" <<'PY'
-          import sys
-
-          path = sys.argv[1]
-          with open(path, "r", encoding="utf-8") as f:
-              src = f.read()
-
-          decl_target = "  unsigned long prim_table_length;\n"
-          decl_repl = "  unsigned long prim_table_length;\n  unsigned long n_primitives;\n"
-          commit_target = (
-              "  export_renumbered_primitives\n"
-              "    ((newspace_to_tospace (prim_table_start)), current_pr);\n"
-          )
-          commit_repl = (
-              commit_target
-              + "  n_primitives = (current_pr->next_code);\n"
-              + "  current_pr = 0;\n"
-          )
-          use_target = "  (FASLHDR_N_PRIMITIVES (fh)) = (current_pr->next_code);\n"
-          use_repl = "  (FASLHDR_N_PRIMITIVES (fh)) = n_primitives;\n"
-
-          for target in (decl_target, commit_target, use_target):
-              if target not in src:
-                  raise RuntimeError(f"Expected snippet not found in {path}: {target!r}")
-
-          src = src.replace(decl_target, decl_repl, 1)
-          src = src.replace(commit_target, commit_repl, 1)
-          src = src.replace(use_target, use_repl, 1)
-
-          with open(path, "w", encoding="utf-8") as f:
-              f.write(src)
-          PY
+            https://ftp.gnu.org/gnu/mit-scheme/stable.pkg/12.1/mit-scheme-12.1-svm1-64le.tar.gz \
+            -o "${HOST_TMP}/mit-scheme-12.1-svm1-64le.tar.gz"
+          tar -xzf "${HOST_TMP}/mit-scheme-12.1-svm1-64le.tar.gz" -C "${HOST_TMP}"
           cd "${HOST_TMP}/mit-scheme-12.1/src"
-          ./configure --prefix="${{ runner.temp }}/mit-scheme-host-12.1"
+          ./configure --prefix="${{ runner.temp }}/mit-scheme-host-12.1" --enable-native-code=svm1
           sed -i 's/ -Werror//g' microcode/Makefile
           make -j"$(nproc)"
           make install
