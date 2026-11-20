@@ -99,7 +99,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/list.c",
     "src/microcode/lookprm.c",
     "src/microcode/lookup.c",
-    "src/microcode/md5.c",
     "src/microcode/memmag.c",
     "src/microcode/missing.c",
     "src/microcode/obstack.c",
