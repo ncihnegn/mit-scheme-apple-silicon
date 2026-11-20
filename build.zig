@@ -111,7 +111,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/primutl.c",
     "src/microcode/prkeccak.c",
     "src/microcode/prmd5.c",
-    "src/microcode/ptrvec.c",
     "src/microcode/purify.c",
     "src/microcode/purutl.c",
     "src/microcode/regex.c",
