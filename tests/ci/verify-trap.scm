@@ -39,7 +39,7 @@
                (set! trap-report (list (condition/report-string condition) out))
                (escape #t)))
          (lambda ()
-           ((environment-lookup env 'trigger-forged-vector-trap) #x10000)))))
+           ((environment-lookup env 'trigger-forged-vector-trap) #x100)))))
     (if (not trap-report)
         (error "Hardware trap did not fire!"))
     (display "TRAP_CONDITION: ") (display (car trap-report)) (newline)
