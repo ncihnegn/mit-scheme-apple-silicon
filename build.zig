@@ -101,7 +101,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/lookup.c",
     "src/microcode/memmag.c",
     "src/microcode/missing.c",
-    "src/microcode/obstack.c",
     "src/microcode/option.c",
     "src/microcode/osscheme.c",
     "src/microcode/ostty.c",
@@ -804,6 +803,15 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_scheme.step);
 
     // `zig build test-smoke`
+    const smoke_obstack_obj = b.addObject(.{
+        .name = "smoke_obstack",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/microcode/zig/obstack.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
     const smoke_step = b.step("test-smoke", "Build and run standalone microcode C smoke tests");
     const smoke_specs = [_]struct {
         name: []const u8,
@@ -819,7 +827,6 @@ pub fn build(b: *std.Build) void {
                 "src/microcode/jit.c",
                 "src/microcode/code_arena.c",
                 "src/microcode/wind.c",
-                "src/microcode/obstack.c",
             },
             .needs_cmpintmd = true,
             .needs_native = false,
@@ -832,7 +839,6 @@ pub fn build(b: *std.Build) void {
                 "src/microcode/jit.c",
                 "src/microcode/transact.c",
                 "src/microcode/wind.c",
-                "src/microcode/obstack.c",
             },
             .needs_cmpintmd = false,
             .needs_native = false,
@@ -846,7 +852,6 @@ pub fn build(b: *std.Build) void {
                 "src/microcode/jit.c",
                 "src/microcode/transact.c",
                 "src/microcode/wind.c",
-                "src/microcode/obstack.c",
             },
             .needs_cmpintmd = true,
             .needs_native = false,
@@ -861,7 +866,6 @@ pub fn build(b: *std.Build) void {
                 "src/microcode/jit.c",
                 "src/microcode/transact.c",
                 "src/microcode/wind.c",
-                "src/microcode/obstack.c",
             },
             .needs_cmpintmd = true,
             .needs_native = false,
@@ -876,7 +880,6 @@ pub fn build(b: *std.Build) void {
                 "src/microcode/jit.c",
                 "src/microcode/transact.c",
                 "src/microcode/wind.c",
-                "src/microcode/obstack.c",
             },
             .needs_cmpintmd = true,
             .needs_native = true,
@@ -900,6 +903,7 @@ pub fn build(b: *std.Build) void {
         if (target.result.os.tag == .linux) {
             smoke_exe.root_module.linkSystemLibrary("m", .{});
         }
+        smoke_exe.root_module.addObject(smoke_obstack_obj);
         smoke_exe.root_module.addCSourceFile(.{ .file = b.path(spec.src), .flags = c_flags });
         if (spec.needs_cmpintmd) {
             smoke_exe.root_module.addCSourceFile(.{ .file = b.path(cmpintmd_c), .flags = c_flags });
