@@ -1,0 +1,14 @@
+.{
+    .name = .mit_scheme,
+    .version = "13.0.50",
+    .fingerprint = 0xc4f5f295356a2720,
+    .minimum_zig_version = "0.17.1",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "tests",
+        "etc",
+    },
+}
