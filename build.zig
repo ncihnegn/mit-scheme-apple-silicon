@@ -573,6 +573,18 @@ pub fn build(b: *std.Build) void {
         "Optional host mit-scheme binary passed to bootstrap step",
     );
 
+    const check_library_path = b.option(
+        []const u8,
+        "check-library-path",
+        "Scheme library directory containing all.com for `zig build check-zig`",
+    );
+
+    const test_suite = b.option(
+        []const u8,
+        "test-suite",
+        "Optional single tests/check.scm suite name for `zig build check-zig`",
+    );
+
     const arch = resolveArch(arch_opt, target.result.cpu);
     const auxdir_name = b.fmt("mit-scheme-{s}-13.0.50", .{arch.scheme_arch});
     const default_library_path = b.option(
@@ -697,6 +709,17 @@ pub fn build(b: *std.Build) void {
     else
         null;
 
+    const microcode_zig_mod = b.createModule(.{
+        .root_source_file = b.path("src/microcode/zig/root.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    const microcode_zig_obj = b.addObject(.{
+        .name = "microcode_zig",
+        .root_module = microcode_zig_mod,
+    });
+
     // Build the microcode `scheme` binary.
     const scheme_exe = b.addExecutable(.{
         .name = auxdir_name,
@@ -718,6 +741,7 @@ pub fn build(b: *std.Build) void {
         arch_headers_dir,
         termcap_opt,
     );
+    scheme_exe.root_module.addObject(microcode_zig_obj);
     scheme_exe.root_module.addCSourceFiles(.{
         .files = scheme_c_sources.items,
         .flags = c_flags,
@@ -893,6 +917,19 @@ pub fn build(b: *std.Build) void {
         smoke_step.dependOn(&run_smoke.step);
     }
 
+    // `zig build test-unit`
+    const unit_test_step = b.step("test-unit", "Run Zig microcode unit tests");
+    const unit_tests = b.addTest(.{
+        .name = "microcode-zig-unit",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/microcode/zig/root.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    unit_test_step.dependOn(&b.addRunArtifact(unit_tests).step);
+
     // `zig build bootstrap`
     const bootstrap_step = b.step(
         "bootstrap",
@@ -917,6 +954,29 @@ pub fn build(b: *std.Build) void {
     });
     check_cmd.setCwd(b.path("."));
     check_step.dependOn(&check_cmd.step);
+
+    // `zig build check-zig`
+    const check_zig_step = b.step(
+        "check-zig",
+        "Run Scheme test suite using the Zig-built mit-scheme binary",
+    );
+    const check_zig_cmd = b.addSystemCommand(&.{
+        "python3",
+        "tests/ci/check-results.py",
+        "--src-dir",
+        "src",
+        "--allow-arm64-flonum-except",
+        "--scheme-exe",
+    });
+    check_zig_cmd.addFileArg(scheme_exe.getEmittedBin());
+    if (check_library_path) |lib_path| {
+        check_zig_cmd.addArgs(&.{ "--library-path", lib_path });
+    }
+    if (test_suite) |suite| {
+        check_zig_cmd.addArgs(&.{ "--test", suite });
+    }
+    check_zig_cmd.setCwd(b.path("."));
+    check_zig_step.dependOn(&check_zig_cmd.step);
 
     // `zig build macos-app` & `zig build macos-dmg`
     if (target.result.os.tag.isDarwin()) {
