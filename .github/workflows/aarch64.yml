@@ -130,7 +130,7 @@ jobs:
             -o "${HOST_TMP}/mit-scheme-12.1-svm1-64le.tar.gz"
           tar -xzf "${HOST_TMP}/mit-scheme-12.1-svm1-64le.tar.gz" -C "${HOST_TMP}"
           cd "${HOST_TMP}/mit-scheme-12.1/src"
-          ./configure --prefix="${{ runner.temp }}/mit-scheme-host-12.1" --enable-native-code=svm1
+          ./configure --prefix="${{ runner.temp }}/mit-scheme-host-12.1" --enable-native-code=svm1-64le
           sed -i 's/ -Werror//g' microcode/Makefile
           make -j"$(nproc)"
           make install
