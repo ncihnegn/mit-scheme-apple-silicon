@@ -725,9 +725,11 @@ pub fn build(b: *std.Build) void {
             .sanitize_c = .off,
         }),
     });
-    if (target.result.os.tag == .linux) {
-        scheme_exe.rdynamic = true;
-    }
+    // Export all microcode symbols and disable linker GC/dead-stripping so
+    // dlopen()-loaded FFI plugins (pruxffi.h helpers like arg_alien_entry,
+    // arg_long, is_alien, etc.) resolve in both Debug and ReleaseFast builds.
+    scheme_exe.rdynamic = true;
+    scheme_exe.link_gc_sections = false;
     configureMicrocodeModule(
         b,
         scheme_exe.root_module,
