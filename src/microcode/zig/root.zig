@@ -1,15 +1,21 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 pub const chacha = @import("chacha.zig");
 pub const keccak = @import("keccak.zig");
 pub const md5 = @import("md5.zig");
 pub const obstack = @import("obstack.zig");
+pub const wind = @import("wind.zig");
 
 comptime {
     _ = chacha;
     _ = keccak;
     _ = md5;
     _ = obstack;
+    _ = wind;
+    if (builtin.is_test) {
+        _ = @import("test_stubs.zig");
+    }
 }
 
 test "microcode zig scaffold" {
@@ -19,4 +25,5 @@ test "microcode zig scaffold" {
     _ = keccak;
     _ = md5;
     _ = obstack;
+    _ = wind;
 }
