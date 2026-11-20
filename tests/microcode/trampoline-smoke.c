@@ -50,7 +50,6 @@ USA.
 } while (0)
 
 /* Interpreter globals & stubs required by cmpint.o + gcloop.o + wind.o. */
-SCHEME_OBJECT Registers[REGBLOCK_MINIMUM_LENGTH];
 SCHEME_OBJECT * Free = 0;
 SCHEME_OBJECT * Free_primitive = 0;
 SCHEME_OBJECT * heap_alloc_limit = 0;
