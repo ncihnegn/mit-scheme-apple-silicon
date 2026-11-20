@@ -6,6 +6,7 @@ pub const keccak = @import("keccak.zig");
 pub const md5 = @import("md5.zig");
 pub const obstack = @import("obstack.zig");
 pub const wind = @import("wind.zig");
+pub const transact = @import("transact.zig");
 
 comptime {
     _ = chacha;
@@ -13,6 +14,7 @@ comptime {
     _ = md5;
     _ = obstack;
     _ = wind;
+    _ = transact;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -26,4 +28,5 @@ test "microcode zig scaffold" {
     _ = md5;
     _ = obstack;
     _ = wind;
+    _ = transact;
 }

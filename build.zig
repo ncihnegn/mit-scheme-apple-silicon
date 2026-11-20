@@ -123,7 +123,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/syntax.c",
     "src/microcode/sysprim.c",
     "src/microcode/term.c",
-    "src/microcode/transact.c",
     "src/microcode/utabmd.c",
     "src/microcode/utils.c",
     "src/microcode/vector.c",
@@ -802,10 +801,10 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_scheme.step);
 
     // `zig build test-smoke`
-    const smoke_wind_obj = b.addObject(.{
-        .name = "smoke_wind",
+    const smoke_dstack_obj = b.addObject(.{
+        .name = "smoke_dstack",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/microcode/zig/wind.zig"),
+            .root_source_file = b.path("src/microcode/zig/transact.zig"),
             .target = target,
             .optimize = optimize,
             .link_libc = true,
@@ -835,7 +834,6 @@ pub fn build(b: *std.Build) void {
             .deps = &.{
                 "src/microcode/code_arena.c",
                 "src/microcode/jit.c",
-                "src/microcode/transact.c",
             },
             .needs_cmpintmd = false,
             .needs_native = false,
@@ -847,7 +845,6 @@ pub fn build(b: *std.Build) void {
                 "src/microcode/gcloop.c",
                 "src/microcode/code_arena.c",
                 "src/microcode/jit.c",
-                "src/microcode/transact.c",
             },
             .needs_cmpintmd = true,
             .needs_native = false,
@@ -860,7 +857,6 @@ pub fn build(b: *std.Build) void {
                 "src/microcode/gcloop.c",
                 "src/microcode/code_arena.c",
                 "src/microcode/jit.c",
-                "src/microcode/transact.c",
             },
             .needs_cmpintmd = true,
             .needs_native = false,
@@ -873,7 +869,6 @@ pub fn build(b: *std.Build) void {
                 "src/microcode/gcloop.c",
                 "src/microcode/code_arena.c",
                 "src/microcode/jit.c",
-                "src/microcode/transact.c",
             },
             .needs_cmpintmd = true,
             .needs_native = true,
@@ -897,7 +892,7 @@ pub fn build(b: *std.Build) void {
         if (target.result.os.tag == .linux) {
             smoke_exe.root_module.linkSystemLibrary("m", .{});
         }
-        smoke_exe.root_module.addObject(smoke_wind_obj);
+        smoke_exe.root_module.addObject(smoke_dstack_obj);
         smoke_exe.root_module.addCSourceFile(.{ .file = b.path(spec.src), .flags = c_flags });
         if (spec.needs_cmpintmd) {
             smoke_exe.root_module.addCSourceFile(.{ .file = b.path(cmpintmd_c), .flags = c_flags });
