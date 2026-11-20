@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 180
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Homebrew build dependencies
         run: |
@@ -43,7 +43,7 @@ jobs:
       - name: Restore Stage 2 native aarch64le host cache
         id: stage2-cache
         if: ${{ inputs.force_full_bootstrap != true }}
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/mit-scheme-stage2-native
           key: >-
@@ -68,7 +68,7 @@ jobs:
 
       - name: Save Stage 2 native aarch64le host cache
         if: ${{ inputs.force_full_bootstrap != true && steps.stage2-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}/mit-scheme-stage2-native
           key: ${{ steps.stage2-cache.outputs.cache-primary-key }}
@@ -84,7 +84,7 @@ jobs:
     timeout-minutes: 180
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install APT build dependencies
         run: |
@@ -96,7 +96,7 @@ jobs:
       - name: Restore Stage 2 native aarch64le host cache
         id: stage2-cache
         if: ${{ inputs.force_full_bootstrap != true }}
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/mit-scheme-stage2-native
           key: >-
@@ -115,7 +115,7 @@ jobs:
       - name: Restore MIT/GNU Scheme 12.1 bootstrap host cache
         id: host-12-1-cache
         if: ${{ steps.stage2-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/mit-scheme-host-12.1
           key: linux-aarch64-host-12.1-svm1-v1
@@ -137,7 +137,7 @@ jobs:
 
       - name: Save MIT/GNU Scheme 12.1 bootstrap host cache
         if: ${{ steps.stage2-cache.outputs.cache-hit != 'true' && steps.host-12-1-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}/mit-scheme-host-12.1
           key: ${{ steps.host-12-1-cache.outputs.cache-primary-key }}
@@ -155,7 +155,7 @@ jobs:
 
       - name: Save Stage 2 native aarch64le host cache
         if: ${{ inputs.force_full_bootstrap != true && steps.stage2-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}/mit-scheme-stage2-native
           key: ${{ steps.stage2-cache.outputs.cache-primary-key }}

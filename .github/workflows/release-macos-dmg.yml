@@ -41,7 +41,7 @@ jobs:
     timeout-minutes: 180
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Homebrew build dependencies
         run: |
@@ -53,7 +53,7 @@ jobs:
       - name: Restore Stage 2 native aarch64le host cache
         id: stage2-cache
         if: ${{ inputs.force_full_bootstrap != true }}
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/mit-scheme-stage2-native
           key: >-
@@ -78,7 +78,7 @@ jobs:
 
       - name: Save Stage 2 native aarch64le host cache
         if: ${{ inputs.force_full_bootstrap != true && steps.stage2-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}/mit-scheme-stage2-native
           key: ${{ steps.stage2-cache.outputs.cache-primary-key }}
@@ -100,7 +100,7 @@ jobs:
           ./tests/ci/build-macos-dmg.sh "${ARGS[@]}"
 
       - name: Upload DMG workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mit-scheme-macos-arm64-dmg
           path: |
