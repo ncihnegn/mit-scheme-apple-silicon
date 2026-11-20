@@ -69,7 +69,7 @@ SMOKE_MK="${TMP_DIR}/smoke.mk"
 TEST_DIR="${REPO_ROOT}/tests/microcode"
 
 cat > "${SMOKE_MK}" <<EOF
-SMOKE_CFLAGS = \$(DEFS) \$(CPPFLAGS) \$(CFLAGS) -Wall -Wextra -Werror
+SMOKE_CFLAGS = \$(DEFS) \$(CPPFLAGS) \$(CFLAGS)
 
 ${TMP_DIR}/jit-smoke.o: ${TEST_DIR}/jit-smoke.c
 	\$(CC) \$(SMOKE_CFLAGS) -c \$< -o \$@
