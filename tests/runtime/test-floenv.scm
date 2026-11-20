@@ -530,11 +530,12 @@ USA.
 	  (if (eq? 'UPWARD (flo:default-rounding-mode))
 	      'TO-NEAREST
 	      'UPWARD))
-	 (flo:set-trapped-exceptions!
-	  (if (= (flo:trappable-exceptions) (flo:default-trapped-exceptions))
-	      (fix:andc (flo:default-trapped-exceptions)
-			(flo:trappable-exceptions))
-	      (flo:trappable-exceptions)))
+	 (if (flo:have-trap-enable/disable?)
+	     (flo:set-trapped-exceptions!
+	      (if (= (flo:trappable-exceptions) (flo:default-trapped-exceptions))
+		  (fix:andc (flo:default-trapped-exceptions)
+			    (flo:trappable-exceptions))
+		  (flo:trappable-exceptions))))
 	 (flo:with-default-environment procedure))))))
 
 (define-default-environment-test 'ROUNDING-MODE
