@@ -86,6 +86,7 @@ pub const sharp_f: SchemeObject = makeObject(tc_false, 0);
 pub const sharp_t: SchemeObject = makeObject(tc_constant, 0);
 pub const unspecific: SchemeObject = makeObject(tc_constant, 1);
 pub const empty_list: SchemeObject = makeObject(tc_constant, 9);
+pub const gc_reclaimed: SchemeObject = makeObject(tc_constant, 10);
 pub const unbound_object: SchemeObject = makeObject(tc_reference_trap, 2);
 
 pub const fasdump_record_marker_start: c_ulong = 0x100;

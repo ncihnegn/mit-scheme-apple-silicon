@@ -22,8 +22,12 @@ pub const int_gc: c_ulong = 0x0004;
 pub const term_exit: c_int = 0x0C;
 pub const err_wrong_number_of_arguments: c_long = 0x0C;
 pub const prim_apply: c_long = -3;
+pub const prim_no_trap_eval: c_long = -5;
+pub const prim_no_trap_apply: c_long = -6;
+pub const prim_no_trap_pop_return: c_long = -11;
 
 pub const fixobj_obarray: usize = 0x03;
+pub const fixobj_stepper_state: usize = 0x0E;
 pub const fixobj_record_tag: usize = 0x11;
 pub const fixobj_record_app_index: usize = 0x12;
 pub const fixobj_proxied_record_types: usize = 0x15;
@@ -70,6 +74,7 @@ pub extern var stack_end: [*]obj.SchemeObject;
 pub extern var memory_block_start: [*]obj.SchemeObject;
 pub extern var fixed_objects: obj.SchemeObject;
 pub extern var gc_space_needed: c_ulong;
+pub extern var trapping: bool;
 
 pub extern "c" fn error_wrong_type_arg(c_int) noreturn;
 pub extern "c" fn error_bad_range_arg(c_int) noreturn;
@@ -78,8 +83,10 @@ pub extern "c" fn signal_error_from_primitive(c_long) noreturn;
 pub extern "c" fn signal_interrupt_from_primitive() noreturn;
 pub extern "c" fn Microcode_Termination(c_int) noreturn;
 pub extern "c" fn outf_fatal([*:0]const u8, ...) void;
+pub extern "c" fn outf_error([*:0]const u8, ...) void;
 pub extern "c" fn record_primitive_entry(obj.SchemeObject) void;
 pub extern "c" fn gc_type_code(c_uint) c_int;
+pub extern "c" fn OS_channel_close_noerror(c_uint) void;
 
 pub extern "c" fn arg_integer(c_int) c_long;
 pub extern "c" fn arg_nonnegative_integer(c_int) c_long;
@@ -363,6 +370,18 @@ pub inline fn primitiveGcIfNeeded(amount: c_ulong) void {
 pub inline fn stackPush(object: obj.SchemeObject) void {
     stack_pointer -= 1;
     stack_pointer[0] = object;
+}
+
+pub inline fn decrementSp(offset: usize) void {
+    stack_pointer -= offset;
+}
+
+pub inline fn incrementSp(offset: usize) void {
+    stack_pointer += offset;
+}
+
+pub inline fn popPrimitiveFrame(n: usize) void {
+    incrementSp(n);
 }
 
 pub inline fn stackCanPushP(n: usize) bool {

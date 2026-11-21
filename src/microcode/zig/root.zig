@@ -40,6 +40,9 @@ pub const edwin_defs = @import("edwin_defs.zig");
 pub const syntax = @import("syntax.zig");
 pub const regex = @import("regex.zig");
 pub const rgxprim = @import("rgxprim.zig");
+pub const bkpt = @import("bkpt.zig");
+pub const daemon = @import("daemon.zig");
+pub const step = @import("step.zig");
 
 comptime {
     _ = chacha;
@@ -80,6 +83,9 @@ comptime {
     _ = syntax;
     _ = regex;
     _ = rgxprim;
+    _ = bkpt;
+    _ = daemon;
+    _ = step;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -127,4 +133,7 @@ test "microcode zig scaffold" {
     _ = syntax;
     _ = regex;
     _ = rgxprim;
+    _ = bkpt;
+    _ = daemon;
+    _ = step;
 }

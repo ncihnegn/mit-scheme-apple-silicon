@@ -66,9 +66,7 @@ fn resolveArch(option: ArchOption, cpu: std.Target.Cpu) ArchConfig {
 }
 
 const std_c_sources = [_][]const u8{
-    "src/microcode/bkpt.c",
     "src/microcode/boot.c",
-    "src/microcode/daemon.c",
     "src/microcode/debug.c",
     "src/microcode/error.c",
     "src/microcode/extern.c",
@@ -90,7 +88,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/purify.c",
     "src/microcode/purutl.c",
     "src/microcode/returns.c",
-    "src/microcode/step.c",
     "src/microcode/storage.c",
     "src/microcode/sysprim.c",
     "src/microcode/term.c",
@@ -131,6 +128,7 @@ const zig_prim_sources = [_][]const u8{
     "src/microcode/zig/bitstr.zig",
     "src/microcode/zig/bytevector.zig",
     "src/microcode/zig/char.zig",
+    "src/microcode/zig/daemon.zig",
     "src/microcode/zig/dfloat.zig",
     "src/microcode/zig/fixnum.zig",
     "src/microcode/zig/floenv.zig",
@@ -145,6 +143,7 @@ const zig_prim_sources = [_][]const u8{
     "src/microcode/zig/prkeccak.zig",
     "src/microcode/zig/prmd5.zig",
     "src/microcode/zig/rgxprim.zig",
+    "src/microcode/zig/step.zig",
     "src/microcode/zig/string.zig",
     "src/microcode/zig/syntax.zig",
     "src/microcode/zig/vector.zig",

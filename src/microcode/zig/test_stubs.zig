@@ -4,6 +4,8 @@ const abi = @import("prim_abi.zig");
 
 pub var signal_block_depth: i32 = 0;
 pub var fatal_count: usize = 0;
+pub var last_closed_channel: ?c_uint = null;
+pub var printed_continuation_count: usize = 0;
 
 var mock_heap: [8192]obj.SchemeObject = @splat(0);
 var mock_stack: [128]obj.SchemeObject = @splat(0);
@@ -21,8 +23,13 @@ pub export var stack_end: [*]obj.SchemeObject = (&mock_stack).ptr + mock_stack.l
 pub export var memory_block_start: [*]obj.SchemeObject = (&mock_heap).ptr;
 pub export var fixed_objects: obj.SchemeObject = obj.sharp_f;
 pub export var gc_space_needed: c_ulong = 0;
+pub export var trapping: bool = false;
 
 pub fn resetMockRuntime() void {
+    signal_block_depth = 0;
+    fatal_count = 0;
+    last_closed_channel = null;
+    printed_continuation_count = 0;
     mock_heap = @splat(0);
     mock_stack = @splat(0);
     Registers = @splat(0);
@@ -39,6 +46,7 @@ pub fn resetMockRuntime() void {
     stack_pointer = stack_end;
     fixed_objects = obj.sharp_f;
     gc_space_needed = 0;
+    trapping = false;
 }
 
 pub fn setArgs(args: []const obj.SchemeObject) void {
@@ -74,7 +82,24 @@ pub export fn outf_fatal(_: [*:0]const u8, ...) callconv(.c) void {
     fatal_count += 1;
 }
 
+pub export fn outf_error(_: [*:0]const u8, ...) callconv(.c) void {}
+
 pub export fn outf_flush_fatal() callconv(.c) void {}
+
+pub export fn OS_channel_close_noerror(ch: c_uint) callconv(.c) void {
+    last_closed_channel = ch;
+}
+
+comptime {
+    if (@import("build_options").debugging) {
+        @export(&mockPrintOneContinuationFrame, .{ .name = "Print_One_Continuation_Frame" });
+    }
+}
+
+fn mockPrintOneContinuationFrame(_: obj.SchemeObject) callconv(.c) bool {
+    printed_continuation_count += 1;
+    return true;
+}
 
 pub export fn strcmp_ci(s1: [*:0]const u8, s2: [*:0]const u8) callconv(.c) c_int {
     var i: usize = 0;
