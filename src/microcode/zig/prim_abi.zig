@@ -301,6 +301,28 @@ pub const RelocRef = extern struct {
 pub const Tchannel = c_uint;
 pub const no_channel: Tchannel = std.math.maxInt(Tchannel);
 pub const SelectRegistry = ?*anyopaque;
+pub const OffT = std.c.off_t;
+pub const off_t_max: i64 = std.math.maxInt(i64);
+
+pub const FileExistence = enum(c_uint) {
+    does_exist = 0,
+    doesnt_exist = 1,
+    is_link = 2,
+};
+
+pub const FileType = enum(c_int) {
+    nonexistent = -1,
+    regular = 0,
+    directory = 1,
+    unix_symbolic_link = 2,
+    unix_character_device = 3,
+    unix_block_device = 4,
+    unix_fifo = 5,
+    unix_stream_socket = 6,
+    unused_1 = 7,
+    win32_named_pipe = 8,
+    unknown = 0xFFFF,
+};
 
 pub const ChannelType = enum(c_uint) {
     unknown = 0,
@@ -425,6 +447,34 @@ pub extern "c" fn OS_test_select_descriptor(c_int, c_int, c_uint) c_int;
 pub extern "c" fn OS_pause(bool, bool) c_int;
 pub extern "c" fn arg_to_channel(obj.SchemeObject, c_int) Tchannel;
 pub extern "c" fn arg_channel(c_int) Tchannel;
+pub extern "c" fn OS_open_input_file([*:0]const u8) Tchannel;
+pub extern "c" fn OS_open_output_file([*:0]const u8) Tchannel;
+pub extern "c" fn OS_open_exclusive_output_file([*:0]const u8) Tchannel;
+pub extern "c" fn OS_open_io_file([*:0]const u8) Tchannel;
+pub extern "c" fn OS_open_append_file([*:0]const u8) Tchannel;
+pub extern "c" fn OS_file_length(Tchannel) OffT;
+pub extern "c" fn OS_file_position(Tchannel) OffT;
+pub extern "c" fn OS_file_set_position(Tchannel, OffT) void;
+pub extern "c" fn OS_file_truncate(Tchannel, OffT) void;
+pub extern "c" fn OS_file_existence_test([*:0]const u8) c_uint;
+pub extern "c" fn OS_file_existence_test_direct([*:0]const u8) c_uint;
+pub extern "c" fn OS_file_type_direct([*:0]const u8) c_int;
+pub extern "c" fn OS_file_type_indirect([*:0]const u8) c_int;
+pub extern "c" fn OS_file_directory_p([*:0]const u8) c_int;
+pub extern "c" fn OS_file_soft_link_p([*:0]const u8) ?[*:0]const u8;
+pub extern "c" fn OS_file_rename([*:0]const u8, [*:0]const u8) void;
+pub extern "c" fn OS_file_link_hard([*:0]const u8, [*:0]const u8) void;
+pub extern "c" fn OS_file_link_soft([*:0]const u8, [*:0]const u8) void;
+pub extern "c" fn OS_directory_make([*:0]const u8) void;
+pub extern "c" fn OS_directory_delete([*:0]const u8) void;
+pub extern "c" fn OS_file_touch([*:0]const u8) c_int;
+pub extern "c" fn OS_directory_open([*:0]const u8) c_uint;
+pub extern "c" fn OS_directory_valid_p(c_uint) c_int;
+pub extern "c" fn OS_directory_close(c_uint) void;
+pub extern "c" fn OS_directory_read(c_uint) ?[*:0]const u8;
+pub extern "c" fn OS_directory_read_matching(c_uint, [*:0]const u8) ?[*:0]const u8;
+pub extern "c" fn OS_channel_copy(OffT, Tchannel, Tchannel) c_int;
+pub extern "c" fn OS_file_copy([*:0]const u8, [*:0]const u8) void;
 pub extern "c" fn find_primitive(obj.SchemeObject, bool, bool, c_int) obj.SchemeObject;
 pub extern "c" fn termination_normal(c_int) noreturn;
 pub extern "c" fn OS_restartable_exit() void;
@@ -817,7 +867,7 @@ pub inline fn checkArg(n: c_int, comptime pred: anytype) void {
 
 pub inline fn stringArg(n: c_int) [*:0]u8 {
     const arg = argRef(@intCast(n));
-    if (!obj.legacyStringP(arg)) {
+    if (!string_p(arg)) {
         error_wrong_type_arg(n);
     }
     return @ptrCast(obj.legacyStringData(arg));

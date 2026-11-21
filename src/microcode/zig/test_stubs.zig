@@ -53,6 +53,12 @@ var mock_sel_fds: [8]c_int = @splat(0);
 var mock_sel_modes: [8]c_uint = @splat(0);
 var mock_sel_count: c_uint = 0;
 var mock_sel_sentinel: u8 = 0;
+var mock_file_lengths: [16]abi.OffT = @splat(0);
+var mock_file_positions: [16]abi.OffT = @splat(0);
+pub var mock_file_existence: c_uint = 0;
+pub var mock_file_type: c_int = 0;
+pub var mock_soft_link: ?[*:0]const u8 = null;
+var mock_dir_open: bool = false;
 pub var mock_write_var_cache_calls: usize = 0;
 pub var mock_make_uuo_link_calls: usize = 0;
 pub var mock_apply_compiled_calls: usize = 0;
@@ -127,6 +133,12 @@ pub fn resetMockRuntime() void {
     mock_sel_fds = @splat(0);
     mock_sel_modes = @splat(0);
     mock_sel_count = 0;
+    mock_file_lengths = @splat(0);
+    mock_file_positions = @splat(0);
+    mock_file_existence = 0;
+    mock_file_type = 0;
+    mock_soft_link = null;
+    mock_dir_open = false;
     storage.memory_block_end = null;
     storage.heap_reserved = 0;
     storage.ephemeron_array = obj.sharp_f;
@@ -768,3 +780,85 @@ pub export fn OS_test_select_descriptor(_: c_int, _: c_int, mode: c_uint) callco
 pub export fn OS_pause(_: bool, _: bool) callconv(.c) c_int {
     return 0;
 }
+
+pub fn setMockFileMetrics(ch: abi.Tchannel, len: abi.OffT, pos: abi.OffT) void {
+    mock_file_lengths[ch] = len;
+    mock_file_positions[ch] = pos;
+}
+
+fn mockOpenFile() abi.Tchannel {
+    const ch: abi.Tchannel = 3;
+    setMockChannel(ch, @intFromEnum(abi.ChannelType.file), false);
+    return ch;
+}
+
+pub export fn OS_open_input_file(_: [*:0]const u8) callconv(.c) abi.Tchannel {
+    return mockOpenFile();
+}
+pub export fn OS_open_output_file(_: [*:0]const u8) callconv(.c) abi.Tchannel {
+    return mockOpenFile();
+}
+pub export fn OS_open_exclusive_output_file(_: [*:0]const u8) callconv(.c) abi.Tchannel {
+    return mockOpenFile();
+}
+pub export fn OS_open_io_file(_: [*:0]const u8) callconv(.c) abi.Tchannel {
+    return mockOpenFile();
+}
+pub export fn OS_open_append_file(_: [*:0]const u8) callconv(.c) abi.Tchannel {
+    return mockOpenFile();
+}
+pub export fn OS_file_length(ch: abi.Tchannel) callconv(.c) abi.OffT {
+    return mock_file_lengths[ch];
+}
+pub export fn OS_file_position(ch: abi.Tchannel) callconv(.c) abi.OffT {
+    return mock_file_positions[ch];
+}
+pub export fn OS_file_set_position(ch: abi.Tchannel, pos: abi.OffT) callconv(.c) void {
+    mock_file_positions[ch] = pos;
+}
+pub export fn OS_file_truncate(ch: abi.Tchannel, len: abi.OffT) callconv(.c) void {
+    mock_file_lengths[ch] = len;
+}
+pub export fn OS_file_existence_test(_: [*:0]const u8) callconv(.c) c_uint {
+    return mock_file_existence;
+}
+pub export fn OS_file_existence_test_direct(_: [*:0]const u8) callconv(.c) c_uint {
+    return mock_file_existence;
+}
+pub export fn OS_file_type_direct(_: [*:0]const u8) callconv(.c) c_int {
+    return mock_file_type;
+}
+pub export fn OS_file_type_indirect(_: [*:0]const u8) callconv(.c) c_int {
+    return mock_file_type;
+}
+pub export fn OS_file_directory_p(_: [*:0]const u8) callconv(.c) c_int {
+    return 0;
+}
+pub export fn OS_file_soft_link_p(_: [*:0]const u8) callconv(.c) ?[*:0]const u8 {
+    return mock_soft_link;
+}
+pub export fn OS_file_rename(_: [*:0]const u8, _: [*:0]const u8) callconv(.c) void {}
+pub export fn OS_file_link_hard(_: [*:0]const u8, _: [*:0]const u8) callconv(.c) void {}
+pub export fn OS_file_link_soft(_: [*:0]const u8, _: [*:0]const u8) callconv(.c) void {}
+pub export fn OS_directory_make(_: [*:0]const u8) callconv(.c) void {}
+pub export fn OS_directory_delete(_: [*:0]const u8) callconv(.c) void {}
+pub export fn OS_file_touch(_: [*:0]const u8) callconv(.c) c_int {
+    return 1;
+}
+pub export fn OS_directory_open(_: [*:0]const u8) callconv(.c) c_uint {
+    mock_dir_open = true;
+    return 1;
+}
+pub export fn OS_directory_valid_p(idx: c_uint) callconv(.c) c_int {
+    return if (mock_dir_open and idx == 1) 1 else 0;
+}
+pub export fn OS_directory_close(idx: c_uint) callconv(.c) void {
+    if (idx == 1) mock_dir_open = false;
+}
+pub export fn OS_directory_read(_: c_uint) callconv(.c) ?[*:0]const u8 {
+    return "entry.scm";
+}
+pub export fn OS_directory_read_matching(_: c_uint, _: [*:0]const u8) callconv(.c) ?[*:0]const u8 {
+    return "match.scm";
+}
+pub export fn OS_file_copy(_: [*:0]const u8, _: [*:0]const u8) callconv(.c) void {}

@@ -69,6 +69,8 @@ pub const fasdump = @import("fasdump.zig");
 pub const debug = @import("debug.zig");
 pub const gcloop = @import("gcloop.zig");
 pub const prosio = @import("prosio.zig");
+pub const prosfile = @import("prosfile.zig");
+pub const prosfs = @import("prosfs.zig");
 
 comptime {
     _ = chacha;
@@ -138,6 +140,8 @@ comptime {
     _ = debug;
     _ = gcloop;
     _ = prosio;
+    _ = prosfile;
+    _ = prosfs;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -214,4 +218,6 @@ test "microcode zig scaffold" {
     _ = debug;
     _ = gcloop;
     _ = prosio;
+    _ = prosfile;
+    _ = prosfs;
 }
