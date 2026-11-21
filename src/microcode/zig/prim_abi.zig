@@ -502,6 +502,10 @@ pub const ChannelType = enum(c_uint) {
 
 pub const mode_reg: c_uint = 0o666;
 
+pub const TttyState = extern struct {
+    tio: std.c.termios,
+};
+
 pub const Channel = extern struct {
     descriptor: c_int,
     type: ChannelType,
@@ -811,6 +815,10 @@ pub extern "c" fn UX_read_file_status_indirect([*:0]const u8, *Stat) c_int;
 pub extern "c" fn UX_file_system_type([*:0]const u8) ?[*:0]const u8;
 pub extern "c" fn find_primitive(obj.SchemeObject, bool, bool, c_int) obj.SchemeObject;
 pub extern "c" fn termination_normal(c_int) noreturn;
+pub extern "c" fn termination_eof() noreturn;
+pub extern "c" fn UX_terminal_get_state(c_int, *TttyState) c_int;
+pub extern "c" fn UX_terminal_set_state(c_int, *const TttyState) c_int;
+pub extern "c" fn terminal_state_raw(*TttyState, c_int) void;
 pub extern "c" fn OS_restartable_exit() void;
 pub extern "c" fn OS_under_emacs_p() c_int;
 pub extern "c" fn OS_set_trap_state(c_int) c_int;

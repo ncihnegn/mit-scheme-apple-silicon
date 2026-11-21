@@ -87,6 +87,9 @@ pub var mock_channel_table_entries: [16]abi.Channel = @splat(.{ .descriptor = -1
 pub export var channel_table: [*]abi.Channel = &mock_channel_table_entries;
 pub export var UX_out_of_files_p: bool = false;
 pub var mock_terminal_open_calls: usize = 0;
+pub var mock_tty_get_calls: usize = 0;
+pub var mock_tty_set_calls: usize = 0;
+pub var mock_tty_raw_calls: usize = 0;
 pub var mock_write_var_cache_calls: usize = 0;
 pub var mock_make_uuo_link_calls: usize = 0;
 pub var mock_apply_compiled_calls: usize = 0;
@@ -191,6 +194,9 @@ pub fn resetMockRuntime() void {
     mock_channel_table_entries = @splat(.{ .descriptor = -1, .type = .unknown, .flags = .{} });
     UX_out_of_files_p = false;
     mock_terminal_open_calls = 0;
+    mock_tty_get_calls = 0;
+    mock_tty_set_calls = 0;
+    mock_tty_raw_calls = 0;
     storage.memory_block_end = null;
     storage.heap_reserved = 0;
     storage.ephemeron_array = obj.sharp_f;
@@ -1268,8 +1274,23 @@ pub export fn channel_allocate() callconv(.c) abi.Tchannel {
 pub export fn terminal_open(_: abi.Tchannel) callconv(.c) void {
     mock_terminal_open_calls += 1;
 }
-pub export fn OS_open_fd(_: c_int) callconv(.c) abi.Tchannel {
-    return mockOpenFile();
+pub export fn OS_open_fd(fd: c_int) callconv(.c) abi.Tchannel {
+    return abi.makeChannel(fd, .file);
+}
+pub export fn UX_terminal_get_state(_: c_int, s: *abi.TttyState) callconv(.c) c_int {
+    s.* = std.mem.zeroes(abi.TttyState);
+    mock_tty_get_calls += 1;
+    return 0;
+}
+pub export fn UX_terminal_set_state(_: c_int, _: *const abi.TttyState) callconv(.c) c_int {
+    mock_tty_set_calls += 1;
+    return 0;
+}
+pub export fn terminal_state_raw(_: *abi.TttyState, _: c_int) callconv(.c) void {
+    mock_tty_raw_calls += 1;
+}
+pub export fn termination_eof() callconv(.c) noreturn {
+    @panic("mock termination_eof");
 }
 pub export fn OS_current_user_name() callconv(.c) [*:0]const u8 {
     return "mock-user";
