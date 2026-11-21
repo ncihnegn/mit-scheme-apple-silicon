@@ -82,7 +82,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/uxio.c",
     "src/microcode/uxproc.c",
     "src/microcode/uxsig.c",
-    "src/microcode/uxsock.c",
     "src/microcode/uxterm.c",
     "src/microcode/uxtop.c",
     "src/microcode/uxtrap.c",
