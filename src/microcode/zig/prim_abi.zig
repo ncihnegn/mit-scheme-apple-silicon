@@ -480,7 +480,32 @@ pub const TimeStructure = extern struct {
 };
 
 pub const Tprocess = c_uint;
+pub const no_process: Tprocess = std.math.maxInt(Tprocess);
 pub const PidT = std.c.pid_t;
+
+pub const Process = extern struct {
+    id: PidT,
+    tick: c_long,
+    sync_tick: c_long,
+    raw_reason: c_ushort,
+    reason: c_ushort,
+    raw_status: ProcessStatus,
+    status: ProcessStatus,
+    jc_status: ProcessJcStatus,
+};
+
+comptime {
+    if (@sizeOf(usize) == 8) {
+        std.debug.assert(@sizeOf(Process) == 40);
+        std.debug.assert(@offsetOf(Process, "tick") == 8);
+        std.debug.assert(@offsetOf(Process, "sync_tick") == 16);
+        std.debug.assert(@offsetOf(Process, "raw_reason") == 24);
+        std.debug.assert(@offsetOf(Process, "reason") == 26);
+        std.debug.assert(@offsetOf(Process, "raw_status") == 28);
+        std.debug.assert(@offsetOf(Process, "status") == 32);
+        std.debug.assert(@offsetOf(Process, "jc_status") == 36);
+    }
+}
 
 pub const ProcessStatus = enum(c_uint) {
     free = 0,
@@ -901,6 +926,15 @@ pub extern "c" fn OS_process_hangup(Tprocess) void;
 pub extern "c" fn OS_process_continue_background(Tprocess) void;
 pub extern "c" fn OS_process_continue_foreground(Tprocess) void;
 pub extern "c" fn OS_process_wait(Tprocess) void;
+pub extern "c" fn OS_ctty_fd() c_int;
+pub extern "c" fn OS_save_internal_state() void;
+pub extern "c" fn OS_restore_internal_state() void;
+pub extern "c" fn OS_save_external_state() void;
+pub extern "c" fn OS_restore_external_state() void;
+pub extern "c" fn UX_initialize_child_signals() void;
+pub extern "c" fn stop_signal_default(c_int) void;
+pub extern var stop_signal_hook: ?*const fn (c_int) callconv(.c) void;
+pub extern var subprocess_death_hook: ?*const fn (PidT, *c_int) callconv(.c) void;
 pub extern "c" fn UX_channel_descriptor(Tchannel) c_int;
 pub extern "c" fn OS_open_tcp_stream_socket(?*anyopaque, c_uint) Tchannel;
 pub extern "c" fn OS_shutdown_socket(Tchannel, c_ulong) void;

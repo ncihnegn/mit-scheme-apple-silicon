@@ -203,6 +203,8 @@ pub fn resetMockRuntime() void {
     mock_sig_quit_handler = 3;
     mock_sig_int_handler = 5;
     mock_sig_tstp_handler = 4;
+    stop_signal_hook = null;
+    subprocess_death_hook = null;
     storage.memory_block_end = null;
     storage.heap_reserved = 0;
     storage.ephemeron_array = obj.sharp_f;
@@ -1356,6 +1358,17 @@ pub export fn userio_confirm(_: [*:0]const u8) callconv(.c) c_int {
     return 0;
 }
 pub export fn UX_dump_core() callconv(.c) void {}
+pub export var stop_signal_hook: ?*const fn (c_int) callconv(.c) void = null;
+pub export var subprocess_death_hook: ?*const fn (abi.PidT, *c_int) callconv(.c) void = null;
+pub export fn OS_ctty_fd() callconv(.c) c_int {
+    return -1;
+}
+pub export fn OS_save_internal_state() callconv(.c) void {}
+pub export fn OS_restore_internal_state() callconv(.c) void {}
+pub export fn OS_save_external_state() callconv(.c) void {}
+pub export fn OS_restore_external_state() callconv(.c) void {}
+pub export fn UX_initialize_child_signals() callconv(.c) void {}
+pub export fn stop_signal_default(_: c_int) callconv(.c) void {}
 pub export fn OS_current_user_name() callconv(.c) [*:0]const u8 {
     return "mock-user";
 }

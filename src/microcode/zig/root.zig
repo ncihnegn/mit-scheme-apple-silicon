@@ -90,6 +90,7 @@ pub const uxenv = @import("uxenv.zig");
 pub const uxfile = @import("uxfile.zig");
 pub const uxfs = @import("uxfs.zig");
 pub const uxio = @import("uxio.zig");
+pub const uxproc = @import("uxproc.zig");
 pub const uxsock = @import("uxsock.zig");
 pub const uxterm = @import("uxterm.zig");
 pub const uxtop = @import("uxtop.zig");
@@ -185,6 +186,7 @@ comptime {
     _ = uxfile;
     _ = uxfs;
     _ = uxio;
+    _ = uxproc;
     _ = uxsock;
     _ = uxterm;
     _ = uxtop;
@@ -289,6 +291,7 @@ test "microcode zig scaffold" {
     _ = uxfile;
     _ = uxfs;
     _ = uxio;
+    _ = uxproc;
     _ = uxsock;
     _ = uxterm;
     _ = uxtop;
