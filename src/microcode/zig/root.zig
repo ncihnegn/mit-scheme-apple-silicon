@@ -15,6 +15,7 @@ pub const scheme_obj = @import("scheme_obj.zig");
 pub const code_arena = @import("code_arena.zig");
 pub const cmpint = @import("cmpint.zig");
 pub const cmpintmd = @import("cmpintmd.zig");
+pub const svm1_interp = @import("svm1_interp.zig");
 pub const prim_abi = @import("prim_abi.zig");
 pub const prchacha = @import("prchacha.zig");
 pub const prkeccak = @import("prkeccak.zig");
@@ -115,6 +116,7 @@ comptime {
     _ = code_arena;
     _ = cmpint;
     _ = cmpintmd;
+    _ = svm1_interp;
     _ = prim_abi;
     _ = prchacha;
     _ = prkeccak;
@@ -224,6 +226,7 @@ test "microcode zig scaffold" {
     _ = code_arena;
     _ = cmpint;
     _ = cmpintmd;
+    _ = svm1_interp;
     _ = prim_abi;
     _ = prchacha;
     _ = prkeccak;

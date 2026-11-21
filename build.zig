@@ -626,10 +626,6 @@ pub fn build(b: *std.Build) void {
         .none => {},
     }
 
-    if (arch.is_svm) {
-        scheme_c_sources.append(b.allocator, "src/microcode/svm1-interp.c") catch @panic("OOM");
-    }
-
     // Build host-native Zig findprim and generate usrdef.c out-of-tree.
     const findprim = b.addExecutable(.{
         .name = "findprim",
