@@ -25,7 +25,7 @@ var mock_tospace: [8192]obj.SchemeObject = @splat(0);
 var mock_stack: [128]obj.SchemeObject = @splat(0);
 var mock_const: [64]obj.SchemeObject = @splat(0);
 
-var mock_Registers: [14]obj.SchemeObject = @splat(0);
+var mock_Registers: [abi.regblock_length]obj.SchemeObject = @splat(0);
 
 comptime {
     if (@import("build_options").cc_support) {
@@ -570,9 +570,21 @@ comptime {
         @export(&mockPlausibleCcBlockP, .{ .name = "plausible_cc_block_p" });
         @export(&mockPcToBuiltinIndex, .{ .name = "pc_to_builtin_index" });
         @export(&mockPcToUtilityIndex, .{ .name = "pc_to_utility_index" });
+        @export(&mockWriteCcEntryType, .{ .name = "write_cc_entry_type" });
+        @export(&mockWriteCcEntryOffset, .{ .name = "write_cc_entry_offset" });
+        @export(&mockReadUuoSymbol, .{ .name = "read_uuo_symbol" });
+        @export(&mockReadUuoFrameSize, .{ .name = "read_uuo_frame_size" });
+        @export(&mockReadUuoTargetNoReloc, .{ .name = "read_uuo_target_no_reloc" });
+        @export(&mockTrampolineEntrySize, .{ .name = "trampoline_entry_size" });
+        @export(&mockTrampolineEntryAddr, .{ .name = "trampoline_entry_addr" });
+        @export(&mockTrampolineReturnAddr, .{ .name = "trampoline_return_addr" });
+        @export(&mockStoreTrampolineInsns, .{ .name = "store_trampoline_insns" });
+        @export(&mockStoreTrampolineToInterfaceInsns, .{ .name = "store_trampoline_to_interface_insns" });
     }
     if (build_options.cc_is_svm) {
         @export(&mockSvmExportIp, .{ .name = "svm_export_instruction_pointer" });
+        @export(&mockCtoInterfaceSvm, .{ .name = "C_to_interface" });
+        @export(&mockInitializeSvm1, .{ .name = "initialize_svm1" });
     }
     if (build_options.cc_is_native) {
         @export(&mockCcReturnAddressToEntryAddress, .{ .name = "cc_return_address_to_entry_address" });
@@ -580,9 +592,17 @@ comptime {
         @export(&mockCompiledClosureStart, .{ .name = "compiled_closure_start" });
         @export(&mockCompiledClosureCount, .{ .name = "compiled_closure_count" });
         @export(&mockCompiledClosureNext, .{ .name = "compiled_closure_next" });
+        @export(&mockCompiledClosureEntry, .{ .name = "compiled_closure_entry" });
+        @export(&mockCompiledClosureEntryToTarget, .{ .name = "compiled_closure_entry_to_target" });
         @export(&mockReadCompiledClosureTarget, .{ .name = "read_compiled_closure_target" });
         @export(&mockWriteCompiledClosureTarget, .{ .name = "write_compiled_closure_target" });
         @export(&mockSkipCompiledClosurePadding, .{ .name = "skip_compiled_closure_padding" });
+        @export(&mockInterfaceToC, .{ .name = "interface_to_C" });
+        @export(&mockInterfaceToScheme, .{ .name = "interface_to_scheme" });
+        @export(&mockInterfaceToSchemeReturn, .{ .name = "interface_to_scheme_return" });
+        @export(&mockCtoInterfaceNative, .{ .name = "C_to_interface" });
+        @export(&mockAarch64ResetHook, .{ .name = "aarch64_reset_hook" });
+        @export(&mockX8664ResetHook, .{ .name = "x86_64_reset_hook" });
     }
 }
 
@@ -863,6 +883,59 @@ pub export fn encode_old_style_format_word(cet: *abi.CcEntryType, fw_r: *u16) ca
     fw_r.* = (high << 8) | low;
     return false;
 }
+
+pub export var prim_apply_error_code: c_long = 0;
+
+pub export fn apply_primitive_external(_: obj.SchemeObject) callconv(.c) void {}
+
+fn mockWriteCcEntryType(_: *abi.CcEntryType, _: ?*anyopaque) callconv(.c) bool {
+    return false;
+}
+fn mockWriteCcEntryOffset(_: *abi.CcEntryOffset, _: ?*anyopaque) callconv(.c) bool {
+    return false;
+}
+fn mockCompiledClosureEntry(ptr: ?*anyopaque) callconv(.c) ?*anyopaque {
+    return ptr;
+}
+fn mockCompiledClosureEntryToTarget(ptr: ?*anyopaque) callconv(.c) obj.SchemeObject {
+    return obj.makeObject(obj.tc_compiled_entry, obj.rawAddressToDatum(@intFromPtr(ptr orelse return obj.sharp_f)));
+}
+fn mockReadUuoSymbol(saddr: [*]obj.SchemeObject) callconv(.c) obj.SchemeObject {
+    return saddr[0];
+}
+fn mockReadUuoFrameSize(_: [*]obj.SchemeObject) callconv(.c) c_uint {
+    return 1;
+}
+fn mockReadUuoTargetNoReloc(saddr: [*]obj.SchemeObject) callconv(.c) ?*anyopaque {
+    return @ptrFromInt(@as(usize, @intCast(saddr[0])));
+}
+fn mockTrampolineEntrySize(n_entries: c_ulong) callconv(.c) c_ulong {
+    return n_entries * 4;
+}
+fn mockTrampolineEntryAddr(block: [*]obj.SchemeObject, index: c_ulong) callconv(.c) ?*anyopaque {
+    return @ptrCast(block + 2 + @as(usize, @intCast(index)) * 4 + 2);
+}
+fn mockTrampolineReturnAddr(block: [*]obj.SchemeObject, index: c_ulong) callconv(.c) ?*anyopaque {
+    return mockTrampolineEntryAddr(block, index);
+}
+fn mockStoreTrampolineInsns(_: ?*anyopaque, _: u8) callconv(.c) bool {
+    return false;
+}
+fn mockStoreTrampolineToInterfaceInsns(_: ?*anyopaque) callconv(.c) bool {
+    return false;
+}
+fn mockInitializeSvm1() callconv(.c) void {}
+fn mockCtoInterfaceSvm(_: ?*anyopaque) callconv(.c) c_long {
+    return abi.prim_done;
+}
+fn mockInterfaceToC() callconv(.c) void {}
+fn mockInterfaceToScheme() callconv(.c) void {}
+fn mockInterfaceToSchemeReturn() callconv(.c) void {}
+fn mockCtoInterfaceNative(_: ?*anyopaque, _: ?*anyopaque) callconv(.c) c_long {
+    return abi.prim_done;
+}
+fn mockAarch64ResetHook() callconv(.c) void {}
+fn mockX8664ResetHook() callconv(.c) void {}
 
 pub export fn compiler_reset(utilities: obj.SchemeObject) callconv(.c) void {
     _ = utilities;

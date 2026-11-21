@@ -632,6 +632,10 @@ pub inline fn entityOperator(o: SchemeObject) SchemeObject {
     return memoryRef(o, 0);
 }
 
+pub inline fn entityData(o: SchemeObject) SchemeObject {
+    return memoryRef(o, 1);
+}
+
 pub inline fn ustringBytesPerCp(obj: SchemeObject) c_ulong {
     return objectType(nmVectorSubheader(obj)) & 0x3;
 }
