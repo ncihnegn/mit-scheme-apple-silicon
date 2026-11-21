@@ -69,7 +69,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/boot.c",
     "src/microcode/debug.c",
     "src/microcode/fasdump.c",
-    "src/microcode/fasl.c",
     "src/microcode/fasload.c",
     "src/microcode/gcloop.c",
     "src/microcode/interp.c",
@@ -684,6 +683,7 @@ pub fn build(b: *std.Build) void {
 
     const zig_options = b.addOptions();
     zig_options.addOption(bool, "cc_is_native", arch.is_native);
+    zig_options.addOption(bool, "cc_is_svm", arch.is_svm);
     zig_options.addOption(bool, "cc_support", arch.is_native or arch.is_svm);
     zig_options.addOption(bool, "debugging", debugging);
     zig_options.addOption([]const u8, "package_version", "13.0.50");
@@ -800,6 +800,17 @@ pub fn build(b: *std.Build) void {
         .name = "smoke_runtime",
         .root_module = smoke_runtime_mod,
     });
+    const fasl_smoke_mod = b.createModule(.{
+        .root_source_file = b.path("src/microcode/zig/fasl.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    fasl_smoke_mod.addOptions("build_options", zig_options);
+    const fasl_smoke_obj = b.addObject(.{
+        .name = "fasl_smoke",
+        .root_module = fasl_smoke_mod,
+    });
     const smoke_step = b.step("test-smoke", "Build and run standalone microcode C smoke tests");
     const smoke_specs = [_]struct {
         name: []const u8,
@@ -807,6 +818,7 @@ pub fn build(b: *std.Build) void {
         deps: []const []const u8,
         needs_cmpintmd: bool,
         needs_native: bool,
+        needs_fasl: bool,
     }{
         .{
             .name = "jit-smoke",
@@ -814,6 +826,7 @@ pub fn build(b: *std.Build) void {
             .deps = &.{},
             .needs_cmpintmd = true,
             .needs_native = false,
+            .needs_fasl = false,
         },
         .{
             .name = "arena-smoke",
@@ -821,6 +834,7 @@ pub fn build(b: *std.Build) void {
             .deps = &.{},
             .needs_cmpintmd = false,
             .needs_native = false,
+            .needs_fasl = false,
         },
         .{
             .name = "gc-arena-smoke",
@@ -830,16 +844,17 @@ pub fn build(b: *std.Build) void {
             },
             .needs_cmpintmd = true,
             .needs_native = false,
+            .needs_fasl = false,
         },
         .{
             .name = "fasl-code-smoke",
             .src = "tests/microcode/fasl-code-smoke.c",
             .deps = &.{
-                "src/microcode/fasl.c",
                 "src/microcode/gcloop.c",
             },
             .needs_cmpintmd = true,
             .needs_native = false,
+            .needs_fasl = true,
         },
         .{
             .name = "trampoline-smoke",
@@ -850,6 +865,7 @@ pub fn build(b: *std.Build) void {
             },
             .needs_cmpintmd = true,
             .needs_native = true,
+            .needs_fasl = false,
         },
     };
 
@@ -871,6 +887,9 @@ pub fn build(b: *std.Build) void {
             smoke_exe.root_module.linkSystemLibrary("m", .{});
         }
         smoke_exe.root_module.addObject(smoke_runtime_obj);
+        if (spec.needs_fasl) {
+            smoke_exe.root_module.addObject(fasl_smoke_obj);
+        }
         smoke_exe.root_module.addCSourceFile(.{ .file = b.path(spec.src), .flags = c_flags });
         if (spec.needs_cmpintmd) {
             smoke_exe.root_module.addCSourceFile(.{ .file = b.path(cmpintmd_c), .flags = c_flags });

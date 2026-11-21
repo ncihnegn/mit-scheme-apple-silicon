@@ -57,6 +57,7 @@ pub const utabmd = @import("utabmd.zig");
 pub const purify = @import("purify.zig");
 pub const lookprm = @import("lookprm.zig");
 pub const hooks = @import("hooks.zig");
+pub const fasl = @import("fasl.zig");
 
 comptime {
     _ = chacha;
@@ -114,6 +115,7 @@ comptime {
     _ = purify;
     _ = lookprm;
     _ = hooks;
+    _ = fasl;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -178,4 +180,5 @@ test "microcode zig scaffold" {
     _ = purify;
     _ = lookprm;
     _ = hooks;
+    _ = fasl;
 }

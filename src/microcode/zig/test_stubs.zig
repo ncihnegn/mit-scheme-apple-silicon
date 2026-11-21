@@ -31,6 +31,7 @@ pub export var compiler_processor_type: c_uint = abi.compiler_aarch64_type;
 pub export var scheme_program_name: [*:0]const u8 = "mit-scheme-unit";
 pub export var critical_section_name: ?[*:0]const u8 = null;
 pub export var current_gc_table: ?*anyopaque = null;
+pub export var compiler_utilities: obj.SchemeObject = obj.sharp_f;
 pub var mock_tospace_ptr: ?[*]obj.SchemeObject = null;
 pub var mock_gc_pt1_calls: usize = 0;
 pub var mock_gc_pt2_calls: usize = 0;
@@ -67,6 +68,7 @@ pub fn resetMockRuntime() void {
     compiler_processor_type = abi.compiler_aarch64_type;
     critical_section_name = null;
     current_gc_table = null;
+    compiler_utilities = obj.sharp_f;
     mock_tospace_ptr = null;
     mock_gc_pt1_calls = 0;
     mock_gc_pt2_calls = 0;
