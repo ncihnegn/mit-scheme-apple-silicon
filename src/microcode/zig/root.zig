@@ -37,6 +37,8 @@ pub const string = @import("string.zig");
 pub const intern = @import("intern.zig");
 pub const edwin_defs = @import("edwin_defs.zig");
 pub const syntax = @import("syntax.zig");
+pub const regex = @import("regex.zig");
+pub const rgxprim = @import("rgxprim.zig");
 
 comptime {
     _ = chacha;
@@ -74,6 +76,8 @@ comptime {
     _ = intern;
     _ = edwin_defs;
     _ = syntax;
+    _ = regex;
+    _ = rgxprim;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -118,4 +122,6 @@ test "microcode zig scaffold" {
     _ = intern;
     _ = edwin_defs;
     _ = syntax;
+    _ = regex;
+    _ = rgxprim;
 }
