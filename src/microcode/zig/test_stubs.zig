@@ -39,6 +39,17 @@ pub var mock_lookup_result: c_long = abi.prim_done;
 pub var mock_lookup_value: obj.SchemeObject = obj.sharp_f;
 pub var mock_define_calls: usize = 0;
 pub var mock_link_calls: usize = 0;
+var mock_dummy_history: [3]obj.SchemeObject = @splat(obj.sharp_f);
+pub export var history_register: [*]obj.SchemeObject = (&mock_dummy_history).ptr;
+pub export var prev_restore_history_offset: c_ulong = 0;
+pub var mock_apply_compiled_calls: usize = 0;
+pub var mock_last_compiled_nargs: c_ulong = 0;
+pub var mock_last_compiled_proc: obj.SchemeObject = obj.sharp_f;
+pub var mock_stack_marker_calls: usize = 0;
+pub var mock_last_marker_thunk: obj.SchemeObject = obj.sharp_f;
+pub var mock_int_mask_calls: usize = 0;
+pub var mock_last_compiled_mask: c_ulong = 0;
+pub var mock_last_compiled_new_mask: c_ulong = 0;
 pub export var MAX_STATIC_PRIMITIVE: c_long = 1;
 pub export var Static_Primitive_Procedure_Table = [_]abi.PrimitiveProcedure{ &mockDummyPrim, &mockDummyPrim };
 pub export var Static_Primitive_Arity_Table = [_]c_int{ 1, 2 };
@@ -64,6 +75,17 @@ pub fn resetMockRuntime() void {
     mock_lookup_value = obj.sharp_f;
     mock_define_calls = 0;
     mock_link_calls = 0;
+    mock_dummy_history = @splat(obj.sharp_f);
+    history_register = (&mock_dummy_history).ptr;
+    prev_restore_history_offset = 0;
+    mock_apply_compiled_calls = 0;
+    mock_last_compiled_nargs = 0;
+    mock_last_compiled_proc = obj.sharp_f;
+    mock_stack_marker_calls = 0;
+    mock_last_marker_thunk = obj.sharp_f;
+    mock_int_mask_calls = 0;
+    mock_last_compiled_mask = 0;
+    mock_last_compiled_new_mask = 0;
     mock_return_to_interpreter = obj.makeObject(obj.tc_compiled_return, 1);
     mock_reflect_to_interface = obj.makeObject(obj.tc_compiled_return, 2);
     mock_heap = @splat(0);
@@ -408,12 +430,45 @@ pub export fn OS_syserr_names(len_out: *c_ulong, names_out: *[*]?[*:0]const u8) 
     names_out.* = &mock_syserr_names_arr;
 }
 
-pub export fn initialize_history() callconv(.c) obj.SchemeObject {
-    return abi.make_vector(3, obj.sharp_f, false);
-}
-
 pub export fn initialize_interrupt_handler_vector() callconv(.c) obj.SchemeObject {
     return abi.make_vector(16, obj.sharp_f, false);
+}
+
+pub export fn make_dummy_history() callconv(.c) [*]obj.SchemeObject {
+    return (&mock_dummy_history).ptr;
+}
+
+pub export fn save_history(_: c_ulong) callconv(.c) void {}
+
+pub export fn stop_history() callconv(.c) void {}
+
+pub export fn preserve_interrupt_mask() callconv(.c) void {}
+
+pub export fn back_out_of_primitive() callconv(.c) void {}
+
+comptime {
+    if (@import("build_options").cc_support) {
+        @export(&mockApplyCompiledFromPrimitive, .{ .name = "apply_compiled_from_primitive" });
+        @export(&mockCompiledWithStackMarker, .{ .name = "compiled_with_stack_marker" });
+        @export(&mockCompiledWithInterruptMask, .{ .name = "compiled_with_interrupt_mask" });
+    }
+}
+
+fn mockApplyCompiledFromPrimitive(nargs: c_ulong, proc: obj.SchemeObject) callconv(.c) void {
+    mock_apply_compiled_calls += 1;
+    mock_last_compiled_nargs = nargs;
+    mock_last_compiled_proc = proc;
+}
+
+fn mockCompiledWithStackMarker(thunk: obj.SchemeObject) callconv(.c) void {
+    mock_stack_marker_calls += 1;
+    mock_last_marker_thunk = thunk;
+}
+
+fn mockCompiledWithInterruptMask(old_mask: c_ulong, _: obj.SchemeObject, new_mask: c_ulong) callconv(.c) void {
+    mock_int_mask_calls += 1;
+    mock_last_compiled_mask = old_mask;
+    mock_last_compiled_new_mask = new_mask;
 }
 
 pub export fn initialize_interrupt_mask_vector() callconv(.c) obj.SchemeObject {

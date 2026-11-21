@@ -37,6 +37,7 @@ pub const tc_vector: c_ulong = 0x0A;
 pub const tc_return_code: c_ulong = 0x0B;
 pub const tc_big_fixnum: c_ulong = 0x0E;
 pub const tc_environment: c_ulong = 0x12;
+pub const tc_delayed: c_ulong = 0x13;
 pub const tc_non_marked_vector: c_ulong = 0x16;
 pub const tc_primitive: c_ulong = 0x18;
 pub const tc_fixnum: c_ulong = 0x1A;
@@ -98,6 +99,11 @@ pub const the_null_env: SchemeObject = makeObject(tc_false, 1);
 pub const unassigned_object: SchemeObject = makeObject(tc_reference_trap, 0);
 pub const unbound_object: SchemeObject = makeObject(tc_reference_trap, 2);
 pub const trap_max_immediate: c_ulong = 9;
+
+pub const tc_history_unmarked: c_ulong = tc_hunk3_a;
+pub const tc_history_marked: c_ulong = tc_hunk3_b;
+pub const history_mark_type: c_ulong = tc_history_unmarked ^ tc_history_marked;
+pub const history_mark_mask: SchemeObject = @as(SchemeObject, history_mark_type) << datum_length;
 
 pub const fasdump_record_marker_start: c_ulong = 0x100;
 pub const fasdump_record_marker_end: c_ulong = 0x200;
@@ -273,6 +279,34 @@ pub inline fn ccEntryP(obj: SchemeObject) bool {
 
 pub inline fn environmentP(obj: SchemeObject) bool {
     return objectType(obj) == tc_environment or obj == the_global_env;
+}
+
+pub inline fn promiseP(obj: SchemeObject) bool {
+    return objectType(obj) == tc_delayed;
+}
+
+pub inline fn delayedSnapped(delayed: SchemeObject) SchemeObject {
+    return memoryRef(delayed, 0);
+}
+
+pub inline fn delayedValue(delayed: SchemeObject) SchemeObject {
+    return memoryRef(delayed, 1);
+}
+
+pub inline fn delayedEnv(delayed: SchemeObject) SchemeObject {
+    return memoryRef(delayed, 0);
+}
+
+pub inline fn delayedProc(delayed: SchemeObject) SchemeObject {
+    return memoryRef(delayed, 1);
+}
+
+pub inline fn historyMarkedP(obj: SchemeObject) bool {
+    return (obj & history_mark_mask) != 0;
+}
+
+pub inline fn historyMark(slot: *SchemeObject) void {
+    slot.* |= history_mark_mask;
 }
 
 pub inline fn cellContents(cell: SchemeObject) SchemeObject {

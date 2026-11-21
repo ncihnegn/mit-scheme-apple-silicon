@@ -24,6 +24,7 @@ pub const int_global_3: c_ulong = 0x0080;
 pub const int_suspend: c_ulong = 0x0100;
 pub const int_mask: c_ulong = (@as(c_ulong, 1) << 16) - 1;
 
+pub const term_bad_stack: c_int = 0x06;
 pub const term_exit: c_int = 0x0C;
 pub const term_no_space: c_int = 0x15;
 pub const err_undefined_primitive: c_long = 0x09;
@@ -45,6 +46,14 @@ pub const prim_no_trap_apply: c_long = -6;
 pub const prim_pop_return: c_long = -7;
 pub const prim_no_trap_pop_return: c_long = -11;
 pub const rc_normal_gc_done: c_ulong = 0x20;
+pub const rc_join_stacklets: c_ulong = 0x01;
+pub const rc_internal_apply: c_ulong = 0x03;
+pub const rc_restore_history: c_ulong = 0x05;
+pub const rc_snap_need_thunk: c_ulong = 0x1C;
+pub const rc_stack_marker: c_ulong = 0x42;
+pub const hist_rib: usize = 0;
+pub const rib_next_reduction: usize = 2;
+pub const rib_mark: usize = 2;
 pub const constant_space_fudge: c_ulong = 128;
 pub const max_return_code: c_ulong = 0x5E;
 pub const rc_comp_interrupt_restart: c_ulong = 0x43;
@@ -184,6 +193,8 @@ pub extern var heap_reserved: c_ulong;
 pub extern var gc_space_needed: c_ulong;
 pub extern var critical_section_name: ?[*:0]const u8;
 pub extern var current_gc_table: ?*anyopaque;
+pub extern var history_register: [*]obj.SchemeObject;
+pub extern var prev_restore_history_offset: c_ulong;
 pub extern var trapping: bool;
 pub extern var constant_start: [*]obj.SchemeObject;
 pub extern var constant_alloc_next: [*]obj.SchemeObject;
@@ -269,6 +280,15 @@ pub extern "c" fn variable_unbound_p(obj.SchemeObject, obj.SchemeObject, *obj.Sc
 pub extern "c" fn variable_unreferenceable_p(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) c_long;
 pub extern "c" fn link_variables(obj.SchemeObject, obj.SchemeObject, obj.SchemeObject, obj.SchemeObject) c_long;
 pub extern "c" fn unbind_variable(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) c_long;
+
+pub extern "c" fn make_dummy_history() [*]obj.SchemeObject;
+pub extern "c" fn save_history(c_ulong) void;
+pub extern "c" fn stop_history() void;
+pub extern "c" fn preserve_interrupt_mask() void;
+pub extern "c" fn back_out_of_primitive() void;
+pub extern "c" fn apply_compiled_from_primitive(c_ulong, obj.SchemeObject) void;
+pub extern "c" fn compiled_with_stack_marker(obj.SchemeObject) void;
+pub extern "c" fn compiled_with_interrupt_mask(c_ulong, obj.SchemeObject, c_ulong) void;
 
 pub extern "c" fn arg_integer(c_int) c_long;
 pub extern "c" fn arg_nonnegative_integer(c_int) c_long;
@@ -622,4 +642,35 @@ pub inline fn heapAvailable() c_ulong {
 pub inline fn argHeapReserved(n: c_int) c_ulong {
     const words: c_ulong = @intCast((@intFromPtr(heap_end) - @intFromPtr(heap_start)) / @sizeOf(obj.SchemeObject));
     return arg_ulong_index_integer(n, words / 2);
+}
+
+pub inline fn stackPop() obj.SchemeObject {
+    const val = stack_pointer[0];
+    stack_pointer += 1;
+    return val;
+}
+
+pub inline fn stackLoc(offset: usize) [*]obj.SchemeObject {
+    return stack_pointer + offset;
+}
+
+pub inline fn stackRef(offset: usize) obj.SchemeObject {
+    return stack_pointer[offset];
+}
+
+pub inline fn stackNPushed() c_ulong {
+    return @intCast((@intFromPtr(stack_end) - @intFromPtr(stack_pointer)) / @sizeOf(obj.SchemeObject));
+}
+
+pub inline fn clearInterrupt(code: c_ulong) void {
+    Registers[regblock_int_code] &= ~code;
+    compilerSetupInterrupt();
+}
+
+pub inline fn contFrameRet(frame: [*]const obj.SchemeObject) obj.SchemeObject {
+    return frame[0];
+}
+
+pub inline fn contFrameExp(frame: [*]const obj.SchemeObject) obj.SchemeObject {
+    return frame[1];
 }
