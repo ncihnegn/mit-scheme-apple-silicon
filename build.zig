@@ -742,17 +742,13 @@ pub fn build(b: *std.Build) void {
         const starter = b.addExecutable(.{
             .name = "macosx-starter",
             .root_module = b.createModule(.{
+                .root_source_file = b.path("src/microcode/zig/macosx_starter.zig"),
                 .target = target,
                 .optimize = optimize,
                 .link_libc = true,
-                .sanitize_c = .off,
             }),
         });
-        starter.root_module.addCSourceFile(.{
-            .file = b.path("src/microcode/macosx-starter.c"),
-            .flags = &.{ "-Wall", "-O2" },
-        });
-        starter.root_module.linkFramework("CoreServices", .{});
+        starter.root_module.linkFramework("CoreFoundation", .{});
         b.getInstallStep().dependOn(&b.addInstallArtifact(starter, .{
             .dest_dir = .{ .override = .{ .custom = b.fmt("lib/{s}", .{auxdir_name}) } },
         }).step);
@@ -950,6 +946,20 @@ pub fn build(b: *std.Build) void {
         }),
     });
     unit_test_step.dependOn(&b.addRunArtifact(findprim_tests).step);
+
+    if (target.result.os.tag.isDarwin()) {
+        const starter_tests = b.addTest(.{
+            .name = "macosx-starter-unit",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("src/microcode/zig/macosx_starter.zig"),
+                .target = target,
+                .optimize = optimize,
+                .link_libc = true,
+            }),
+        });
+        starter_tests.root_module.linkFramework("CoreFoundation", .{});
+        unit_test_step.dependOn(&b.addRunArtifact(starter_tests).step);
+    }
 
     // `zig build bootstrap`
     const bootstrap_step = b.step(
