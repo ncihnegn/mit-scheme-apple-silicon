@@ -221,7 +221,7 @@ pub export fn Prim_garbage_collect() callconv(.c) obj.SchemeObject {
     abi.critical_section_name = "garbage collector";
 
     if (build_options.debugging and storage.gc_debug) {
-        abi.debug_verify_heap();
+        _ = abi.debug_verify_heap();
     }
 
     abi.open_tospace(abi.heap_start);

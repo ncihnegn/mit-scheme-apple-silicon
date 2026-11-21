@@ -42,15 +42,20 @@ pub const tc_procedure: c_ulong = 0x0F;
 pub const tc_entity: c_ulong = 0x10;
 pub const tc_environment: c_ulong = 0x12;
 pub const tc_delayed: c_ulong = 0x13;
+pub const tc_extended_lambda: c_ulong = 0x14;
 pub const tc_non_marked_vector: c_ulong = 0x16;
+pub const tc_lambda: c_ulong = 0x17;
 pub const tc_primitive: c_ulong = 0x18;
 pub const tc_fixnum: c_ulong = 0x1A;
 pub const tc_unicode_string: c_ulong = 0x1B;
 pub const tc_control_point: c_ulong = 0x1C;
 pub const tc_interned_symbol: c_ulong = 0x1D;
 pub const tc_character_string: c_ulong = 0x1E;
+pub const tc_access: c_ulong = 0x1F;
 pub const tc_hunk3_a: c_ulong = 0x20;
+pub const tc_definition: c_ulong = 0x21;
 pub const tc_broken_heart: c_ulong = 0x22;
+pub const tc_assignment: c_ulong = 0x23;
 pub const tc_hunk3_b: c_ulong = 0x24;
 pub const tc_hunk3: c_ulong = tc_hunk3_b;
 pub const tc_tagged_object: c_ulong = 0x25;
@@ -58,6 +63,7 @@ pub const tc_combination: c_ulong = 0x26;
 pub const tc_manifest_nm_vector: c_ulong = 0x27;
 pub const tc_compiled_entry: c_ulong = 0x28;
 pub const tc_ephemeron: c_ulong = 0x2B;
+pub const tc_variable: c_ulong = 0x2C;
 pub const tc_vector_1b: c_ulong = 0x2F;
 pub const tc_bit_string: c_ulong = tc_vector_1b;
 pub const tc_reference_trap: c_ulong = 0x32;
@@ -101,6 +107,11 @@ pub inline fn objectNewType(tc: c_ulong, o: SchemeObject) SchemeObject {
 pub const sharp_f: SchemeObject = makeObject(tc_false, 0);
 pub const sharp_t: SchemeObject = makeObject(tc_constant, 0);
 pub const unspecific: SchemeObject = makeObject(tc_constant, 1);
+pub const optional_marker: SchemeObject = makeObject(tc_constant, 3);
+pub const rest_marker: SchemeObject = makeObject(tc_constant, 4);
+pub const key_marker: SchemeObject = makeObject(tc_constant, 5);
+pub const eof_object: SchemeObject = makeObject(tc_constant, 6);
+pub const default_object: SchemeObject = makeObject(tc_constant, 7);
 pub const empty_list: SchemeObject = makeObject(tc_constant, 9);
 pub const gc_reclaimed: SchemeObject = makeObject(tc_constant, 10);
 pub const the_global_env: SchemeObject = makeObject(tc_false, 0);
@@ -453,6 +464,54 @@ pub inline fn lambdaNParams(exp: SchemeObject) c_ulong {
     return vectorLength(lambdaNames(exp)) - 1;
 }
 
+pub inline fn elambdaNames(exp: SchemeObject) SchemeObject {
+    return memoryRef(exp, 1);
+}
+
+pub inline fn elambdaArgCounts(exp: SchemeObject) SchemeObject {
+    return memoryRef(exp, 2);
+}
+
+pub inline fn elambdaReqs(exp: SchemeObject) c_ulong {
+    return (elambdaArgCounts(exp) >> 8) & 0xFF;
+}
+
+pub inline fn elambdaOpts(exp: SchemeObject) c_ulong {
+    return elambdaArgCounts(exp) & 0xFF;
+}
+
+pub inline fn elambdaRest(exp: SchemeObject) c_ulong {
+    return (elambdaArgCounts(exp) >> 16) & 0x1;
+}
+
+pub inline fn accessName(exp: SchemeObject) SchemeObject {
+    return memoryRef(exp, 1);
+}
+
+pub inline fn assignmentName(exp: SchemeObject) SchemeObject {
+    return memoryRef(exp, 0);
+}
+
+pub inline fn definitionName(exp: SchemeObject) SchemeObject {
+    return memoryRef(exp, 0);
+}
+
+pub inline fn variableName(exp: SchemeObject) SchemeObject {
+    return memoryRef(exp, 0);
+}
+
+pub inline fn variableSafeP(exp: SchemeObject) bool {
+    return memoryRef(exp, 1) == sharp_f;
+}
+
+pub inline fn combinationSize(exp: SchemeObject) c_ulong {
+    return vectorLength(exp);
+}
+
+pub inline fn combinationExpr(exp: SchemeObject, idx: usize) SchemeObject {
+    return vectorRef(exp, idx);
+}
+
 pub inline fn symbolGlobalValue(sym: SchemeObject) SchemeObject {
     return memoryRef(sym, 1);
 }
@@ -575,6 +634,14 @@ pub inline fn entityOperator(o: SchemeObject) SchemeObject {
 
 pub inline fn ustringBytesPerCp(obj: SchemeObject) c_ulong {
     return objectType(nmVectorSubheader(obj)) & 0x3;
+}
+
+pub inline fn ustringLength(s: SchemeObject) c_ulong {
+    return objectDatum(nmVectorSubheader(s));
+}
+
+pub inline fn ustringData(s: SchemeObject) [*]u8 {
+    return bytevectorData(s);
 }
 
 // Memory operations

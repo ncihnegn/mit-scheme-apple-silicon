@@ -99,6 +99,7 @@ pub const rc_eval_error: c_ulong = 0x41;
 pub const rc_stack_marker: c_ulong = 0x42;
 pub const rc_comp_interrupt_restart: c_ulong = 0x43;
 pub const rc_restore_int_mask: c_ulong = 0x45;
+pub const rc_halt: c_ulong = 0x46;
 pub const rc_comp_lookup_trap_restart: c_ulong = 0x53;
 pub const rc_comp_assignment_trap_restart: c_ulong = 0x54;
 pub const rc_comp_op_ref_trap_restart: c_ulong = 0x56;
@@ -269,6 +270,18 @@ pub const CcEntryTypeGroup = enum(c_ulong) {
     unknown = 4,
 };
 
+pub const CcEntryOffset = extern struct {
+    offset: c_ulong,
+    continued_p: bool,
+};
+
+pub const LinkageSectionType = enum(c_uint) {
+    operator = 0,
+    reference = 1,
+    assignment = 2,
+    global_operator = 3,
+};
+
 pub const CacheRefKind = enum(c_int) {
     lookup_cache = 0,
     assignment_cache = 1,
@@ -341,6 +354,8 @@ pub extern "c" fn debug_stack_trace(OutfChannel) void;
 pub extern "c" fn debug_print_expr(obj.SchemeObject, [*:0]const u8) void;
 pub extern "c" fn outf_fatal([*:0]const u8, ...) void;
 pub extern "c" fn outf_error([*:0]const u8, ...) void;
+pub extern "c" fn outf_flush_error() void;
+pub extern "c" fn code_address_p(?*const anyopaque) bool;
 pub extern "c" fn record_primitive_entry(obj.SchemeObject) void;
 pub extern "c" fn gc_type_code(c_uint) c_int;
 pub extern "c" fn gc_ptr_type(obj.SchemeObject) c_int;
@@ -455,7 +470,7 @@ pub extern "c" fn gc_scan_oldspace([*]obj.SchemeObject, [*]obj.SchemeObject) voi
 pub extern "c" fn gc_drain_tospace_and_code_arena([*]obj.SchemeObject) void;
 pub extern "c" fn aarch64_flush_i_cache() void;
 pub extern "c" fn aarch64_flush_i_cache_region([*]obj.SchemeObject, usize) void;
-pub extern "c" fn debug_verify_heap() void;
+pub extern "c" fn debug_verify_heap() bool;
 pub extern "c" fn std_gc_death([*:0]const u8, ...) noreturn;
 pub extern "c" fn initialize_gc_object_references() void;
 pub extern "c" fn finalize_gc_object_references() void;
@@ -492,6 +507,9 @@ pub extern "c" fn gc_scan_stage_tospace() void;
 pub extern "c" fn OS_file_remove([*:0]const u8) void;
 pub extern "c" fn OS_file_remove_link([*:0]const u8) void;
 pub extern "c" fn cc_return_to_block_address(obj.SchemeObject) [*]obj.SchemeObject;
+pub extern "c" fn cc_block_debugging_info(obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn read_cc_entry_offset(*CcEntryOffset, ?*anyopaque) bool;
+pub extern "c" fn compiled_closure_objects([*]obj.SchemeObject) [*]obj.SchemeObject;
 pub extern "c" fn OS_initialize() void;
 pub extern "c" fn OS_announcement() void;
 pub extern "c" fn Interpret() void;

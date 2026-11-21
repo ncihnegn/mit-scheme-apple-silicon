@@ -11,7 +11,7 @@ const option = @import("option.zig");
 pub var signal_block_depth: i32 = 0;
 pub var fatal_count: usize = 0;
 pub var last_closed_channel: ?c_uint = null;
-pub var printed_continuation_count: usize = 0;
+pub var mock_outf_calls: usize = 0;
 pub var mock_trap_state: c_int = 4;
 pub var mock_under_emacs: c_int = 0;
 
@@ -74,7 +74,7 @@ pub fn resetMockRuntime() void {
     signal_block_depth = 0;
     fatal_count = 0;
     last_closed_channel = null;
-    printed_continuation_count = 0;
+    mock_outf_calls = 0;
     mock_trap_state = 4;
     mock_under_emacs = 0;
     compiler_processor_type = abi.compiler_aarch64_type;
@@ -195,23 +195,16 @@ pub export fn outf_fatal(_: [*:0]const u8, ...) callconv(.c) void {
     fatal_count += 1;
 }
 
-pub export fn outf_error(_: [*:0]const u8, ...) callconv(.c) void {}
+pub export fn outf_error(_: [*:0]const u8, ...) callconv(.c) void {
+    mock_outf_calls += 1;
+}
+
+pub export fn outf_flush_error() callconv(.c) void {}
 
 pub export fn outf_flush_fatal() callconv(.c) void {}
 
 pub export fn OS_channel_close_noerror(ch: c_uint) callconv(.c) void {
     last_closed_channel = ch;
-}
-
-comptime {
-    if (@import("build_options").debugging) {
-        @export(&mockPrintOneContinuationFrame, .{ .name = "Print_One_Continuation_Frame" });
-    }
-}
-
-fn mockPrintOneContinuationFrame(_: obj.SchemeObject) callconv(.c) bool {
-    printed_continuation_count += 1;
-    return true;
 }
 
 pub export fn Microcode_Termination(_: c_int) callconv(.c) noreturn {
@@ -242,8 +235,8 @@ fn mockReadCcEntryType(cet: *abi.CcEntryType, _: ?*anyopaque) callconv(.c) bool 
 
 pub export fn gc_type_code(tc: c_uint) callconv(.c) c_int {
     return switch (@as(c_ulong, tc)) {
-        obj.tc_pair, obj.tc_weak_cons, obj.tc_tagged_object, obj.tc_interned_symbol, obj.tc_uninterned_symbol => @intFromEnum(abi.GcType.pair),
-        obj.tc_hunk3_a, obj.tc_hunk3_b => @intFromEnum(abi.GcType.triple),
+        obj.tc_pair, obj.tc_weak_cons, obj.tc_tagged_object, obj.tc_interned_symbol, obj.tc_uninterned_symbol, obj.tc_lambda, obj.tc_procedure, obj.tc_extended_procedure => @intFromEnum(abi.GcType.pair),
+        obj.tc_hunk3_a, obj.tc_hunk3_b, obj.tc_extended_lambda => @intFromEnum(abi.GcType.triple),
         obj.tc_vector,
         obj.tc_record,
         obj.tc_ephemeron,
@@ -263,7 +256,7 @@ pub export fn gc_type_code(tc: c_uint) callconv(.c) c_int {
         obj.tc_return_code,
         => @intFromEnum(abi.GcType.non_pointer),
         obj.tc_cell => @intFromEnum(abi.GcType.cell),
-        obj.tc_reference_trap => @intFromEnum(abi.GcType.special),
+        obj.tc_reference_trap, obj.tc_broken_heart, obj.tc_manifest_nm_vector => @intFromEnum(abi.GcType.special),
         else => @intFromEnum(abi.GcType.undefined),
     };
 }
@@ -283,13 +276,11 @@ pub export fn OS_tty_map_interrupt_char(c: u8) callconv(.c) u8 {
     return c;
 }
 
-pub export fn outf(_: abi.OutfChannel, _: [*:0]const u8, ...) callconv(.c) void {}
+pub export fn outf(_: abi.OutfChannel, _: [*:0]const u8, ...) callconv(.c) void {
+    mock_outf_calls += 1;
+}
 
 pub export fn outf_flush(_: abi.OutfChannel) callconv(.c) void {}
-
-pub export fn debug_stack_trace(_: abi.OutfChannel) callconv(.c) void {}
-
-pub export fn debug_print_expr(_: obj.SchemeObject, _: [*:0]const u8) callconv(.c) void {}
 
 pub export fn OS_get_entropy(buf: *[32]u8) callconv(.c) void {
     for (buf, 0..) |*slot, idx| {
@@ -490,7 +481,6 @@ comptime {
         @export(&mockAarch64FlushICacheRegion, .{ .name = "aarch64_flush_i_cache_region" });
     }
     if (build_options.debugging) {
-        @export(&mockDebugVerifyHeap, .{ .name = "debug_verify_heap" });
         @export(&mockStdGcDeath, .{ .name = "std_gc_death" });
         @export(&mockInitGcObjRefs, .{ .name = "initialize_gc_object_references" });
         @export(&mockFinalizeGcObjRefs, .{ .name = "finalize_gc_object_references" });
@@ -505,8 +495,6 @@ fn mockAarch64FlushICache() callconv(.c) void {
 fn mockAarch64FlushICacheRegion(_: [*]obj.SchemeObject, _: usize) callconv(.c) void {
     mock_icache_flush_calls += 1;
 }
-
-fn mockDebugVerifyHeap() callconv(.c) void {}
 
 fn mockStdGcDeath(_: [*:0]const u8, ...) callconv(.c) noreturn {
     @panic("mock std_gc_death");
@@ -565,6 +553,9 @@ comptime {
         @export(&mockCcBlockEnvironment, .{ .name = "cc_block_environment" });
         @export(&mockWriteVariableCache, .{ .name = "write_variable_cache" });
         @export(&mockMakeUuoLink, .{ .name = "make_uuo_link" });
+        @export(&mockCcBlockDebuggingInfo, .{ .name = "cc_block_debugging_info" });
+        @export(&mockReadCcEntryOffset, .{ .name = "read_cc_entry_offset" });
+        @export(&mockCompiledClosureObjects, .{ .name = "compiled_closure_objects" });
     }
     if (build_options.cc_is_native) {
         @export(&mockCcReturnAddressToEntryAddress, .{ .name = "cc_return_address_to_entry_address" });
@@ -656,6 +647,19 @@ fn mockBkptP(_: ?*anyopaque) callconv(.c) bool {
 
 fn mockBkptProceed(_: ?*anyopaque, _: obj.SchemeObject, state: obj.SchemeObject) callconv(.c) obj.SchemeObject {
     return state;
+}
+
+fn mockCcBlockDebuggingInfo(_: obj.SchemeObject) callconv(.c) obj.SchemeObject {
+    return obj.sharp_f;
+}
+
+fn mockReadCcEntryOffset(ceo: *abi.CcEntryOffset, _: ?*anyopaque) callconv(.c) bool {
+    ceo.* = .{ .offset = 1, .continued_p = false };
+    return true;
+}
+
+fn mockCompiledClosureObjects(ptr: [*]obj.SchemeObject) callconv(.c) [*]obj.SchemeObject {
+    return ptr;
 }
 
 pub export fn compiler_reset(utilities: obj.SchemeObject) callconv(.c) void {

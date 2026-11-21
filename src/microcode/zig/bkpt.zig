@@ -72,11 +72,14 @@ test "bkpt add and fire pop-return breakpoint in debugging mode" {
     stubs.resetMockRuntime();
 
     if (build_options.debugging) {
+        abi.stackPush(obj.sharp_f);
+        abi.Registers[abi.regblock_return] = obj.makeObject(obj.tc_return_code, abi.rc_end_of_computation);
         const target_sp = abi.stack_pointer;
         try std.testing.expect(addAPopReturnBreakpoint(target_sp));
         try std.testing.expect(sp_list != null);
         popReturnBreakPoint();
-        try std.testing.expectEqual(@as(usize, 1), stubs.printed_continuation_count);
+        try std.testing.expect(stubs.mock_outf_calls > 0);
+        try std.testing.expectEqual(target_sp, abi.stack_pointer);
         try std.testing.expect(sp_list == null);
     } else {
         try std.testing.expect(sp_list == null);
