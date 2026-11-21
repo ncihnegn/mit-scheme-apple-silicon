@@ -106,6 +106,137 @@ pub extern "c" fn abort_to_interpreter(c_long) noreturn;
 pub extern "c" fn stack_death([*:0]const u8) noreturn;
 pub extern "c" fn cons(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
 
+pub extern "c" fn arg_integer_in_range(c_int, c_long, c_long) c_long;
+pub extern "c" fn arg_index_integer_to_intmax(c_int, i64) i64;
+pub extern "c" fn error_unimplemented_primitive() noreturn;
+pub extern "c" fn Mul(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+
+pub const BignumComparison = enum(c_int) {
+    equal = 0,
+    less = 1,
+    greater = 2,
+};
+
+pub const dbl_max_exp: c_long = 1024;
+pub const dbl_mant_dig: c_long = 53;
+
+pub extern "c" fn bignum_equal_p(obj.SchemeObject, obj.SchemeObject) c_int;
+pub extern "c" fn bignum_test(obj.SchemeObject) c_int;
+pub extern "c" fn bignum_compare(obj.SchemeObject, obj.SchemeObject) c_int;
+pub extern "c" fn bignum_add(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn bignum_subtract(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn bignum_negate(obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn bignum_multiply(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn bignum_divide(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject, *obj.SchemeObject) c_int;
+pub extern "c" fn bignum_quotient(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn bignum_remainder(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn long_to_bignum(c_long) obj.SchemeObject;
+pub extern "c" fn ulong_to_bignum(c_ulong) obj.SchemeObject;
+pub extern "c" fn bignum_to_long(obj.SchemeObject) c_long;
+pub extern "c" fn bignum_to_ulong(obj.SchemeObject) c_ulong;
+pub extern "c" fn intmax_to_bignum(i64) obj.SchemeObject;
+pub extern "c" fn uintmax_to_bignum(u64) obj.SchemeObject;
+pub extern "c" fn bignum_to_intmax(obj.SchemeObject) i64;
+pub extern "c" fn bignum_to_uintmax(obj.SchemeObject) u64;
+pub extern "c" fn double_to_bignum(f64) obj.SchemeObject;
+pub extern "c" fn bignum_to_double(obj.SchemeObject) f64;
+pub extern "c" fn bignum_fits_in_word_p(obj.SchemeObject, c_long, c_int) c_int;
+pub extern "c" fn bignum_length_in_bits(obj.SchemeObject) c_ulong;
+pub extern "c" fn bignum_integer_length(obj.SchemeObject) c_ulong;
+pub extern "c" fn bignum_first_set_bit(obj.SchemeObject) c_long;
+pub extern "c" fn bignum_bit_count(obj.SchemeObject) c_ulong;
+pub extern "c" fn bignum_hamming_distance(obj.SchemeObject, obj.SchemeObject) c_long;
+pub extern "c" fn bignum_bitwise_not(obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn bignum_bitwise_and(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn bignum_bitwise_andc2(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn bignum_bitwise_andc1(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn bignum_bitwise_xor(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn bignum_bitwise_ior(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn bignum_bitwise_nor(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn bignum_bitwise_eqv(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn bignum_bitwise_orc2(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn bignum_bitwise_orc1(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn bignum_bitwise_nand(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn bignum_nonnegative_one_bits(c_ulong, c_ulong) obj.SchemeObject;
+pub extern "c" fn bignum_negative_zero_bits(c_ulong, c_ulong) obj.SchemeObject;
+pub extern "c" fn bignum_shift_right(obj.SchemeObject, c_ulong) obj.SchemeObject;
+pub extern "c" fn bignum_shift_left(obj.SchemeObject, c_ulong) obj.SchemeObject;
+pub extern "c" fn unsigned_long_to_shifted_bignum(c_ulong, c_ulong, c_int) obj.SchemeObject;
+pub extern "c" fn digit_stream_to_bignum(
+    c_uint,
+    *const fn (?*anyopaque) callconv(.c) c_uint,
+    ?*anyopaque,
+    c_uint,
+    c_int,
+) obj.SchemeObject;
+pub extern "c" fn bignum_to_digit_stream(
+    obj.SchemeObject,
+    c_uint,
+    *const fn (?*anyopaque, c_long) callconv(.c) void,
+    ?*anyopaque,
+) void;
+pub extern "c" fn bignum_max_digit_stream_radix() c_long;
+
+pub inline fn bignumZeroP(b: obj.SchemeObject) bool {
+    return bignum_test(b) == @intFromEnum(BignumComparison.equal);
+}
+
+pub inline fn bignumNegativeP(b: obj.SchemeObject) bool {
+    return bignum_test(b) == @intFromEnum(BignumComparison.less);
+}
+
+pub inline fn bignumPositiveP(b: obj.SchemeObject) bool {
+    return bignum_test(b) == @intFromEnum(BignumComparison.greater);
+}
+
+pub inline fn bignumLessP(x: obj.SchemeObject, y: obj.SchemeObject) bool {
+    return bignum_compare(x, y) == @intFromEnum(BignumComparison.less);
+}
+
+pub inline fn bignumToLongP(b: obj.SchemeObject) bool {
+    return bignum_fits_in_word_p(b, @bitSizeOf(c_long), 1) != 0;
+}
+
+pub inline fn bignumToUlongP(b: obj.SchemeObject) bool {
+    return bignum_fits_in_word_p(b, @bitSizeOf(c_ulong), 0) != 0;
+}
+
+pub inline fn bignumToIntmaxP(b: obj.SchemeObject) bool {
+    return bignum_fits_in_word_p(b, 64, 1) != 0;
+}
+
+pub inline fn bignumToUintmaxP(b: obj.SchemeObject) bool {
+    return bignum_fits_in_word_p(b, 64, 0) != 0;
+}
+
+pub inline fn bignumToDoubleP(b: obj.SchemeObject) bool {
+    return bignum_fits_in_word_p(b, dbl_max_exp + 1, 1) != 0;
+}
+
+pub inline fn losslessBignumToDoubleP(b: obj.SchemeObject) bool {
+    return bignum_fits_in_word_p(b, dbl_mant_dig + 1, 1) != 0;
+}
+
+pub inline fn bignumToFixnumP(b: obj.SchemeObject) bool {
+    return bignum_fits_in_word_p(b, @as(c_long, obj.fixnum_length) + 1, 1) != 0;
+}
+
+pub inline fn fixnumToBignum(f: obj.SchemeObject) obj.SchemeObject {
+    return long_to_bignum(obj.fixnumToLong(f));
+}
+
+pub inline fn bignumToFixnumVal(b: obj.SchemeObject) obj.SchemeObject {
+    return obj.longToFixnum(bignum_to_long(b));
+}
+
+pub inline fn bignumToFlonumVal(b: obj.SchemeObject) obj.SchemeObject {
+    return double_to_flonum(bignum_to_double(b));
+}
+
+pub inline fn flonumToBignum(f: obj.SchemeObject) obj.SchemeObject {
+    return double_to_bignum(obj.flonumToDouble(f));
+}
+
 pub inline fn primitiveHeader() void {
     if (build_options.debugging) {
         record_primitive_entry(Registers[regblock_expr]);
