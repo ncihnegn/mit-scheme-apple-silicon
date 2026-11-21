@@ -584,7 +584,6 @@ pub fn build(b: *std.Build) void {
     ) orelse b.fmt("/usr/local/lib/{s}", .{auxdir_name});
 
     const target_config_dir = addMicrocodeConfig(b, target, termcap_opt);
-    const host_config_dir = addMicrocodeConfig(b, b.graph.host, termcap_opt);
 
     const arch_headers = b.addWriteFiles();
     _ = arch_headers.add(
@@ -669,22 +668,14 @@ pub fn build(b: *std.Build) void {
         scheme_c_sources.append(b.allocator, "src/microcode/svm1-interp.c") catch @panic("OOM");
     }
 
-    // Build host-native findprim and generate usrdef.c out-of-tree.
+    // Build host-native Zig findprim and generate usrdef.c out-of-tree.
     const findprim = b.addExecutable(.{
         .name = "findprim",
         .root_module = b.createModule(.{
+            .root_source_file = b.path("src/microcode/zig/findprim.zig"),
             .target = b.graph.host,
             .optimize = .fast,
-            .link_libc = true,
-            .sanitize_c = .off,
         }),
-    });
-    findprim.root_module.addIncludePath(host_config_dir);
-    findprim.root_module.addIncludePath(arch_headers_dir);
-    findprim.root_module.addIncludePath(b.path("src/microcode"));
-    findprim.root_module.addCSourceFile(.{
-        .file = b.path("src/microcode/findprim.c"),
-        .flags = &.{"-DHAVE_CONFIG_H"},
     });
 
     const fp_run = b.addRunArtifact(findprim);
@@ -917,6 +908,16 @@ pub fn build(b: *std.Build) void {
         }),
     });
     unit_test_step.dependOn(&b.addRunArtifact(unit_tests).step);
+
+    const findprim_tests = b.addTest(.{
+        .name = "findprim-unit",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/microcode/zig/findprim.zig"),
+            .target = b.graph.host,
+            .optimize = optimize,
+        }),
+    });
+    unit_test_step.dependOn(&b.addRunArtifact(findprim_tests).step);
 
     // `zig build bootstrap`
     const bootstrap_step = b.step(
