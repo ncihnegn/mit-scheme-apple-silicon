@@ -6,14 +6,14 @@ const std = @import("std");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
 
-pub export fn arg_ascii_char(n: c_int) callconv(.c) c_long {
+pub export fn arg_ascii_char(n: c_int) callconv(.c) isize {
     abi.checkArg(n, obj.characterP);
     const object = abi.argRef(@intCast(n));
     if (!obj.charToAsciiP(object)) abi.error_bad_range_arg(n);
     return @intCast(obj.charToAscii(object));
 }
 
-pub export fn arg_ascii_integer(n: c_int) callconv(.c) c_long {
+pub export fn arg_ascii_integer(n: c_int) callconv(.c) isize {
     return abi.arg_index_integer(n, @intCast(obj.max_ascii));
 }
 
@@ -26,8 +26,8 @@ pub export fn Prim_char_p() callconv(.c) obj.SchemeObject {
 // DEFINE_PRIMITIVE ("MAKE-CHAR", Prim_make_char, 2, 2, 0)
 pub export fn Prim_make_char() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    const bits: c_ulong = @intCast(abi.arg_index_integer(2, @intCast(obj.max_bits)));
-    const code: c_ulong = @intCast(abi.arg_index_integer(1, @intCast(obj.max_code)));
+    const bits: usize = @intCast(abi.arg_index_integer(2, @intCast(obj.max_bits)));
+    const code: usize = @intCast(abi.arg_index_integer(1, @intCast(obj.max_code)));
     return obj.makeChar(bits, code);
 }
 
@@ -55,15 +55,15 @@ pub export fn Prim_char_to_integer() callconv(.c) obj.SchemeObject {
 // DEFINE_PRIMITIVE ("INTEGER->CHAR", Prim_integer_to_char, 1, 1, 0)
 pub export fn Prim_integer_to_char() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    const code: c_ulong = @intCast(abi.arg_index_integer(1, @intCast(obj.max_mit_ascii)));
+    const code: usize = @intCast(abi.arg_index_integer(1, @intCast(obj.max_mit_ascii)));
     return obj.makeObject(obj.tc_character, code);
 }
 
-pub export fn char_downcase(c: c_long) callconv(.c) c_long {
+pub export fn char_downcase(c: isize) callconv(.c) isize {
     return if (c >= 'A' and c <= 'Z') (c - 'A') + 'a' else c;
 }
 
-pub export fn char_upcase(c: c_long) callconv(.c) c_long {
+pub export fn char_upcase(c: isize) callconv(.c) isize {
     return if (c >= 'a' and c <= 'z') (c - 'a') + 'A' else c;
 }
 
@@ -72,7 +72,7 @@ pub export fn Prim_char_downcase() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     abi.checkArg(1, obj.characterP);
     const ch = abi.argRef(1);
-    const down: c_ulong = @intCast(char_downcase(@intCast(obj.charCode(ch))));
+    const down: usize = @intCast(char_downcase(@intCast(obj.charCode(ch))));
     return obj.makeChar(obj.charBits(ch), down);
 }
 
@@ -81,7 +81,7 @@ pub export fn Prim_char_upcase() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     abi.checkArg(1, obj.characterP);
     const ch = abi.argRef(1);
-    const up: c_ulong = @intCast(char_upcase(@intCast(obj.charCode(ch))));
+    const up: usize = @intCast(char_upcase(@intCast(obj.charCode(ch))));
     return obj.makeChar(obj.charBits(ch), up);
 }
 

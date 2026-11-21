@@ -77,7 +77,7 @@ pub export fn Prim_tty_get_interrupt_enables() callconv(.c) obj.SchemeObject {
 //   "Change the keyboard interrupt enables to MASK.")
 pub export fn Prim_tty_set_interrupt_enables() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    var mask: abi.TinterruptEnables = @truncate(@as(c_ulong, @bitCast(abi.arg_integer(1))));
+    var mask: abi.TinterruptEnables = @truncate(@as(usize, @bitCast(abi.arg_integer(1))));
     abi.OS_ctty_set_interrupt_enables(&mask);
     return obj.unspecific;
 }
@@ -148,7 +148,7 @@ test "prostty channels, dimensions, beep/clear, and interrupt chars" {
     try std.testing.expectEqual(obj.ulongToFixnum(5), Prim_tty_get_interrupt_enables());
 
     const ic = Prim_tty_get_interrupt_chars();
-    try std.testing.expectEqual(@as(c_ulong, 4), obj.legacyStringLength(ic));
+    try std.testing.expectEqual(@as(usize, 4), obj.legacyStringLength(ic));
     const next_ic = string.char_pointer_to_string("\x03a\x07b");
     stubs.setArgs(&.{next_ic});
     _ = Prim_tty_set_interrupt_chars();

@@ -26,7 +26,7 @@ pub export fn Prim_primitive_purify() callconv(.c) obj.SchemeObject {
 
     abi.stackCheck(abi.cont_size);
     const avail = abi.heapAvailable();
-    const remaining: c_ulong = if (avail > abi.gc_space_needed) avail - abi.gc_space_needed else 0;
+    const remaining: usize = if (avail > abi.gc_space_needed) avail - abi.gc_space_needed else 0;
     abi.pushCont(
         abi.rc_normal_gc_done,
         abi.cons(obj.sharp_t, obj.ulongToFixnum(remaining)),
@@ -67,7 +67,7 @@ fn purifyObject(object: obj.SchemeObject) void {
 
     abi.std_gc_pt2();
 
-    const heap_words: c_ulong = @intCast((@intFromPtr(abi.heap_end) - @intFromPtr(abi.heap_start)) / @sizeOf(obj.SchemeObject));
+    const heap_words: usize = @intCast((@intFromPtr(abi.heap_end) - @intFromPtr(abi.heap_start)) / @sizeOf(obj.SchemeObject));
     abi.resize_tospace(heap_words);
 }
 
@@ -96,5 +96,5 @@ test "purify updates constant_alloc_next, constant_end, heap_start, and resizes 
     try std.testing.expectEqual((&arena).ptr + 5 + abi.constant_space_fudge, abi.constant_end);
     try std.testing.expectEqual(abi.constant_end, abi.heap_start);
     try std.testing.expectEqual(item, arena[4]);
-    try std.testing.expectEqual(@as(c_ulong, arena.len - (5 + abi.constant_space_fudge)), stubs.mock_resize_tospace_arg);
+    try std.testing.expectEqual(@as(usize, arena.len - (5 + abi.constant_space_fudge)), stubs.mock_resize_tospace_arg);
 }

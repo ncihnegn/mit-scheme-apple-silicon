@@ -13,7 +13,7 @@ const string = @import("string.zig");
 const code_arena = @import("code_arena.zig");
 const jit = @import("jit.zig");
 
-const ThunkFn = *const fn () callconv(.c) c_ulong;
+const ThunkFn = *const fn () callconv(.c) usize;
 
 var ilof_prefix: ?[*:0]const u8 = null;
 
@@ -98,8 +98,8 @@ pub export fn Prim_compiled_entry_kind() callconv(.c) obj.SchemeObject {
     const entry = abi.argRef(1);
 
     var group: abi.CcEntryTypeGroup = .unknown;
-    var field1: c_ulong = 0;
-    var field2: c_long = 0;
+    var field1: usize = 0;
+    var field2: isize = 0;
 
     if (build_options.cc_support) {
         var cet: abi.CcEntryType = undefined;
@@ -107,8 +107,8 @@ pub export fn Prim_compiled_entry_kind() callconv(.c) obj.SchemeObject {
             switch (cet.marker) {
                 .procedure => {
                     group = .procedure;
-                    field1 = 1 + @as(c_ulong, cet.args.for_procedure.n_required);
-                    const max_args: c_long = @intCast(field1 + @as(c_ulong, cet.args.for_procedure.n_optional));
+                    field1 = 1 + @as(usize, cet.args.for_procedure.n_required);
+                    const max_args: isize = @intCast(field1 + @as(usize, cet.args.for_procedure.n_optional));
                     field2 = if (cet.args.for_procedure.rest_p) -(max_args + 1) else max_args;
                 },
                 .continuation => {
@@ -267,7 +267,7 @@ pub export fn Prim_install_compiled_code_block() callconv(.c) obj.SchemeObject {
         abi.error_wrong_type_arg(1);
     }
 
-    const n_words: c_ulong = 1 + obj.objectDatum(src[0]);
+    const n_words: usize = 1 + obj.objectDatum(src[0]);
     if (n_words < 2 or
         obj.objectType(src[1]) != obj.tc_manifest_nm_vector or
         (2 + obj.objectDatum(src[1])) > n_words)
@@ -429,7 +429,7 @@ test "comutl stack offset, entry kind, liarc prefix binding, code arena install 
 
     const stack_env = obj.makeObject(obj.tc_stack_environment, obj.addressToDatum(abi.stack_end - 5));
     stubs.setArgs(&.{stack_env});
-    try std.testing.expectEqual(@as(c_ulong, 5), artutl.integer_to_ulong(Prim_stack_address_offset()));
+    try std.testing.expectEqual(@as(usize, 5), artutl.integer_to_ulong(Prim_stack_address_offset()));
 
     // COMPILED-ENTRY-KIND across procedure (required/optional/rest), continuation, return_to_interpreter
     if (build_options.cc_support) {
@@ -472,7 +472,7 @@ test "comutl stack offset, entry kind, liarc prefix binding, code arena install 
         var observed: [16]u8 = @splat(0);
         var observed_len: usize = 0;
 
-        fn run() callconv(.c) c_ulong {
+        fn run() callconv(.c) usize {
             if (liarc_object_file_prefix()) |p| {
                 const s = std.mem.span(p);
                 @memcpy(observed[0..s.len], s);
@@ -485,7 +485,7 @@ test "comutl stack offset, entry kind, liarc prefix binding, code arena install 
     const prefix_str = string.char_pointer_to_string("mod_");
     stubs.setArgs(&.{ artutl.ulong_to_integer(@intFromPtr(&Hook.run)), prefix_str });
     const res = Prim_initialize_liarc_object_file();
-    try std.testing.expectEqual(@as(c_ulong, 77), artutl.integer_to_ulong(res));
+    try std.testing.expectEqual(@as(usize, 77), artutl.integer_to_ulong(res));
     try std.testing.expectEqualStrings("mod_", Hook.observed[0..Hook.observed_len]);
     try std.testing.expect(liarc_object_file_prefix() == null);
 

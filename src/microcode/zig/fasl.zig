@@ -22,7 +22,7 @@ extern "c" fn fread(?*anyopaque, usize, usize, FaslFileHandle) usize;
 extern "c" fn fwrite(?*const anyopaque, usize, usize, FaslFileHandle) usize;
 extern "c" fn abort() noreturn;
 
-pub const fasl_file_marker: obj.SchemeObject = if (@sizeOf(c_ulong) == 4)
+pub const fasl_file_marker: obj.SchemeObject = if (@sizeOf(usize) == 4)
     0xFAFAFAFA
 else
     0xFAFAFAFAFAFAFAFA;
@@ -50,7 +50,7 @@ pub const fasl_offset_ephemerons: usize = 18;
 pub const fasl_offset_code_size: usize = 19;
 pub const fasl_offset_code_base: usize = 20;
 
-const half_datum_length: std.math.Log2Int(obj.SchemeObject) = if (@sizeOf(c_ulong) == 4) 13 else 29;
+const half_datum_length: std.math.Log2Int(obj.SchemeObject) = if (@sizeOf(usize) == 4) 13 else 29;
 const half_datum_mask: obj.SchemeObject = (@as(obj.SchemeObject, 1) << half_datum_length) - 1;
 
 const fasl_arch_length: std.math.Log2Int(obj.SchemeObject) = @bitSizeOf(obj.SchemeObject) / 2;
@@ -64,7 +64,7 @@ pub const fasl_version_stack_end: c_uint = 11;
 pub const fasl_version_ephemerons: c_uint = 12;
 pub const fasl_version_code_space: c_uint = 13;
 
-pub const compiler_none_type: c_ulong = 0;
+pub const compiler_none_type: usize = 0;
 
 pub const fasl_file_fine: c_uint = 0;
 pub const fasl_file_too_short: c_uint = 1;
@@ -85,27 +85,27 @@ pub const FaslHeader = extern struct {
     root_pointer: ?[*]obj.SchemeObject,
     heap_start: ?[*]obj.SchemeObject,
     heap_end: ?[*]obj.SchemeObject,
-    heap_reserved: c_ulong,
+    heap_reserved: usize,
     constant_start: ?[*]obj.SchemeObject,
     constant_end: ?[*]obj.SchemeObject,
     code_start: ?[*]obj.SchemeObject,
     code_end: ?[*]obj.SchemeObject,
     stack_start: ?[*]obj.SchemeObject,
     stack_end: ?[*]obj.SchemeObject,
-    n_primitives: c_ulong,
-    primitive_table_size: c_ulong,
-    n_c_code_blocks: c_ulong,
-    c_code_table_size: c_ulong,
+    n_primitives: usize,
+    primitive_table_size: usize,
+    n_c_code_blocks: usize,
+    c_code_table_size: usize,
     utilities_vector: obj.SchemeObject,
     utilities_start: ?[*]obj.SchemeObject,
     utilities_end: ?[*]obj.SchemeObject,
-    ephemeron_count: c_ulong,
+    ephemeron_count: usize,
 };
 
 pub fn currentFaslArch() c_uint {
     if (build_options.cc_is_svm) {
         const endian = builtin.cpu.arch.endian();
-        if (@sizeOf(c_ulong) == 8) {
+        if (@sizeOf(usize) == 8) {
             return if (endian == .little) 29 else 28; // FASL_SVM1_64LE : FASL_SVM1_64BE
         }
         return if (endian == .little) 27 else 26; // FASL_SVM1_32LE : FASL_SVM1_32BE
@@ -159,11 +159,11 @@ inline fn ptrToBrokenHeart(ptr: ?[*]const obj.SchemeObject) obj.SchemeObject {
     return obj.makeObject(obj.tc_broken_heart, datum);
 }
 
-pub inline fn ptrRangeWords(end: ?[*]const obj.SchemeObject, start: ?[*]const obj.SchemeObject) c_ulong {
+pub inline fn ptrRangeWords(end: ?[*]const obj.SchemeObject, start: ?[*]const obj.SchemeObject) usize {
     return @intCast((@intFromPtr(end) -% @intFromPtr(start)) / @sizeOf(obj.SchemeObject));
 }
 
-inline fn ptrAddWords(base: ?[*]obj.SchemeObject, n_words: c_ulong) ?[*]obj.SchemeObject {
+inline fn ptrAddWords(base: ?[*]obj.SchemeObject, n_words: usize) ?[*]obj.SchemeObject {
     if (n_words == 0) return base;
     return base.? + @as(usize, @intCast(n_words));
 }
@@ -214,7 +214,7 @@ pub export fn check_fasl_version(fh: *FaslHeader) callconv(.c) c_uint {
     return fasl_file_bad_version;
 }
 
-pub export fn check_fasl_cc_version(fh: *FaslHeader, version: c_ulong, cc_type: c_ulong) callconv(.c) c_uint {
+pub export fn check_fasl_cc_version(fh: *FaslHeader, version: usize, cc_type: usize) callconv(.c) c_uint {
     if (fh.cc_version == 0 and fh.cc_arch == compiler_none_type) {
         return fasl_file_fine;
     }
@@ -379,11 +379,11 @@ pub export fn fasl_raw_address_to_object(
     h: *FaslHeader,
 ) callconv(.c) obj.SchemeObject {
     if (h.memory_base) |mb| {
-        const datum: c_ulong = @intCast((@intFromPtr(address) -% @intFromPtr(mb)) / @sizeOf(obj.SchemeObject));
+        const datum: usize = @intCast((@intFromPtr(address) -% @intFromPtr(mb)) / @sizeOf(obj.SchemeObject));
         return obj.makeObject(@intCast(type_code), datum);
     }
     if (h.arch == currentFaslArch()) {
-        const datum: c_ulong = if (obj.heap_in_low_memory)
+        const datum: usize = if (obj.heap_in_low_memory)
             @intCast(@intFromPtr(address))
         else
             obj.addressToDatum(address.?);
@@ -394,11 +394,11 @@ pub export fn fasl_raw_address_to_object(
 
 pub export fn fasl_raw_address_to_cc_entry(address: ?[*]Insn, h: *FaslHeader) callconv(.c) obj.SchemeObject {
     if (h.memory_base) |mb| {
-        const datum: c_ulong = @intCast((@intFromPtr(address) -% @intFromPtr(mb)) / @sizeOf(Insn));
+        const datum: usize = @intCast((@intFromPtr(address) -% @intFromPtr(mb)) / @sizeOf(Insn));
         return obj.makeObject(obj.tc_compiled_entry, datum);
     }
     if (h.arch == currentFaslArch()) {
-        const datum: c_ulong = obj.rawAddressToDatum(@intFromPtr(address));
+        const datum: usize = obj.rawAddressToDatum(@intFromPtr(address));
         return obj.makeObject(obj.tc_compiled_entry, datum);
     }
     abort();
@@ -487,7 +487,7 @@ test "fasl header encode/decode roundtrip, version checks, addressing, and utili
     try std.testing.expectEqual(h.code_end, decoded.code_end);
     try std.testing.expectEqual(h.stack_start, decoded.stack_start);
     try std.testing.expectEqual(h.stack_end, decoded.stack_end);
-    try std.testing.expectEqual(@as(c_ulong, 3), decoded.ephemeron_count);
+    try std.testing.expectEqual(@as(usize, 3), decoded.ephemeron_count);
     try std.testing.expectEqual(arena[20..].ptr, faslhdr_utilities_end(&decoded).?);
 
     // Relocation mode when memory_base is non-null

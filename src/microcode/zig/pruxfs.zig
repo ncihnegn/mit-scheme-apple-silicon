@@ -245,7 +245,7 @@ test "pruxfs modes, times, attributes, mode string, file-eq?, and filesystem typ
     try std.testing.expectEqual(obj.ulongToFixnum(1001), Prim_file_acc_time_indirect());
 
     const attrs = Prim_file_attributes();
-    try std.testing.expectEqual(@as(c_ulong, 10), obj.vectorLength(attrs));
+    try std.testing.expectEqual(@as(usize, 10), obj.vectorLength(attrs));
     try std.testing.expectEqual(obj.sharp_f, obj.vectorRef(attrs, 0));
     try std.testing.expectEqual(obj.ulongToFixnum(2), obj.vectorRef(attrs, 1));
     try std.testing.expectEqual(obj.ulongToFixnum(501), obj.vectorRef(attrs, 2));

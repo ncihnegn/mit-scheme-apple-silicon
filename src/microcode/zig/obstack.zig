@@ -12,17 +12,17 @@ pub const ObstackChunk = extern struct {
 };
 
 pub const ChunkAllocFn = *const fn (usize) callconv(.c) ?*anyopaque;
-pub const ChunkAllocStoredFn = *const fn (c_long) callconv(.c) ?*ObstackChunk;
+pub const ChunkAllocStoredFn = *const fn (isize) callconv(.c) ?*ObstackChunk;
 pub const ChunkFreeFn = *const fn (?*anyopaque) callconv(.c) void;
 
 pub const Obstack = extern struct {
-    chunk_size: c_long,
+    chunk_size: isize,
     chunk: ?*ObstackChunk,
     object_base: ?[*]u8,
     next_free: ?[*]u8,
     chunk_limit: ?[*]u8,
-    temp: c_long,
-    alignment_mask: c_long,
+    temp: isize,
+    alignment_mask: isize,
     chunkfun: ChunkAllocStoredFn,
     freefun: ChunkFreeFn,
 
@@ -121,10 +121,10 @@ const FooAlign = extern struct {
     x: u8,
     d: f64,
 };
-const default_alignment: c_long = @intCast(@offsetOf(FooAlign, "d"));
+const default_alignment: isize = @intCast(@offsetOf(FooAlign, "d"));
 
 const FooRound = extern union {
-    x: c_long,
+    x: isize,
     d: f64,
 };
 const default_rounding: usize = @sizeOf(FooRound);
@@ -137,12 +137,12 @@ pub export var _obstack: ?*Obstack = null;
 pub export fn _obstack_begin(
     h: *Obstack,
     size_arg: c_int,
-    alignment_arg: c_long,
+    alignment_arg: isize,
     chunkfun: ChunkAllocFn,
     freefun: ChunkFreeFn,
 ) callconv(.c) void {
-    const alignment: c_long = if (alignment_arg == 0) default_alignment else alignment_arg;
-    const size: c_long = if (size_arg == 0) blk: {
+    const alignment: isize = if (alignment_arg == 0) default_alignment else alignment_arg;
+    const size: isize = if (size_arg == 0) blk: {
         const extra = ((((12 + default_rounding - 1) & ~(default_rounding - 1)) +
             4 + default_rounding - 1) & ~(default_rounding - 1));
         break :blk @intCast(4096 - extra);

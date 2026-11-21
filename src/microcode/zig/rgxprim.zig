@@ -48,7 +48,7 @@ fn finishReMatchResult(result: c_int, vec: obj.SchemeObject, regs: *const regex.
 pub export fn Prim_re_char_set_adjoin() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     abi.checkArg(1, reCharSetP);
-    const ascii: c_ulong = @bitCast(abi.arg_ascii_integer(2));
+    const ascii: usize = @bitCast(abi.arg_ascii_integer(2));
     const byte_ptr = obj.legacyStringLoc(abi.argRef(1), @intCast(ascii / obj.ascii_length));
     byte_ptr[0] |= @as(u8, 1) << @intCast(ascii % obj.ascii_length);
     return obj.unspecific;
@@ -86,8 +86,8 @@ fn reSubstringPrimitive(comptime proc: ReSearchFn) obj.SchemeObject {
     abi.checkArg(3, syntax.syntaxTableP);
     abi.checkArg(4, reRegistersP);
     abi.checkArg(5, str.string_p);
-    const match_start: c_ulong = @intCast(abi.arg_nonnegative_integer(6));
-    const match_end: c_ulong = @intCast(abi.arg_nonnegative_integer(7));
+    const match_start: usize = @intCast(abi.arg_nonnegative_integer(6));
+    const match_end: usize = @intCast(abi.arg_nonnegative_integer(7));
     const text_obj = abi.argRef(5);
     const text = obj.legacyStringLoc(text_obj, 0);
     const text_end = obj.legacyStringLength(text_obj);
@@ -131,11 +131,11 @@ fn reBufferPrimitive(comptime proc: ReSearchFn) obj.SchemeObject {
     abi.checkArg(4, reRegistersP);
     abi.checkArg(5, edwin.groupP);
     const group = abi.argRef(5);
-    var match_start: c_ulong = @intCast(abi.arg_nonnegative_integer(6));
-    var match_end: c_ulong = @intCast(abi.arg_nonnegative_integer(7));
+    var match_start: usize = @intCast(abi.arg_nonnegative_integer(6));
+    var match_end: usize = @intCast(abi.arg_nonnegative_integer(7));
     const text = edwin.groupText(group, null);
-    const text_start: c_ulong = @intCast(edwin.markIndex(edwin.groupStartMark(group)));
-    var text_end: c_ulong = @intCast(edwin.markIndex(edwin.groupEndMark(group)));
+    const text_start: usize = @intCast(edwin.markIndex(edwin.groupStartMark(group)));
+    var text_end: usize = @intCast(edwin.markIndex(edwin.groupEndMark(group)));
     const gap_start = edwin.groupGapStart(group);
     const gap_length = edwin.groupGapLength(group);
     if (text_end > gap_start) text_end += gap_length;

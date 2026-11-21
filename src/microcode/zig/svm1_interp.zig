@@ -27,7 +27,7 @@ pub const reg_dynamic_link: WregT = 4;
 pub const SvmUtilityResult = extern struct {
     scheme_p: bool,
     arg: extern union {
-        interpreter_code: c_long,
+        interpreter_code: isize,
         new_pc: ?*anyopaque,
     },
 };
@@ -48,7 +48,7 @@ const type_code_mask_low: WordT = obj.n_type_codes - 1;
 
 const svm_fasl_arch_value: c_uint = blk: {
     const endian = builtin.cpu.arch.endian();
-    if (@sizeOf(c_ulong) == 8) {
+    if (@sizeOf(usize) == 8) {
         break :blk if (endian == .little) 29 else 28; // FASL_SVM1_64LE : FASL_SVM1_64BE
     }
     break :blk if (endian == .little) 27 else 26; // FASL_SVM1_32LE : FASL_SVM1_32BE
@@ -58,7 +58,7 @@ var svm_fasl_arch_storage: c_uint = svm_fasl_arch_value;
 
 var word_registers: [n_word_registers]WordT = @splat(0);
 var float_registers: [n_float_registers]f64 = @splat(0.0);
-var svm1_result: c_long = 0;
+var svm1_result: isize = 0;
 var running_p: bool = false;
 var instruction_pointer: ?[*]u8 = null;
 
@@ -126,7 +126,7 @@ const UtilId = enum {
 const TestMockState = struct {
     var util_calls: usize = 0;
     var last_util: ?UtilId = null;
-    var last_args: [4]c_ulong = .{ 0, 0, 0, 0 };
+    var last_args: [4]usize = .{ 0, 0, 0, 0 };
     var next_util_result: SvmUtilityResult = .{
         .scheme_p = false,
         .arg = .{ .interpreter_code = abi.prim_done },
@@ -160,53 +160,53 @@ const TestMockState = struct {
 };
 
 const SvmRuntime = if (!builtin.is_test and build_options.cc_is_svm) struct {
-    extern "c" fn comutil_plus(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_decrement(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_divide(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_equal(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_greater(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_increment(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_less(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_modulo(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_multiply(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_negative(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_positive(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_quotient(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_remainder(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_minus(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_zero(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_operator_1_0_trap(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_operator_2_0_trap(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_operator_2_1_trap(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_operator_3_0_trap(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_operator_3_1_trap(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_operator_3_2_trap(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_operator_4_0_trap(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_operator_4_1_trap(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_operator_4_2_trap(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_operator_4_3_trap(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_operator_apply_trap(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_operator_lexpr_trap(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_operator_lookup_trap(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_operator_primitive_trap(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_reflect_to_interface(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_return_to_interpreter(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_error(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_primitive_apply(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_primitive_lexpr_apply(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_lookup_trap(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_safe_lookup_trap(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_unassigned_p_trap(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_apply(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_lexpr_apply(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_assignment_trap(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_primitive_error(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_cache_lookup_apply(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
-    extern "c" fn comutil_link(*SvmUtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) void;
+    extern "c" fn comutil_plus(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_decrement(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_divide(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_equal(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_greater(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_increment(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_less(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_modulo(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_multiply(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_negative(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_positive(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_quotient(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_remainder(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_minus(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_zero(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_operator_1_0_trap(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_operator_2_0_trap(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_operator_2_1_trap(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_operator_3_0_trap(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_operator_3_1_trap(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_operator_3_2_trap(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_operator_4_0_trap(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_operator_4_1_trap(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_operator_4_2_trap(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_operator_4_3_trap(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_operator_apply_trap(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_operator_lexpr_trap(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_operator_lookup_trap(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_operator_primitive_trap(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_reflect_to_interface(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_return_to_interpreter(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_error(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_primitive_apply(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_primitive_lexpr_apply(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_lookup_trap(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_safe_lookup_trap(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_unassigned_p_trap(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_apply(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_lexpr_apply(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_assignment_trap(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_primitive_error(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_cache_lookup_apply(*SvmUtilityResult, usize, usize, usize, usize) void;
+    extern "c" fn comutil_link(*SvmUtilityResult, usize, usize, usize, usize) void;
     extern "c" fn compiler_interrupt_common(*SvmUtilityResult, ?*anyopaque, obj.SchemeObject) void;
     extern "c" fn trampoline_storage([*]obj.SchemeObject) [*]obj.SchemeObject;
 
-    fn callUtil(comptime id: UtilId, result: *SvmUtilityResult, a1: c_ulong, a2: c_ulong, a3: c_ulong, a4: c_ulong) void {
+    fn callUtil(comptime id: UtilId, result: *SvmUtilityResult, a1: usize, a2: usize, a3: usize, a4: usize) void {
         const proc = comptime switch (id) {
             .plus => comutil_plus,
             .decrement => comutil_decrement,
@@ -259,12 +259,12 @@ const SvmRuntime = if (!builtin.is_test and build_options.cc_is_svm) struct {
         compiler_interrupt_common(result, entry_addr, state);
     }
 
-    fn callTrampolineStorage(entry_addr: [*]u8) c_ulong {
+    fn callTrampolineStorage(entry_addr: [*]u8) usize {
         const block = abi.cc_entry_address_to_block_address(@ptrCast(entry_addr));
         return @intCast(@intFromPtr(trampoline_storage(block)));
     }
 } else struct {
-    fn callUtil(comptime id: UtilId, result: *SvmUtilityResult, a1: c_ulong, a2: c_ulong, a3: c_ulong, a4: c_ulong) void {
+    fn callUtil(comptime id: UtilId, result: *SvmUtilityResult, a1: usize, a2: usize, a3: usize, a4: usize) void {
         TestMockState.util_calls += 1;
         TestMockState.last_util = id;
         TestMockState.last_args = .{ a1, a2, a3, a4 };
@@ -278,7 +278,7 @@ const SvmRuntime = if (!builtin.is_test and build_options.cc_is_svm) struct {
         result.* = TestMockState.next_interrupt_result;
     }
 
-    fn callTrampolineStorage(entry_addr: [*]u8) c_ulong {
+    fn callTrampolineStorage(entry_addr: [*]u8) usize {
         TestMockState.mock_trampoline_block[0] = @intFromPtr(entry_addr);
         return @intCast(@intFromPtr(&TestMockState.mock_trampoline_block[2]));
     }
@@ -322,7 +322,7 @@ pub fn initializeSvm1() callconv(.c) void {
 }
 
 /// Execute SVM1 bytecode starting at `address` until returning to C/interpreter.
-pub fn cToInterface(address: ?*anyopaque) callconv(.c) c_long {
+pub fn cToInterface(address: ?*anyopaque) callconv(.c) isize {
     instruction_pointer = if (address) |a| @ptrCast(a) else null;
     importRegs();
     running_p = true;
@@ -336,7 +336,7 @@ pub fn cToInterface(address: ?*anyopaque) callconv(.c) c_long {
 }
 
 /// Export SVM1 VM registers and return the active bytecode IP when running, else `pc`.
-pub fn svmExportInstructionPointer(pc: c_ulong) callconv(.c) c_ulong {
+pub fn svmExportInstructionPointer(pc: usize) callconv(.c) usize {
     if (running_p) {
         exportRegs();
         return @intFromPtr(instruction_pointer);
@@ -344,7 +344,7 @@ pub fn svmExportInstructionPointer(pc: c_ulong) callconv(.c) c_ulong {
     return pc;
 }
 
-inline fn exitVm(code: c_long) ?[*]u8 {
+inline fn exitVm(code: isize) ?[*]u8 {
     svm1_result = code;
     return null;
 }
@@ -426,17 +426,17 @@ inline fn readU64Le(pc: [*]const u8) u64 {
         (@as(u64, pc[7]) << 56);
 }
 
-inline fn decodeS8(pc: [*]const u8) struct { pc: [*]u8, val: c_long } {
+inline fn decodeS8(pc: [*]const u8) struct { pc: [*]u8, val: isize } {
     const signed: i8 = @bitCast(pc[0]);
     return .{ .pc = @constCast(pc + 1), .val = signed };
 }
 
-inline fn decodeS16(pc: [*]const u8) struct { pc: [*]u8, val: c_long } {
+inline fn decodeS16(pc: [*]const u8) struct { pc: [*]u8, val: isize } {
     const signed: i16 = @bitCast(readU16Le(pc));
     return .{ .pc = @constCast(pc + 2), .val = signed };
 }
 
-inline fn decodeS32(pc: [*]const u8) struct { pc: [*]u8, val: c_long } {
+inline fn decodeS32(pc: [*]const u8) struct { pc: [*]u8, val: isize } {
     const signed: i32 = @bitCast(readU32Le(pc));
     return .{ .pc = @constCast(pc + 4), .val = signed };
 }
@@ -658,7 +658,7 @@ inline fn xObjectAddress(o: WordT) WordT {
 }
 
 inline fn xFixnumToLong(o: WordT) WordT {
-    const shifted: c_long = @bitCast(o << obj.type_code_length);
+    const shifted: isize = @bitCast(o << obj.type_code_length);
     return @bitCast(shifted >> obj.type_code_length);
 }
 
@@ -828,10 +828,10 @@ inline fn evalWrCmp(comptime op: WrCmpOp, a: WordT, b: WordT) bool {
         .le => a <= b,
         .gt => a > b,
         .ge => a >= b,
-        .slt => @as(c_long, @bitCast(a)) < @as(c_long, @bitCast(b)),
-        .sle => @as(c_long, @bitCast(a)) <= @as(c_long, @bitCast(b)),
-        .sgt => @as(c_long, @bitCast(a)) > @as(c_long, @bitCast(b)),
-        .sge => @as(c_long, @bitCast(a)) >= @as(c_long, @bitCast(b)),
+        .slt => @as(isize, @bitCast(a)) < @as(isize, @bitCast(b)),
+        .sle => @as(isize, @bitCast(a)) <= @as(isize, @bitCast(b)),
+        .sgt => @as(isize, @bitCast(a)) > @as(isize, @bitCast(b)),
+        .sge => @as(isize, @bitCast(a)) >= @as(isize, @bitCast(b)),
     };
 }
 
@@ -1167,7 +1167,7 @@ fn insnFlonumAlign(pc: [*]u8) ?[*]u8 {
 // Word & float ALU operations
 
 fn opNegateWr(x: WordT) WordT {
-    const s: c_long = @bitCast(x);
+    const s: isize = @bitCast(x);
     return @bitCast(-%s);
 }
 
@@ -1180,7 +1180,7 @@ fn opDecrementWr(x: WordT) WordT {
 }
 
 fn opAbsWr(x: WordT) WordT {
-    const s: c_long = @bitCast(x);
+    const s: isize = @bitCast(x);
     return if (s < 0) @bitCast(-%s) else x;
 }
 
@@ -1205,30 +1205,30 @@ fn opMultiplyWr(a: WordT, b: WordT) WordT {
 }
 
 fn opProductWr(a: WordT, b: WordT) WordT {
-    const x: c_long = @bitCast(a);
-    const y: c_long = @bitCast(b);
+    const x: isize = @bitCast(a);
+    const y: isize = @bitCast(b);
     const ans = abi.Mul(obj.longToFixnum(x), obj.longToFixnum(y));
     if (ans == obj.sharp_f) return obj.sharp_t;
     return @bitCast(obj.fixnumToLong(ans));
 }
 
 fn opQuotientWr(a: WordT, b: WordT) WordT {
-    const n1: c_long = @bitCast(a);
-    const n2: c_long = @bitCast(b);
-    if (n1 == std.math.minInt(c_long) and n2 == -1) return @bitCast(n1);
+    const n1: isize = @bitCast(a);
+    const n2: isize = @bitCast(b);
+    if (n1 == std.math.minInt(isize) and n2 == -1) return @bitCast(n1);
     return @bitCast(@divTrunc(n1, n2));
 }
 
 fn opRemainderWr(a: WordT, b: WordT) WordT {
-    const n1: c_long = @bitCast(a);
-    const n2: c_long = @bitCast(b);
-    if (n1 == std.math.minInt(c_long) and n2 == -1) return 0;
+    const n1: isize = @bitCast(a);
+    const n2: isize = @bitCast(b);
+    if (n1 == std.math.minInt(isize) and n2 == -1) return 0;
     return @bitCast(@rem(n1, n2));
 }
 
 fn opLshWr(a: WordT, b: WordT) WordT {
-    const source: c_long = @bitCast(a);
-    const number: c_long = @bitCast(b);
+    const source: isize = @bitCast(a);
+    const number: isize = @bitCast(b);
     if (number >= 0) {
         const shift: u64 = @intCast(number);
         if (shift > obj.datum_length) return 0;
@@ -1883,12 +1883,12 @@ test "svm1 immediates, memory addressing modes, non-pointer, and block copy" {
     TestMockState.next_util_result = .{ .scheme_p = false, .arg = .{ .interpreter_code = abi.prim_done } };
     const rc = cToInterface(&code);
     try std.testing.expectEqual(abi.prim_done, rc);
-    try std.testing.expectEqual(@as(c_long, -5), @as(c_long, @bitCast(wregRef(8))));
-    try std.testing.expectEqual(@as(c_long, -1000), @as(c_long, @bitCast(wregRef(9))));
-    try std.testing.expectEqual(@as(c_long, -70000), @as(c_long, @bitCast(wregRef(10))));
+    try std.testing.expectEqual(@as(isize, -5), @as(isize, @bitCast(wregRef(8))));
+    try std.testing.expectEqual(@as(isize, -1000), @as(isize, @bitCast(wregRef(9))));
+    try std.testing.expectEqual(@as(isize, -70000), @as(isize, @bitCast(wregRef(10))));
     try std.testing.expectEqual(@as(f64, 12.0), fregRef(1));
     try std.testing.expectEqual(@as(f64, 12.0), fregRef(2));
-    try std.testing.expectEqual(@as(c_long, -5), @as(c_long, @bitCast(wregRef(11))));
+    try std.testing.expectEqual(@as(isize, -5), @as(isize, @bitCast(wregRef(11))));
     try std.testing.expectEqual(@as(WordT, 0xfb), wregRef(12));
     try std.testing.expectEqual(@intFromPtr(&scratch_bytes), wregRef(6));
     try std.testing.expectEqual(expected_pcr_addr, wregRef(13));
@@ -1939,9 +1939,9 @@ test "svm1 word/float ALU, jumps, icall/pop_return, closure, traps, and interrup
     var p: usize = 0;
 
     // ALU setup: r5 = -17, r6 = 5, r7 = 0x3F (tc_fixnum? test)
-    wregSet(5, @bitCast(@as(c_long, -17)));
+    wregSet(5, @bitCast(@as(isize, -17)));
     wregSet(6, 5);
-    wregSet(7, @bitCast(@as(c_long, obj.smallest_fixnum - 1))); // non-fixnum for cjump_nfix
+    wregSet(7, @bitCast(@as(isize, obj.smallest_fixnum - 1))); // non-fixnum for cjump_nfix
 
     // quotient r8 = r5 / r6 (-3); remainder r9 = r5 % r6 (-2); abs r10 = |r5| (17)
     code[p] = 0xc2;
@@ -1960,7 +1960,7 @@ test "svm1 word/float ALU, jumps, icall/pop_return, closure, traps, and interrup
     p += 3;
     // lsh: r11 = r6 << 3 (40), r12 = r5 >> 2 (-5 via -2 => s=-17, n=-2 => -5)
     wregSet(13, 3);
-    wregSet(14, @bitCast(@as(c_long, -2)));
+    wregSet(14, @bitCast(@as(isize, -2)));
     code[p] = 0xc4;
     code[p + 1] = 11;
     code[p + 2] = 6;
@@ -2030,12 +2030,12 @@ test "svm1 word/float ALU, jumps, icall/pop_return, closure, traps, and interrup
 
     const rc = cToInterface(&code);
     try std.testing.expectEqual(abi.prim_done, rc);
-    try std.testing.expectEqual(@as(c_long, -3), @as(c_long, @bitCast(wregRef(8))));
-    try std.testing.expectEqual(@as(c_long, -2), @as(c_long, @bitCast(wregRef(9))));
+    try std.testing.expectEqual(@as(isize, -3), @as(isize, @bitCast(wregRef(8))));
+    try std.testing.expectEqual(@as(isize, -2), @as(isize, @bitCast(wregRef(9))));
     try std.testing.expectEqual(@as(WordT, 17), wregRef(10));
     try std.testing.expectEqual(@as(WordT, 40), wregRef(11));
-    try std.testing.expectEqual(@as(c_long, -5), @as(c_long, @bitCast(wregRef(12))));
-    try std.testing.expectEqual(@as(c_long, -85), @as(c_long, @bitCast(wregRef(15))));
+    try std.testing.expectEqual(@as(isize, -5), @as(isize, @bitCast(wregRef(12))));
+    try std.testing.expectEqual(@as(isize, -85), @as(isize, @bitCast(wregRef(15))));
     try std.testing.expectEqual(obj.sharp_t, wregRef(17));
     try std.testing.expectEqual(@as(f64, 2.0), fregRef(3));
 
@@ -2085,10 +2085,10 @@ test "svm1 word/float ALU, jumps, icall/pop_return, closure, traps, and interrup
     try std.testing.expectEqual(abi.prim_done, cToInterface(&code));
     try std.testing.expectEqual(UtilId.lookup_trap, TestMockState.last_util.?);
     try std.testing.expectEqual(@intFromPtr(&code[3]) + 4, TestMockState.last_args[0]);
-    try std.testing.expectEqual(@as(c_ulong, 0x1234), TestMockState.last_args[1]);
+    try std.testing.expectEqual(@as(usize, 0x1234), TestMockState.last_args[1]);
 
     // svm_export_instruction_pointer idle vs active
-    try std.testing.expectEqual(@as(c_ulong, 0xfeed), svmExportInstructionPointer(0xfeed));
+    try std.testing.expectEqual(@as(usize, 0xfeed), svmExportInstructionPointer(0xfeed));
     running_p = true;
     instruction_pointer = &code;
     defer {

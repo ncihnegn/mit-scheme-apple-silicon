@@ -18,7 +18,7 @@ inline fn asBignum(x: obj.SchemeObject) obj.SchemeObject {
     return if (obj.fixnumP(x)) abi.fixnumToBignum(x) else x;
 }
 
-inline fn fixnumDivTrunc(lx: c_long, ly: c_long) struct { q: c_long, r: c_long } {
+inline fn fixnumDivTrunc(lx: isize, ly: isize) struct { q: isize, r: isize } {
     const abs_x = if (lx < 0) -lx else lx;
     const abs_y = if (ly < 0) -ly else ly;
     const mag_q = @divTrunc(abs_x, abs_y);
@@ -40,45 +40,45 @@ inline fn bitwiseBinop(
     return bignum_to_integer(bigOp(asBignum(n), asBignum(m)));
 }
 
-inline fn fixAnd(x: c_long, y: c_long) c_long {
+inline fn fixAnd(x: isize, y: isize) isize {
     return x & y;
 }
-inline fn fixAndc2(x: c_long, y: c_long) c_long {
+inline fn fixAndc2(x: isize, y: isize) isize {
     return x & ~y;
 }
-inline fn fixAndc1(x: c_long, y: c_long) c_long {
+inline fn fixAndc1(x: isize, y: isize) isize {
     return y & ~x;
 }
-inline fn fixXor(x: c_long, y: c_long) c_long {
+inline fn fixXor(x: isize, y: isize) isize {
     return x ^ y;
 }
-inline fn fixIor(x: c_long, y: c_long) c_long {
+inline fn fixIor(x: isize, y: isize) isize {
     return x | y;
 }
-inline fn fixNor(x: c_long, y: c_long) c_long {
+inline fn fixNor(x: isize, y: isize) isize {
     return ~(x | y);
 }
-inline fn fixEqv(x: c_long, y: c_long) c_long {
+inline fn fixEqv(x: isize, y: isize) isize {
     return ~(x ^ y);
 }
-inline fn fixOrc2(x: c_long, y: c_long) c_long {
+inline fn fixOrc2(x: isize, y: isize) isize {
     return x | ~y;
 }
-inline fn fixOrc1(x: c_long, y: c_long) c_long {
+inline fn fixOrc1(x: isize, y: isize) isize {
     return y | ~x;
 }
-inline fn fixNand(x: c_long, y: c_long) c_long {
+inline fn fixNand(x: isize, y: isize) isize {
     return ~(x & y);
 }
 
 // Conversions between Scheme types and C types.
 
-pub export fn fixnum_to_long(fixnum: obj.SchemeObject) callconv(.c) c_long {
+pub export fn fixnum_to_long(fixnum: obj.SchemeObject) callconv(.c) isize {
     return obj.fixnumToLong(fixnum);
 }
 
 pub export fn double_to_fixnum(value: f64) callconv(.c) obj.SchemeObject {
-    const min_f: f64 = @floatFromInt(std.math.minInt(c_long));
+    const min_f: f64 = @floatFromInt(std.math.minInt(isize));
     const max_f: f64 = -min_f;
     if (!(value >= min_f and value < max_f)) return obj.longToFixnum(0);
     return obj.longToFixnum(@intFromFloat(value));
@@ -88,7 +88,7 @@ pub export fn integer_to_long_p(n: obj.SchemeObject) callconv(.c) bool {
     return obj.fixnumP(n) or abi.bignumToLongP(n);
 }
 
-pub export fn integer_to_long(n: obj.SchemeObject) callconv(.c) c_long {
+pub export fn integer_to_long(n: obj.SchemeObject) callconv(.c) isize {
     return if (obj.fixnumP(n)) obj.fixnumToLong(n) else abi.bignum_to_long(n);
 }
 
@@ -100,13 +100,13 @@ pub export fn integer_to_intmax(n: obj.SchemeObject) callconv(.c) i64 {
     return if (obj.fixnumP(n)) @intCast(obj.fixnumToLong(n)) else abi.bignum_to_intmax(n);
 }
 
-pub export fn long_to_integer(number: c_long) callconv(.c) obj.SchemeObject {
+pub export fn long_to_integer(number: isize) callconv(.c) obj.SchemeObject {
     return if (obj.longToFixnumP(number)) obj.longToFixnum(number) else abi.long_to_bignum(number);
 }
 
 pub export fn intmax_to_integer(number: i64) callconv(.c) obj.SchemeObject {
-    const min_l: i64 = std.math.minInt(c_long);
-    const max_l: i64 = std.math.maxInt(c_long);
+    const min_l: i64 = std.math.minInt(isize);
+    const max_l: i64 = std.math.maxInt(isize);
     return if (number >= min_l and number <= max_l)
         long_to_integer(@intCast(number))
     else
@@ -117,7 +117,7 @@ pub export fn integer_to_ulong_p(n: obj.SchemeObject) callconv(.c) bool {
     return if (obj.fixnumP(n)) !obj.fixnumNegativeP(n) else abi.bignumToUlongP(n);
 }
 
-pub export fn integer_to_ulong(n: obj.SchemeObject) callconv(.c) c_ulong {
+pub export fn integer_to_ulong(n: obj.SchemeObject) callconv(.c) usize {
     return if (obj.fixnumP(n)) @bitCast(obj.fixnumToLong(n)) else abi.bignum_to_ulong(n);
 }
 
@@ -132,8 +132,8 @@ pub export fn integer_to_uintmax(n: obj.SchemeObject) callconv(.c) u64 {
         abi.bignum_to_uintmax(n);
 }
 
-pub export fn ulong_to_integer(number: c_ulong) callconv(.c) obj.SchemeObject {
-    const s_number: c_long = @bitCast(number);
+pub export fn ulong_to_integer(number: usize) callconv(.c) obj.SchemeObject {
+    const s_number: isize = @bitCast(number);
     if (s_number >= 0) {
         return if (obj.longToFixnumP(s_number)) obj.longToFixnum(s_number) else abi.long_to_bignum(s_number);
     }
@@ -141,7 +141,7 @@ pub export fn ulong_to_integer(number: c_ulong) callconv(.c) obj.SchemeObject {
 }
 
 pub export fn uintmax_to_integer(number: u64) callconv(.c) obj.SchemeObject {
-    return if (number <= std.math.maxInt(c_ulong))
+    return if (number <= std.math.maxInt(usize))
         ulong_to_integer(@intCast(number))
     else
         abi.uintmax_to_bignum(number);
@@ -219,7 +219,7 @@ pub export fn flonum_round(x: obj.SchemeObject) callconv(.c) obj.SchemeObject {
 pub export fn flonum_normalize(x: obj.SchemeObject) callconv(.c) obj.SchemeObject {
     var exponent: c_int = undefined;
     const significand = frexp(obj.flonumToDouble(x), &exponent);
-    return abi.cons(abi.double_to_flonum(significand), long_to_integer(@as(c_long, exponent)));
+    return abi.cons(abi.double_to_flonum(significand), long_to_integer(@as(isize, exponent)));
 }
 
 pub export fn flonum_denormalize(x: obj.SchemeObject, e: obj.SchemeObject) callconv(.c) obj.SchemeObject {
@@ -343,7 +343,7 @@ pub export fn integer_remainder(n: obj.SchemeObject, d: obj.SchemeObject) callco
 pub export fn integer_length_in_bits(n: obj.SchemeObject) callconv(.c) obj.SchemeObject {
     if (obj.fixnumP(n)) {
         const n1 = obj.fixnumToLong(n);
-        const mag: c_ulong = @intCast(if (n1 < 0) -n1 else n1);
+        const mag: usize = @intCast(if (n1 < 0) -n1 else n1);
         return obj.ulongToFixnum(bits.ulongLengthInBits(mag));
     }
     return ulong_to_integer(abi.bignum_length_in_bits(n));
@@ -352,7 +352,7 @@ pub export fn integer_length_in_bits(n: obj.SchemeObject) callconv(.c) obj.Schem
 pub export fn integer_length(n: obj.SchemeObject) callconv(.c) obj.SchemeObject {
     if (obj.fixnumP(n)) {
         const n1 = obj.fixnumToLong(n);
-        const mag: c_ulong = @intCast(if (n1 < 0) ~n1 else n1);
+        const mag: usize = @intCast(if (n1 < 0) ~n1 else n1);
         return obj.ulongToFixnum(bits.ulongLengthInBits(mag));
     }
     return ulong_to_integer(abi.bignum_integer_length(n));
@@ -361,7 +361,7 @@ pub export fn integer_length(n: obj.SchemeObject) callconv(.c) obj.SchemeObject 
 pub export fn integer_first_set_bit(n: obj.SchemeObject) callconv(.c) obj.SchemeObject {
     if (obj.fixnumP(n)) {
         const n1 = obj.fixnumToLong(n);
-        const uval: c_ulong = if (n1 < 0) ~@as(c_ulong, @intCast(~n1)) else @intCast(n1);
+        const uval: usize = if (n1 < 0) ~@as(usize, @intCast(~n1)) else @intCast(n1);
         return obj.longToFixnum(bits.ulongFirstSetBit(uval));
     }
     return long_to_integer(abi.bignum_first_set_bit(n));
@@ -370,7 +370,7 @@ pub export fn integer_first_set_bit(n: obj.SchemeObject) callconv(.c) obj.Scheme
 pub export fn integer_bit_count(n: obj.SchemeObject) callconv(.c) obj.SchemeObject {
     if (obj.fixnumP(n)) {
         const n1 = obj.fixnumToLong(n);
-        const mag: c_ulong = @intCast(if (n1 < 0) ~n1 else n1);
+        const mag: usize = @intCast(if (n1 < 0) ~n1 else n1);
         return obj.ulongToFixnum(bits.ulongBitCount(mag));
     }
     return ulong_to_integer(abi.bignum_bit_count(n));
@@ -434,42 +434,42 @@ pub export fn integer_bitwise_nand(n: obj.SchemeObject, m: obj.SchemeObject) cal
     return bitwiseBinop(n, m, fixNand, abi.bignum_bitwise_nand);
 }
 
-pub export fn integer_nonnegative_one_bits(n: c_ulong, m: c_ulong) callconv(.c) obj.SchemeObject {
+pub export fn integer_nonnegative_one_bits(n: usize, m: usize) callconv(.c) obj.SchemeObject {
     if (n == 0) return obj.fixnum_zero;
     if (n <= obj.fixnum_length and m <= obj.fixnum_length - n) {
-        const mask = (~((~@as(c_ulong, 0)) << @intCast(n))) << @intCast(m);
+        const mask = (~((~@as(usize, 0)) << @intCast(n))) << @intCast(m);
         return obj.ulongToFixnum(mask);
     }
     return abi.bignum_nonnegative_one_bits(n, m);
 }
 
-pub export fn integer_negative_zero_bits(n: c_ulong, m: c_ulong) callconv(.c) obj.SchemeObject {
+pub export fn integer_negative_zero_bits(n: usize, m: usize) callconv(.c) obj.SchemeObject {
     if (n == 0) return obj.longToFixnum(-1);
     if (n <= obj.fixnum_length and m <= obj.fixnum_length - n) {
-        const mask = (~((~@as(c_ulong, 0)) << @intCast(n))) << @intCast(m);
-        return obj.longToFixnum(~@as(c_long, @bitCast(mask)));
+        const mask = (~((~@as(usize, 0)) << @intCast(n))) << @intCast(m);
+        return obj.longToFixnum(~@as(isize, @bitCast(mask)));
     }
     return abi.bignum_negative_zero_bits(n, m);
 }
 
 // Shift: multiplication and Euclidean division by 2^m
 
-pub export fn integer_shift_left(n: obj.SchemeObject, m: c_ulong) callconv(.c) obj.SchemeObject {
+pub export fn integer_shift_left(n: obj.SchemeObject, m: usize) callconv(.c) obj.SchemeObject {
     if (m == 0) return n;
     if (obj.fixnumP(n)) {
         const n1 = obj.fixnumToLong(n);
         if (n1 < 0) {
-            const len: c_ulong = bits.ulongLengthInBits(@intCast(~n1));
+            const len: usize = bits.ulongLengthInBits(@intCast(~n1));
             if (m <= obj.fixnum_length and len <= obj.fixnum_length - m) {
-                const mag: c_ulong = @intCast(-n1);
-                return obj.longToFixnum(-@as(c_long, @intCast(mag << @intCast(m))));
+                const mag: usize = @intCast(-n1);
+                return obj.longToFixnum(-@as(isize, @intCast(mag << @intCast(m))));
             }
             return abi.bignum_negate(abi.unsigned_long_to_shifted_bignum(@intCast(-n1), m, 0));
         }
         if (n1 > 0) {
-            const len: c_ulong = bits.ulongLengthInBits(@intCast(n1));
+            const len: usize = bits.ulongLengthInBits(@intCast(n1));
             if (m <= obj.fixnum_length and len <= obj.fixnum_length - m) {
-                const mag: c_ulong = @intCast(n1);
+                const mag: usize = @intCast(n1);
                 return obj.longToFixnum(@intCast(mag << @intCast(m)));
             }
             return abi.unsigned_long_to_shifted_bignum(@intCast(n1), m, 0);
@@ -479,11 +479,11 @@ pub export fn integer_shift_left(n: obj.SchemeObject, m: c_ulong) callconv(.c) o
     return abi.bignum_shift_left(n, m);
 }
 
-pub export fn integer_shift_right(n: obj.SchemeObject, m: c_ulong) callconv(.c) obj.SchemeObject {
+pub export fn integer_shift_right(n: obj.SchemeObject, m: usize) callconv(.c) obj.SchemeObject {
     if (m == 0) return n;
     if (obj.fixnumP(n)) {
         const n1 = obj.fixnumToLong(n);
-        if (m >= @bitSizeOf(c_long)) return obj.longToFixnum(if (n1 < 0) -1 else 0);
+        if (m >= @bitSizeOf(isize)) return obj.longToFixnum(if (n1 < 0) -1 else 0);
         const sh: u6 = @intCast(m);
         return obj.longToFixnum(if (n1 < 0) ~((~n1) >> sh) else (n1 >> sh));
     }
@@ -500,10 +500,10 @@ test "artutl conversions, division sign rules, shifts, and double rounding" {
     try std.testing.expect(obj.bignumP(big_pos));
     try std.testing.expectEqual(obj.biggest_fixnum + 1, integer_to_long(big_pos));
 
-    const neg_u = ulong_to_integer(std.math.maxInt(c_ulong));
+    const neg_u = ulong_to_integer(std.math.maxInt(usize));
     try std.testing.expect(obj.bignumP(neg_u));
     try std.testing.expect(integer_to_ulong_p(neg_u));
-    try std.testing.expectEqual(std.math.maxInt(c_ulong), integer_to_ulong(neg_u));
+    try std.testing.expectEqual(std.math.maxInt(usize), integer_to_ulong(neg_u));
 
     // Negating SMALLEST_FIXNUM overflows fixnum into bignum
     const neg_min = integer_negate(obj.longToFixnum(obj.smallest_fixnum));
@@ -514,12 +514,12 @@ test "artutl conversions, division sign rules, shifts, and double rounding" {
     var q: obj.SchemeObject = 0;
     var r: obj.SchemeObject = 0;
     try std.testing.expect(!integer_divide(obj.longToFixnum(-17), obj.longToFixnum(5), &q, &r));
-    try std.testing.expectEqual(@as(c_long, -3), obj.fixnumToLong(q));
-    try std.testing.expectEqual(@as(c_long, -2), obj.fixnumToLong(r));
+    try std.testing.expectEqual(@as(isize, -3), obj.fixnumToLong(q));
+    try std.testing.expectEqual(@as(isize, -2), obj.fixnumToLong(r));
 
     try std.testing.expect(!integer_divide(obj.longToFixnum(-17), obj.longToFixnum(-5), &q, &r));
-    try std.testing.expectEqual(@as(c_long, 3), obj.fixnumToLong(q));
-    try std.testing.expectEqual(@as(c_long, -2), obj.fixnumToLong(r));
+    try std.testing.expectEqual(@as(isize, 3), obj.fixnumToLong(q));
+    try std.testing.expectEqual(@as(isize, -2), obj.fixnumToLong(r));
 
     // Multiply fixnum overflow into bignum
     const prod = integer_multiply(obj.longToFixnum(1 << 30), obj.longToFixnum(1 << 30));
@@ -527,18 +527,18 @@ test "artutl conversions, division sign rules, shifts, and double rounding" {
     try std.testing.expectEqual(@as(i64, 1) << 60, integer_to_intmax(prod));
 
     // Bit counts & first set bit
-    try std.testing.expectEqual(@as(c_long, 5), obj.fixnumToLong(integer_length(obj.longToFixnum(17))));
-    try std.testing.expectEqual(@as(c_long, 4), obj.fixnumToLong(integer_length(obj.longToFixnum(-16))));
-    try std.testing.expectEqual(@as(c_long, -1), obj.fixnumToLong(integer_first_set_bit(obj.fixnum_zero)));
-    try std.testing.expectEqual(@as(c_long, 2), obj.fixnumToLong(integer_first_set_bit(obj.longToFixnum(-12))));
-    try std.testing.expectEqual(@as(c_long, 3), obj.fixnumToLong(integer_bit_count(obj.longToFixnum(-12))));
+    try std.testing.expectEqual(@as(isize, 5), obj.fixnumToLong(integer_length(obj.longToFixnum(17))));
+    try std.testing.expectEqual(@as(isize, 4), obj.fixnumToLong(integer_length(obj.longToFixnum(-16))));
+    try std.testing.expectEqual(@as(isize, -1), obj.fixnumToLong(integer_first_set_bit(obj.fixnum_zero)));
+    try std.testing.expectEqual(@as(isize, 2), obj.fixnumToLong(integer_first_set_bit(obj.longToFixnum(-12))));
+    try std.testing.expectEqual(@as(isize, 3), obj.fixnumToLong(integer_bit_count(obj.longToFixnum(-12))));
 
     // Shifts & one/zero bits
     try std.testing.expectEqual(obj.longToFixnum(0), integer_shift_right(obj.longToFixnum(42), 100));
     try std.testing.expectEqual(obj.longToFixnum(-1), integer_shift_right(obj.longToFixnum(-42), 100));
     try std.testing.expect(obj.bignumP(integer_shift_left(obj.longToFixnum(1), 60)));
-    try std.testing.expectEqual(@as(c_long, 0b11100), obj.fixnumToLong(integer_nonnegative_one_bits(3, 2)));
-    try std.testing.expectEqual(@as(c_long, ~@as(c_long, 0b11100)), obj.fixnumToLong(integer_negative_zero_bits(3, 2)));
+    try std.testing.expectEqual(@as(isize, 0b11100), obj.fixnumToLong(integer_nonnegative_one_bits(3, 2)));
+    try std.testing.expectEqual(@as(isize, ~@as(isize, 0b11100)), obj.fixnumToLong(integer_negative_zero_bits(3, 2)));
 
     // IEEE round-to-even & normalize/denormalize
     try std.testing.expectEqual(@as(f64, 2.0), double_round(2.5));
@@ -551,6 +551,6 @@ test "artutl conversions, division sign rules, shifts, and double rounding" {
     try std.testing.expect(flonum_integer_p(fl));
     const norm = flonum_normalize(fl);
     try std.testing.expectEqual(@as(f64, 0.75), obj.flonumToDouble(obj.pairCar(norm)));
-    try std.testing.expectEqual(@as(c_long, 3), obj.fixnumToLong(obj.pairCdr(norm)));
+    try std.testing.expectEqual(@as(isize, 3), obj.fixnumToLong(obj.pairCdr(norm)));
     try std.testing.expectEqual(@as(f64, 6.0), obj.flonumToDouble(flonum_denormalize(obj.pairCar(norm), obj.pairCdr(norm))));
 }

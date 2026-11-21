@@ -34,7 +34,11 @@ USA.
    machine.  Thus it declares teensy functions like empty_list(). */
 
 /* This is redundant, but avoids the need for object.h, config.h, types.h... */
+#ifdef _WIN64
+typedef unsigned long long SCM;
+#else
 typedef unsigned long SCM;
+#endif
 
 extern char* cstack_top (void);
 extern void cstack_push (void * addr, int bytes);

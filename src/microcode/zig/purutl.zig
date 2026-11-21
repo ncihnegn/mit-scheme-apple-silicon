@@ -35,8 +35,8 @@ pub export fn object_in_constant_space_p(object: obj.SchemeObject) callconv(.c) 
     return abi.addressInConstantP(address);
 }
 
-pub export fn copy_to_constant_space(source: [*]const obj.SchemeObject, n_words: c_ulong) callconv(.c) [*]obj.SchemeObject {
-    const avail_words: c_ulong = if (@intFromPtr(abi.constant_end) > @intFromPtr(abi.constant_alloc_next))
+pub export fn copy_to_constant_space(source: [*]const obj.SchemeObject, n_words: usize) callconv(.c) [*]obj.SchemeObject {
+    const avail_words: usize = if (@intFromPtr(abi.constant_end) > @intFromPtr(abi.constant_alloc_next))
         @intCast((@intFromPtr(abi.constant_end) - @intFromPtr(abi.constant_alloc_next)) / @sizeOf(obj.SchemeObject))
     else
         0;

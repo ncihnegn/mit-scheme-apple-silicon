@@ -17,12 +17,12 @@ extern "c" fn free(ptr: ?*anyopaque) void;
 extern "c" fn memmove(dst: ?*anyopaque, src: ?*const anyopaque, n: usize) ?*anyopaque;
 extern "c" fn exit(status: c_int) noreturn;
 
-var saved_heap_size: c_ulong = 0;
-var saved_constant_size: c_ulong = 0;
-var saved_stack_size: c_ulong = 0;
+var saved_heap_size: usize = 0;
+var saved_constant_size: usize = 0;
+var saved_stack_size: usize = 0;
 var saved_to: ?[*]obj.SchemeObject = null;
 
-const primes = [_]c_ulong{
+const primes = [_]usize{
     11,
     23,
     53,
@@ -62,10 +62,10 @@ fn allocationTooLarge() noreturn {
 }
 
 pub export fn setup_memory(
-    heap_size: c_ulong,
-    stack_size: c_ulong,
-    constant_size: c_ulong,
-    code_size: c_ulong,
+    heap_size: usize,
+    stack_size: usize,
+    constant_size: usize,
+    code_size: usize,
 ) callconv(.c) void {
     if (heap_size == 0 or stack_size == 0) {
         abi.outf_fatal("Configuration won't hold initial data.\n");
@@ -115,14 +115,14 @@ pub export fn reset_memory() callconv(.c) void {
 }
 
 pub export fn allocations_ok_p(
-    n_constant: c_ulong,
-    n_heap: c_ulong,
-    n_reserved: c_ulong,
+    n_constant: usize,
+    n_heap: usize,
+    n_reserved: usize,
 ) callconv(.c) bool {
     const start = storage.memory_block_start orelse return false;
     const end = storage.memory_block_end orelse return false;
     const block_words: u128 = (@intFromPtr(end) - @intFromPtr(start)) / @sizeOf(obj.SchemeObject);
-    const effective_reserved: c_ulong = if (n_reserved == 0) abi.default_heap_reserved else n_reserved;
+    const effective_reserved: usize = if (n_reserved == 0) abi.default_heap_reserved else n_reserved;
     const needed: u128 =
         @as(u128, saved_stack_size) +
         n_constant +
@@ -133,8 +133,8 @@ pub export fn allocations_ok_p(
 }
 
 pub export fn reset_allocator_parameters(
-    n_constant: c_ulong,
-    reserved: c_ulong,
+    n_constant: usize,
+    reserved: usize,
 ) callconv(.c) void {
     const start = storage.memory_block_start.?;
     const end = storage.memory_block_end.?;
@@ -157,7 +157,7 @@ pub export fn reset_allocator_parameters(
 }
 
 fn allocateTospace(
-    n_words: c_ulong,
+    n_words: usize,
     start_r: *?[*]obj.SchemeObject,
     end_r: *?[*]obj.SchemeObject,
 ) callconv(.c) void {
@@ -202,16 +202,16 @@ pub export fn Prim_garbage_collect() callconv(.c) obj.SchemeObject {
     if (@intFromPtr(abi.Free) > @intFromPtr(abi.heap_end)) {
         abi.outf_fatal("\nGC has been delayed too long!\n");
         abi.outf_fatal(
-            "Free = %#lx; heap_alloc_limit = %#lx; heap_end = %#lx\n",
-            @as(c_ulong, @intFromPtr(abi.Free)),
-            @as(c_ulong, @intFromPtr(abi.heap_alloc_limit)),
-            @as(c_ulong, @intFromPtr(abi.heap_end)),
+            "Free = %#zx; heap_alloc_limit = %#zx; heap_end = %#zx\n",
+            @as(usize, @intFromPtr(abi.Free)),
+            @as(usize, @intFromPtr(abi.heap_alloc_limit)),
+            @as(usize, @intFromPtr(abi.heap_end)),
         );
         abi.Microcode_Termination(abi.term_no_space);
     }
 
     const safety_margin = abi.argHeapReserved(1);
-    const heap_words: c_ulong = @intCast((@intFromPtr(abi.heap_end) - @intFromPtr(abi.heap_start)) / @sizeOf(obj.SchemeObject));
+    const heap_words: usize = @intCast((@intFromPtr(abi.heap_end) - @intFromPtr(abi.heap_start)) / @sizeOf(obj.SchemeObject));
     if (safety_margin < heap_words) {
         abi.heap_reserved = safety_margin;
         abi.heap_alloc_limit = abi.heap_end - @as(usize, @intCast(safety_margin));
@@ -233,7 +233,7 @@ pub export fn Prim_garbage_collect() callconv(.c) obj.SchemeObject {
 
     abi.stackCheck(abi.cont_size);
     const avail = abi.heapAvailable();
-    const remaining: c_ulong = if (avail > abi.gc_space_needed) avail - abi.gc_space_needed else 0;
+    const remaining: usize = if (avail > abi.gc_space_needed) avail - abi.gc_space_needed else 0;
     abi.pushCont(abi.rc_normal_gc_done, obj.ulongToFixnum(remaining));
 
     abi.critical_section_name = "garbage collector daemon";
@@ -354,7 +354,7 @@ pub export fn Prim_gc_trace_references() callconv(.c) obj.SchemeObject {
     return obj.unspecific;
 }
 
-fn computeEphemeronArrayLength(n: c_ulong) c_ulong {
+fn computeEphemeronArrayLength(n: usize) usize {
     var start: usize = 0;
     var end: usize = primes.len;
     if (primes[end - 1] < n) return primes[end - 1];
@@ -372,16 +372,16 @@ fn computeEphemeronArrayLength(n: c_ulong) c_ulong {
     return primes[start];
 }
 
-fn ephemeronArrayBigEnoughP(n: c_ulong) bool {
+fn ephemeronArrayBigEnoughP(n: usize) bool {
     return n == 0 or (obj.vectorP(storage.ephemeron_array) and n <= obj.vectorLength(storage.ephemeron_array));
 }
 
-pub export fn compute_extra_ephemeron_space(n: c_ulong) callconv(.c) c_ulong {
+pub export fn compute_extra_ephemeron_space(n: usize) callconv(.c) usize {
     if (ephemeronArrayBigEnoughP(n)) return 0;
     return 1 + computeEphemeronArrayLength(n);
 }
 
-pub export fn guarantee_extra_ephemeron_space(n: c_ulong) callconv(.c) void {
+pub export fn guarantee_extra_ephemeron_space(n: usize) callconv(.c) void {
     storage.ephemeron_count = n;
     if (!ephemeronArrayBigEnoughP(n)) {
         const length = computeEphemeronArrayLength(n);
@@ -390,7 +390,7 @@ pub export fn guarantee_extra_ephemeron_space(n: c_ulong) callconv(.c) void {
     }
 }
 
-fn gcIfNeededForEphemeron(extra_space: c_ulong) void {
+fn gcIfNeededForEphemeron(extra_space: usize) void {
     if (abi.gcNeededP(abi.ephemeron_size + extra_space)) {
         storage.n_ephemerons_requested = 1;
         storage.ephemeron_request_hard_p = true;
@@ -424,13 +424,13 @@ test "memmag ephemeron array sizing, make-ephemeron, memory setup, and std_gc cy
     stubs.resetMockRuntime();
     defer stubs.resetMockRuntime();
 
-    try std.testing.expectEqual(@as(c_ulong, 11), computeEphemeronArrayLength(0));
-    try std.testing.expectEqual(@as(c_ulong, 11), computeEphemeronArrayLength(11));
-    try std.testing.expectEqual(@as(c_ulong, 23), computeEphemeronArrayLength(12));
-    try std.testing.expectEqual(@as(c_ulong, 1610612741), computeEphemeronArrayLength(std.math.maxInt(c_ulong)));
+    try std.testing.expectEqual(@as(usize, 11), computeEphemeronArrayLength(0));
+    try std.testing.expectEqual(@as(usize, 11), computeEphemeronArrayLength(11));
+    try std.testing.expectEqual(@as(usize, 23), computeEphemeronArrayLength(12));
+    try std.testing.expectEqual(@as(usize, 1610612741), computeEphemeronArrayLength(std.math.maxInt(usize)));
 
-    try std.testing.expectEqual(@as(c_ulong, 0), compute_extra_ephemeron_space(0));
-    try std.testing.expectEqual(@as(c_ulong, 12), compute_extra_ephemeron_space(1));
+    try std.testing.expectEqual(@as(usize, 0), compute_extra_ephemeron_space(0));
+    try std.testing.expectEqual(@as(usize, 12), compute_extra_ephemeron_space(1));
 
     var arena: [8192]obj.SchemeObject = @splat(0);
     storage.memory_block_start = (&arena).ptr;
@@ -440,7 +440,7 @@ test "memmag ephemeron array sizing, make-ephemeron, memory setup, and std_gc cy
     saved_heap_size = 2000;
     reset_allocator_parameters(100, 32);
 
-    try std.testing.expectEqual(@as(c_ulong, 32), storage.heap_reserved);
+    try std.testing.expectEqual(@as(usize, 32), storage.heap_reserved);
     try std.testing.expectEqual((&arena).ptr + 5000, storage.constant_start);
     try std.testing.expectEqual((&arena).ptr + 5000 + 100 + abi.constant_space_fudge, storage.heap_start);
     try std.testing.expectEqual(storage.heap_start, storage.Free);
@@ -458,8 +458,8 @@ test "memmag ephemeron array sizing, make-ephemeron, memory setup, and std_gc cy
     try std.testing.expectEqual(obj.tc_ephemeron, obj.objectType(eph));
     try std.testing.expect(object_in_heap_p(eph));
     try std.testing.expect(obj.vectorP(storage.ephemeron_array));
-    try std.testing.expectEqual(@as(c_ulong, 11), obj.vectorLength(storage.ephemeron_array));
-    try std.testing.expectEqual(@as(c_ulong, 1), storage.ephemeron_count);
+    try std.testing.expectEqual(@as(usize, 11), obj.vectorLength(storage.ephemeron_array));
+    try std.testing.expectEqual(@as(usize, 1), storage.ephemeron_count);
     const eph_addr = obj.objectAddress(eph);
     try std.testing.expectEqual(abi.marked_ephemeron_manifest, eph_addr[0]);
     try std.testing.expectEqual(obj.ulongToFixnum(7), eph_addr[1]);
@@ -468,8 +468,8 @@ test "memmag ephemeron array sizing, make-ephemeron, memory setup, and std_gc cy
     try std.testing.expectEqual(obj.sharp_f, eph_addr[4]);
 
     guarantee_extra_ephemeron_space(12);
-    try std.testing.expectEqual(@as(c_ulong, 12), storage.ephemeron_count);
-    try std.testing.expectEqual(@as(c_ulong, 23), obj.vectorLength(storage.ephemeron_array));
+    try std.testing.expectEqual(@as(usize, 12), storage.ephemeron_count);
+    try std.testing.expectEqual(@as(usize, 23), obj.vectorLength(storage.ephemeron_array));
 
     // Exercise std_gc_pt1 / std_gc_pt2 cycle
     storage.fixed_objects = obj.sharp_t;
@@ -486,15 +486,15 @@ test "memmag ephemeron array sizing, make-ephemeron, memory setup, and std_gc cy
     std_gc_pt2();
     try std.testing.expectEqual(obj.sharp_t, storage.fixed_objects);
     try std.testing.expectEqual((&arena).ptr + 5010, utils.history_register.?);
-    try std.testing.expectEqual(@as(c_ulong, 0), abi.Registers[abi.regblock_int_code] & abi.int_gc);
+    try std.testing.expectEqual(@as(usize, 0), abi.Registers[abi.regblock_int_code] & abi.int_gc);
     if (build_options.cc_support) {
-        try std.testing.expectEqual(@as(c_ulong, 0), abi.Registers[abi.regblock_closure_free]);
-        try std.testing.expectEqual(@as(c_ulong, 0), abi.Registers[abi.regblock_closure_space]);
+        try std.testing.expectEqual(@as(usize, 0), abi.Registers[abi.regblock_closure_free]);
+        try std.testing.expectEqual(@as(usize, 0), abi.Registers[abi.regblock_closure_space]);
         if (build_options.cc_is_native and builtin.cpu.arch == .aarch64) {
             try std.testing.expectEqual(@as(usize, 1), stubs.mock_icache_flush_calls);
         }
     }
-    try std.testing.expectEqual(@as(c_ulong, 23), obj.vectorLength(storage.ephemeron_array));
+    try std.testing.expectEqual(@as(usize, 23), obj.vectorLength(storage.ephemeron_array));
 
     // Reset before deferred resetMockRuntime (not calling OS reset_memory on stack arena)
     storage.memory_block_start = null;

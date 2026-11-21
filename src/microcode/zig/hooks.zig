@@ -14,7 +14,7 @@ pub export fn Prim_apply() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     const procedure = abi.argRef(1);
     const args = abi.argRef(2);
-    var n_args: c_ulong = 0;
+    var n_args: usize = 0;
 
     // Validate list length & detect cycles before popping our frame.
     {
@@ -66,7 +66,7 @@ pub export fn Prim_apply() callconv(.c) obj.SchemeObject {
     abi.abort_to_interpreter(abi.prim_apply);
 }
 
-fn allocateControlPoint(n: c_ulong, gc_p: bool) obj.SchemeObject {
+fn allocateControlPoint(n: usize, gc_p: bool) obj.SchemeObject {
     const cp = abi.allocate_marked_vector(obj.tc_control_point, n + 2, gc_p);
     obj.vectorSet(cp, 0, obj.sharp_f);
     obj.vectorSet(cp, 1, obj.ulongToFixnum(0));
@@ -368,7 +368,7 @@ pub export fn Prim_with_stack_marker() callconv(.c) obj.SchemeObject {
     abi.abort_to_interpreter(abi.prim_apply);
 }
 
-fn withNewInterruptMask(new_mask: c_ulong) obj.SchemeObject {
+fn withNewInterruptMask(new_mask: usize) obj.SchemeObject {
     const receiver = abi.argRef(2);
     if (build_options.cc_support) {
         if (obj.ccReturnP(abi.stackRef(2)) and obj.ccEntryP(receiver)) {
@@ -399,7 +399,7 @@ fn withNewInterruptMask(new_mask: c_ulong) obj.SchemeObject {
 // RECEIVER is passed the old interrupt mask as its argument.")
 pub export fn Prim_with_interrupt_mask() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    const raw_mask: c_ulong = @bitCast(abi.arg_integer(1));
+    const raw_mask: usize = @bitCast(abi.arg_integer(1));
     return withNewInterruptMask(abi.int_mask & raw_mask);
 }
 
@@ -493,23 +493,23 @@ test "hooks interrupt masks, fixed objects, control points, force, and compiled 
 
     stubs.setArgs(&.{obj.ulongToFixnum(0x13)});
     try std.testing.expectEqual(obj.ulongToFixnum(0x05), Prim_set_interrupt_enables());
-    try std.testing.expectEqual(@as(c_ulong, 0x13), abi.Registers[abi.regblock_int_mask]);
+    try std.testing.expectEqual(@as(usize, 0x13), abi.Registers[abi.regblock_int_mask]);
 
     stubs.setArgs(&.{obj.ulongToFixnum(0x02)});
     try std.testing.expectEqual(obj.ulongToFixnum(0x13), Prim_disable_interrupts());
-    try std.testing.expectEqual(@as(c_ulong, 0x11), abi.Registers[abi.regblock_int_mask]);
+    try std.testing.expectEqual(@as(usize, 0x11), abi.Registers[abi.regblock_int_mask]);
 
     stubs.setArgs(&.{obj.ulongToFixnum(0x08)});
     try std.testing.expectEqual(obj.ulongToFixnum(0x11), Prim_enable_interrupts());
-    try std.testing.expectEqual(@as(c_ulong, 0x19), abi.Registers[abi.regblock_int_mask]);
+    try std.testing.expectEqual(@as(usize, 0x19), abi.Registers[abi.regblock_int_mask]);
 
     stubs.setArgs(&.{obj.ulongToFixnum(0x21)});
     try std.testing.expectEqual(obj.unspecific, Prim_request_interrupts());
-    try std.testing.expectEqual(@as(c_ulong, 0x21), abi.Registers[abi.regblock_int_code]);
+    try std.testing.expectEqual(@as(usize, 0x21), abi.Registers[abi.regblock_int_code]);
 
     stubs.setArgs(&.{obj.ulongToFixnum(0x01)});
     try std.testing.expectEqual(obj.unspecific, Prim_clear_interrupts());
-    try std.testing.expectEqual(@as(c_ulong, 0x20), abi.Registers[abi.regblock_int_code]);
+    try std.testing.expectEqual(@as(usize, 0x20), abi.Registers[abi.regblock_int_code]);
 
     // GET/SET-FIXED-OBJECTS-VECTOR
     const old_fov = abi.make_vector(abi.n_fixed_objects, obj.sharp_f, false);
@@ -527,7 +527,7 @@ test "hooks interrupt masks, fixed objects, control points, force, and compiled 
     obj.vectorSet(cp, 4, obj.ulongToFixnum(30));
     try std.testing.expectEqual(@intFromPtr(control_point_start(cp)) + 3 * @sizeOf(obj.SchemeObject), @intFromPtr(control_point_end(cp)));
     unpack_control_point(cp);
-    try std.testing.expectEqual(@as(c_ulong, 3), abi.stackNPushed());
+    try std.testing.expectEqual(@as(usize, 3), abi.stackNPushed());
     try std.testing.expectEqual(obj.ulongToFixnum(10), abi.stackPop());
     try std.testing.expectEqual(obj.ulongToFixnum(20), abi.stackPop());
     try std.testing.expectEqual(obj.ulongToFixnum(30), abi.stackPop());
@@ -551,7 +551,7 @@ test "hooks interrupt masks, fixed objects, control points, force, and compiled 
         // Back up stack_pointer so arg1, arg2 are at index 0,1 and cc_ret is at index 2 (stackRef(n_args=2) after popPrimitiveFrame(2) + decrementSp(2))
         try std.testing.expectEqual(obj.unspecific, Prim_apply());
         try std.testing.expectEqual(@as(usize, 1), stubs.mock_apply_compiled_calls);
-        try std.testing.expectEqual(@as(c_ulong, 2), stubs.mock_last_compiled_nargs);
+        try std.testing.expectEqual(@as(usize, 2), stubs.mock_last_compiled_nargs);
         try std.testing.expectEqual(cc_proc, stubs.mock_last_compiled_proc);
 
         stubs.setArgs(&.{ cc_proc, obj.ulongToFixnum(1), obj.ulongToFixnum(2), cc_ret });
@@ -563,14 +563,14 @@ test "hooks interrupt masks, fixed objects, control points, force, and compiled 
         stubs.setArgs(&.{ obj.ulongToFixnum(0x03), cc_proc, cc_ret });
         try std.testing.expectEqual(obj.unspecific, Prim_with_interrupt_mask());
         try std.testing.expectEqual(@as(usize, 1), stubs.mock_int_mask_calls);
-        try std.testing.expectEqual(@as(c_ulong, 0x0A), stubs.mock_last_compiled_mask);
-        try std.testing.expectEqual(@as(c_ulong, 0x03), stubs.mock_last_compiled_new_mask);
-        try std.testing.expectEqual(@as(c_ulong, 0x03), abi.Registers[abi.regblock_int_mask]);
+        try std.testing.expectEqual(@as(usize, 0x0A), stubs.mock_last_compiled_mask);
+        try std.testing.expectEqual(@as(usize, 0x03), stubs.mock_last_compiled_new_mask);
+        try std.testing.expectEqual(@as(usize, 0x03), abi.Registers[abi.regblock_int_mask]);
 
         // WITH-INTERRUPTS-REDUCED with new_mask < old_mask uses (new_mask & old_mask)
         stubs.setArgs(&.{ obj.ulongToFixnum(0x05), cc_proc, cc_ret });
         abi.Registers[abi.regblock_int_mask] = 0x0A;
         try std.testing.expectEqual(obj.unspecific, Prim_with_interrupts_reduced());
-        try std.testing.expectEqual(@as(c_ulong, 0x00), abi.Registers[abi.regblock_int_mask]);
+        try std.testing.expectEqual(@as(usize, 0x00), abi.Registers[abi.regblock_int_mask]);
     }
 }

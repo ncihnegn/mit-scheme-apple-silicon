@@ -10,7 +10,7 @@ const boot = @import("boot.zig");
 const fasl = @import("fasl.zig");
 
 extern "c" fn getenv(name: [*:0]const u8) ?[*:0]const u8;
-extern "c" fn strtoul(nptr: [*:0]const u8, endptr: *[*]const u8, base: c_int) c_ulong;
+extern "c" fn strtoull(nptr: [*:0]const u8, endptr: *[*]const u8, base: c_int) c_ulonglong;
 
 const compiler_interface_version: c_uint = 4;
 
@@ -37,11 +37,11 @@ const heap_size_variable: [*:0]const u8 = "MITSCHEME_HEAP_SIZE";
 const stack_size_variable: [*:0]const u8 = "MITSCHEME_STACK_SIZE";
 const code_size_variable: [*:0]const u8 = "MITSCHEME_CODE_SIZE";
 
-const default_heap_size: c_ulong = if (@sizeOf(c_ulong) == 8) 16384 else 3072;
-const default_constant_size: c_ulong = 1024;
-const minimum_fasl_constant: c_ulong = default_constant_size * 2;
-const default_stack_size: c_ulong = 1024;
-const default_code_size: c_ulong = if (@sizeOf(c_ulong) == 8) 8192 else 4096;
+const default_heap_size: usize = if (@sizeOf(usize) == 8) 16384 else 3072;
+const default_constant_size: usize = 1024;
+const minimum_fasl_constant: usize = default_constant_size * 2;
+const default_stack_size: usize = 1024;
+const default_code_size: usize = if (@sizeOf(usize) == 8) 8192 else 4096;
 
 const sub_directory_delimiter: u8 = '/';
 const path_delimiter: u8 = ':';
@@ -70,10 +70,10 @@ pub export var option_library_path: ?[*]?[*:0]const u8 = null;
 pub export var option_band_file: ?[*:0]const u8 = null;
 pub export var option_fasl_file: ?[*:0]const u8 = null;
 
-pub export var option_heap_size: c_ulong = 0;
-pub export var option_constant_size: c_ulong = 0;
-pub export var option_stack_size: c_ulong = 0;
-pub export var option_code_size: c_ulong = 0;
+pub export var option_heap_size: usize = 0;
+pub export var option_constant_size: usize = 0;
+pub export var option_stack_size: usize = 0;
+pub export var option_code_size: usize = 0;
 
 var option_summary: bool = false;
 var option_raw_library: ?[*:0]const u8 = null;
@@ -98,7 +98,7 @@ inline fn fileReadable(filename: [*:0]const u8) bool {
     return abi.OS_file_access(filename, 4) != 0;
 }
 
-inline fn schemeWordsToBlocks(n: c_ulong) c_ulong {
+inline fn schemeWordsToBlocks(n: usize) usize {
     return (n + 1023) / 1024;
 }
 
@@ -405,23 +405,23 @@ fn parseNumericString(
     raw: [*:0]const u8,
     comptime err_fmt: [*:0]const u8,
     ctx_name: [*:0]const u8,
-) c_ulong {
+) usize {
     var end_ptr: [*]const u8 = undefined;
-    const n = strtoul(raw, &end_ptr, 0);
+    const n = strtoull(raw, &end_ptr, 0);
     if (@intFromPtr(end_ptr) == @intFromPtr(raw) or end_ptr[0] != 0) {
         const prog = boot.scheme_program_name orelse "mit-scheme";
         abi.outf_fatal(err_fmt, prog, ctx_name, raw);
         abi.termination_init_error();
     }
-    return n;
+    return @intCast(n);
 }
 
 fn standardNumericOption(
     option: [*:0]const u8,
     optval: ?[*:0]const u8,
     variable: ?[*:0]const u8,
-    defval: c_ulong,
-) c_ulong {
+    defval: usize,
+) usize {
     if (optval) |val| {
         return parseNumericString(val, "%s: illegal argument for option --%s: %s\n", option);
     }
@@ -638,9 +638,9 @@ fn conflictingOptions(option1: [*:0]const u8, option2: [*:0]const u8) noreturn {
 
 fn readBandSizes(
     filename: [*:0]const u8,
-    constant_size: *c_ulong,
-    heap_size: *c_ulong,
-    code_size: *c_ulong,
+    constant_size: *usize,
+    heap_size: *usize,
+    code_size: *usize,
 ) bool {
     var handle: fasl.FaslFileHandle = null;
     if (!fasl.open_fasl_input_file(filename, &handle)) return false;
@@ -668,7 +668,7 @@ fn describeStringOption(name: [*:0]const u8, value: [*:0]const u8) void {
     abi.outf_fatal("  %s: %s\n", name, value);
 }
 
-fn describeSizeOption(name: [*:0]const u8, value: c_ulong) void {
+fn describeSizeOption(name: [*:0]const u8, value: usize) void {
     const v: c_uint = @truncate(value);
     abi.outf_fatal("  %s size: %d\n", name, v);
 }
@@ -719,9 +719,9 @@ fn describeOptions() void {
 
 pub export fn read_command_line_options(argc: c_int, argv: [*]?[*:0]const u8) callconv(.c) void {
     var band_sizes_valid = false;
-    var band_constant_size: c_ulong = 0;
-    var band_heap_size: c_ulong = 0;
-    var band_code_size: c_ulong = 0;
+    var band_constant_size: usize = 0;
+    var band_heap_size: usize = 0;
+    var band_code_size: usize = 0;
 
     parseStandardOptions(argc, argv);
 
@@ -853,7 +853,7 @@ test "option quoting, parsePathString, parseStandardOptions, and readBandSizes" 
     var argv1 = [_]?[*:0]const u8{ "mit-scheme", "--batch-mode", "--heap", "0x2000", "--extra" };
     parseStandardOptions(argv1.len, &argv1);
     try std.testing.expect(option_batch_mode);
-    try std.testing.expectEqual(@as(c_ulong, 8192), standardNumericOption("heap", option_raw_heap, null, default_heap_size));
+    try std.testing.expectEqual(@as(usize, 8192), standardNumericOption("heap", option_raw_heap, null, default_heap_size));
     try std.testing.expectEqual(@as(c_int, 1), option_unused_argc);
     try std.testing.expectEqualStrings("--extra", std.mem.span(option_unused_argv.?[0].?));
 
@@ -885,11 +885,11 @@ test "option quoting, parsePathString, parseStandardOptions, and readBandSizes" 
     try std.testing.expect(fasl.close_fasl_output_file(wf));
     defer _ = std.c.unlink(tmp_path);
 
-    var cs: c_ulong = 0;
-    var hs: c_ulong = 0;
-    var cds: c_ulong = 0;
+    var cs: usize = 0;
+    var hs: usize = 0;
+    var cds: usize = 0;
     try std.testing.expect(readBandSizes(tmp_path, &cs, &hs, &cds));
-    try std.testing.expectEqual(@as(c_ulong, 2), cs);
-    try std.testing.expectEqual(@as(c_ulong, 2), hs);
-    try std.testing.expectEqual(@as(c_ulong, 1), cds);
+    try std.testing.expectEqual(@as(usize, 2), cs);
+    try std.testing.expectEqual(@as(usize, 2), hs);
+    try std.testing.expectEqual(@as(usize, 1), cds);
 }

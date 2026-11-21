@@ -14,7 +14,7 @@ const storage = @import("storage.zig");
 const primutl = @import("primutl.zig");
 const bignum = @import("bignum.zig");
 
-const identity_length: c_ulong = 20;
+const identity_length: usize = 20;
 const id_release: usize = 0;
 const id_micro_version: usize = 1;
 const id_printer_width: usize = 3;
@@ -123,14 +123,14 @@ inline fn fixobjSetPrim(slot: usize, name: [*:0]const u8, arity: c_int) void {
 }
 
 fn fixedObjectsSyscallNames() obj.SchemeObject {
-    var length: c_ulong = 0;
+    var length: usize = 0;
     var names_ptr: [*]?[*:0]const u8 = undefined;
     abi.OS_syscall_names(&length, &names_ptr);
     return namesToVector(if (length == 0) &.{} else names_ptr[0..@intCast(length)]);
 }
 
 fn fixedObjectsSyserrNames() obj.SchemeObject {
-    var length: c_ulong = 0;
+    var length: usize = 0;
     var names_ptr: [*]?[*:0]const u8 = undefined;
     abi.OS_syserr_names(&length, &names_ptr);
     return namesToVector(if (length == 0) &.{} else names_ptr[0..@intCast(length)]);
@@ -204,13 +204,13 @@ test "utabmd identification vector and initialize_fixed_objects_vector" {
         build_options.package_version,
         std.mem.sliceTo(obj.legacyStringData(obj.vectorRef(id_vec, id_micro_version)), 0),
     );
-    try std.testing.expectEqual(@as(c_ulong, 80), obj.fixnumToUlong(obj.vectorRef(id_vec, id_printer_width)));
-    try std.testing.expectEqual(@as(c_ulong, 24), obj.fixnumToUlong(obj.vectorRef(id_vec, id_printer_length)));
+    try std.testing.expectEqual(@as(usize, 80), obj.fixnumToUlong(obj.vectorRef(id_vec, id_printer_width)));
+    try std.testing.expectEqual(@as(usize, 24), obj.fixnumToUlong(obj.vectorRef(id_vec, id_printer_length)));
     try std.testing.expectEqual(obj.asciiToChar('\n'), obj.vectorRef(id_vec, id_new_line_character));
-    try std.testing.expectEqual(@as(c_ulong, 53), obj.fixnumToUlong(obj.vectorRef(id_vec, id_flonum_precision)));
+    try std.testing.expectEqual(@as(usize, 53), obj.fixnumToUlong(obj.vectorRef(id_vec, id_flonum_precision)));
     try std.testing.expectEqual(std.math.floatEps(f64), obj.flonumToDouble(obj.vectorRef(id_vec, id_flonum_epsilon)));
-    try std.testing.expectEqual(@as(c_long, -1022), obj.fixnumToLong(obj.vectorRef(id_vec, id_flonum_exp_min)));
-    try std.testing.expectEqual(@as(c_long, 1023), obj.fixnumToLong(obj.vectorRef(id_vec, id_flonum_exp_max)));
+    try std.testing.expectEqual(@as(isize, -1022), obj.fixnumToLong(obj.vectorRef(id_vec, id_flonum_exp_min)));
+    try std.testing.expectEqual(@as(isize, 1023), obj.fixnumToLong(obj.vectorRef(id_vec, id_flonum_exp_max)));
     try std.testing.expectEqualStrings("aarch64", std.mem.sliceTo(obj.legacyStringData(obj.vectorRef(id_vec, id_cc_arch)), 0));
 
     abi.compiler_processor_type = abi.compiler_svm_type;
@@ -234,15 +234,15 @@ test "utabmd identification vector and initialize_fixed_objects_vector" {
     try std.testing.expect(obj.vectorP(abi.fixed_objects));
     try std.testing.expectEqual(abi.n_fixed_objects, obj.vectorLength(abi.fixed_objects));
     try std.testing.expectEqual(abi.obarray_size, obj.vectorLength(obj.vectorRef(abi.fixed_objects, abi.fixobj_obarray)));
-    try std.testing.expectEqual(@as(c_ulong, 64), obj.vectorLength(obj.vectorRef(abi.fixed_objects, abi.fixobj_types_vector)));
-    try std.testing.expectEqual(@as(c_ulong, 70), obj.vectorLength(obj.vectorRef(abi.fixed_objects, abi.fixobj_fixed_objects_slots)));
-    try std.testing.expectEqual(@as(c_ulong, 17), obj.vectorLength(obj.vectorRef(abi.fixed_objects, abi.fixobj_identification_vector)));
-    try std.testing.expectEqual(@as(c_ulong, 3), obj.vectorLength(obj.vectorRef(abi.fixed_objects, abi.fixobj_system_call_names)));
-    try std.testing.expectEqual(@as(c_ulong, 2), obj.vectorLength(obj.vectorRef(abi.fixed_objects, abi.fixobj_system_call_errors)));
+    try std.testing.expectEqual(@as(usize, 64), obj.vectorLength(obj.vectorRef(abi.fixed_objects, abi.fixobj_types_vector)));
+    try std.testing.expectEqual(@as(usize, 70), obj.vectorLength(obj.vectorRef(abi.fixed_objects, abi.fixobj_fixed_objects_slots)));
+    try std.testing.expectEqual(@as(usize, 17), obj.vectorLength(obj.vectorRef(abi.fixed_objects, abi.fixobj_identification_vector)));
+    try std.testing.expectEqual(@as(usize, 3), obj.vectorLength(obj.vectorRef(abi.fixed_objects, abi.fixobj_system_call_names)));
+    try std.testing.expectEqual(@as(usize, 2), obj.vectorLength(obj.vectorRef(abi.fixed_objects, abi.fixobj_system_call_errors)));
     try std.testing.expectEqual(obj.sharp_f, obj.vectorRef(obj.vectorRef(abi.fixed_objects, abi.fixobj_system_call_names), 1));
-    try std.testing.expectEqual(@as(c_long, 1), bignum.bignum_to_long(obj.vectorRef(abi.fixed_objects, abi.fixobj_bignum_one)));
+    try std.testing.expectEqual(@as(isize, 1), bignum.bignum_to_long(obj.vectorRef(abi.fixed_objects, abi.fixobj_bignum_one)));
     try std.testing.expectEqual(obj.gc_reclaimed, obj.vectorRef(abi.fixed_objects, abi.fixobj_gc_reclaimed));
     try std.testing.expect(obj.primitiveP(obj.vectorRef(abi.fixed_objects, abi.fixobj_generic_trampoline_add)));
     try std.testing.expectEqual(obj.sharp_f, obj.vectorRef(abi.fixed_objects, abi.fixobj_generic_trampoline_divide));
-    try std.testing.expectEqual(@as(c_ulong, 256), obj.vectorLength(obj.vectorRef(abi.fixed_objects, abi.fixobj_proxied_record_types)));
+    try std.testing.expectEqual(@as(usize, 256), obj.vectorLength(obj.vectorRef(abi.fixed_objects, abi.fixobj_proxied_record_types)));
 }

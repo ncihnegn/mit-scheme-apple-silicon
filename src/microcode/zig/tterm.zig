@@ -155,7 +155,7 @@ pub export fn Prim_termcap_pad_string() callconv(.c) obj.SchemeObject {
     PC = if (abi.argRef(4) == obj.sharp_f) 0 else abi.stringArg(4)[0];
     tputs_output_scan = &tputs_output;
     _ = tputs(abi.stringArg(1), @truncate(abi.arg_nonnegative_integer(2)), &tputsWriteChar);
-    const n_bytes: c_ulong = @intCast(@intFromPtr(tputs_output_scan) - @intFromPtr(&tputs_output));
+    const n_bytes: usize = @intCast(@intFromPtr(tputs_output_scan) - @intFromPtr(&tputs_output));
     return string.memory_to_string(n_bytes, &tputs_output);
 }
 

@@ -275,7 +275,7 @@ test "pruxsock host, service, client, and server primitives" {
     stubs.setArgs(&.{string.char_pointer_to_string("localhost")});
     const addrs = Prim_get_host_by_name();
     try std.testing.expect(obj.vectorP(addrs));
-    try std.testing.expectEqual(@as(c_ulong, 2), obj.vectorLength(addrs));
+    try std.testing.expectEqual(@as(usize, 2), obj.vectorLength(addrs));
     try std.testing.expectEqualSlices(u8, &.{ 127, 0, 0, 1 }, obj.legacyStringData(obj.vectorRef(addrs, 0))[0..4]);
     stubs.setArgs(&.{string.char_pointer_to_string("missing.invalid")});
     try std.testing.expectEqual(obj.sharp_f, Prim_get_host_by_name());
@@ -299,7 +299,7 @@ test "pruxsock host, service, client, and server primitives" {
 
     stubs.setArgs(&.{ obj.ulongToFixnum(7), obj.ulongToFixnum(3) });
     _ = Prim_shutdown_socket();
-    try std.testing.expectEqual(@as(c_ulong, 3), stubs.mock_last_sock_shutdown);
+    try std.testing.expectEqual(@as(usize, 3), stubs.mock_last_sock_shutdown);
 
     const wc_srv = abi.system_pair_cons(@intCast(obj.tc_weak_cons), obj.sharp_f, obj.sharp_f);
     stubs.setArgs(&.{ obj.ulongToFixnum(9000), wc_srv });

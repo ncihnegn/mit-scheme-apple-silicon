@@ -18,8 +18,8 @@ const str = @import("string.zig");
 // number (i.e. external representation) of the desired result.")
 pub export fn Prim_map_code_to_address() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    const tc: c_ulong = @intCast(abi.arg_nonnegative_integer(1));
-    const number: c_ulong = @intCast(abi.arg_nonnegative_integer(2));
+    const tc: usize = @intCast(abi.arg_nonnegative_integer(1));
+    const number: usize = @intCast(abi.arg_nonnegative_integer(2));
     switch (tc) {
         obj.tc_return_code => {
             if (number > abi.max_return_code) abi.error_bad_range_arg(2);
@@ -40,7 +40,7 @@ pub export fn Prim_map_code_to_address() callconv(.c) obj.SchemeObject {
 // the internal address.")
 pub export fn Prim_map_address_to_code() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    const tc: c_ulong = @intCast(abi.arg_nonnegative_integer(1));
+    const tc: usize = @intCast(abi.arg_nonnegative_integer(1));
     const address = abi.argRef(2);
     if (obj.objectType(address) != tc) abi.error_wrong_type_arg(2);
     switch (tc) {
@@ -169,7 +169,7 @@ test "extern primitive address, metadata, counts, and lookup" {
     try std.testing.expectEqual(obj.sharp_f, Prim_primitive_procedure_doc());
     stubs.setArgs(&.{obj.ulongToFixnum(1)});
     const p1_name = Prim_get_primitive_name();
-    try std.testing.expectEqual(@as(c_ulong, 3), obj.legacyStringLength(p1_name));
+    try std.testing.expectEqual(@as(usize, 3), obj.legacyStringLength(p1_name));
     stubs.setArgs(&.{p0});
     try std.testing.expectEqual(obj.sharp_f, Prim_primitive_procedure_open_coded());
 

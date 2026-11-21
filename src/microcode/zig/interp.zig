@@ -43,19 +43,19 @@ pub extern "c" fn scm_setjmp_try(
 pub extern "c" fn scm_longjmp(env: *anyopaque, code: c_int) noreturn;
 
 extern "c" fn preserve_signal_mask() void;
-extern "c" fn enter_compiled_expression() c_long;
-extern "c" fn apply_compiled_procedure() c_long;
-extern "c" fn guarantee_cc_return(c_ulong) void;
-extern "c" fn return_to_compiled_code() c_long;
-extern "c" fn comp_interrupt_restart() c_long;
-extern "c" fn comp_lookup_trap_restart() c_long;
-extern "c" fn comp_assignment_trap_restart() c_long;
-extern "c" fn comp_op_lookup_trap_restart() c_long;
-extern "c" fn comp_cache_lookup_apply_restart() c_long;
-extern "c" fn comp_safe_lookup_trap_restart() c_long;
-extern "c" fn comp_unassigned_p_trap_restart() c_long;
-extern "c" fn comp_link_caches_restart() c_long;
-extern "c" fn comp_error_restart() c_long;
+extern "c" fn enter_compiled_expression() isize;
+extern "c" fn apply_compiled_procedure() isize;
+extern "c" fn guarantee_cc_return(usize) void;
+extern "c" fn return_to_compiled_code() isize;
+extern "c" fn comp_interrupt_restart() isize;
+extern "c" fn comp_lookup_trap_restart() isize;
+extern "c" fn comp_assignment_trap_restart() isize;
+extern "c" fn comp_op_lookup_trap_restart() isize;
+extern "c" fn comp_cache_lookup_apply_restart() isize;
+extern "c" fn comp_safe_lookup_trap_restart() isize;
+extern "c" fn comp_unassigned_p_trap_restart() isize;
+extern "c" fn comp_link_caches_restart() isize;
+extern "c" fn comp_error_restart() isize;
 
 const Action = enum {
     apply,
@@ -83,7 +83,7 @@ const Variant = enum {
 };
 
 var interpreter_state: ?*InterpreterState = null;
-pub var prim_apply_error_code_storage: c_long = 0;
+pub var prim_apply_error_code_storage: isize = 0;
 
 inline fn getVal() obj.SchemeObject {
     return abi.Registers[abi.regblock_val];
@@ -112,10 +112,10 @@ inline fn setRet(ret: obj.SchemeObject) void {
 inline fn setPrimitive(prim: obj.SchemeObject) void {
     abi.Registers[abi.regblock_primitive] = prim;
 }
-inline fn setLexprActuals(n: c_ulong) void {
+inline fn setLexprActuals(n: usize) void {
     abi.Registers[abi.regblock_lexpr_actuals] = n;
 }
-inline fn getIntMask() c_ulong {
+inline fn getIntMask() usize {
     return abi.Registers[abi.regblock_int_mask];
 }
 
@@ -136,10 +136,10 @@ inline fn setApplyFrameProc(proc: obj.SchemeObject) void {
 inline fn applyFrameArgs() [*]obj.SchemeObject {
     return abi.stack_pointer + 2;
 }
-inline fn applyFrameSize() c_ulong {
+inline fn applyFrameSize() usize {
     return obj.objectDatum(applyFrameHeader());
 }
-inline fn applyFrameNArgs() c_ulong {
+inline fn applyFrameNArgs() usize {
     return applyFrameSize() - 1;
 }
 
@@ -163,7 +163,7 @@ pub fn unbindInterpreterState(s: *InterpreterState) callconv(.c) void {
     interpreter_state = s.previous_state;
 }
 
-pub fn abortToInterpreter(argument: c_long) callconv(.c) noreturn {
+pub fn abortToInterpreter(argument: isize) callconv(.c) noreturn {
     std.debug.assert(argument != 0);
     const state = interpreter_state orelse {
         abi.outf_fatal("abort_to_interpreter: Interpreter not set up.\n");
@@ -190,12 +190,12 @@ inline fn handleInterrupt() Action {
     return .apply_no_interrupt;
 }
 
-inline fn handleError(code: c_long, from_return: bool) Action {
+inline fn handleError(code: isize, from_return: bool) Action {
     utils.Do_Micro_Error(code, from_return);
     return .apply;
 }
 
-inline fn immediateGc(n: c_ulong) Action {
+inline fn immediateGc(n: usize) Action {
     abi.requestGc(n);
     return handleInterrupt();
 }
@@ -221,7 +221,7 @@ inline fn singleVal(val: obj.SchemeObject) Action {
     return .@"return";
 }
 
-inline fn evalError(code: c_long, exp: obj.SchemeObject, env: obj.SchemeObject) Action {
+inline fn evalError(code: isize, exp: obj.SchemeObject, env: obj.SchemeObject) Action {
     if (code == abi.prim_interrupt) {
         abi.stackCheck(3);
         abi.pushEnvCont(abi.rc_eval_error, exp, env);
@@ -232,7 +232,7 @@ inline fn evalError(code: c_long, exp: obj.SchemeObject, env: obj.SchemeObject) 
     return handleError(code, false);
 }
 
-inline fn applyError(code: c_long) Action {
+inline fn applyError(code: isize) Action {
     setVal(applyFrameProc());
     abi.pushCont(abi.rc_internal_apply_val, obj.sharp_f);
     return handleError(code, true);
@@ -244,7 +244,7 @@ inline fn prepareApplyInterrupt() void {
     abi.pushCont(abi.rc_restore_value, value);
 }
 
-inline fn applyImmediateGc(n: c_ulong) Action {
+inline fn applyImmediateGc(n: usize) Action {
     prepareApplyInterrupt();
     return immediateGc(n);
 }
@@ -259,7 +259,7 @@ inline fn prepareReturnInterrupt() void {
     abi.pushCont(abi.rc_restore_value, getVal());
 }
 
-inline fn returnError(code: c_long) Action {
+inline fn returnError(code: isize) Action {
     if (code == abi.prim_interrupt) {
         prepareReturnInterrupt();
         return handleInterrupt();
@@ -268,12 +268,12 @@ inline fn returnError(code: c_long) Action {
     return handleError(code, true);
 }
 
-inline fn returnImmediateGc(n: c_ulong) Action {
+inline fn returnImmediateGc(n: usize) Action {
     prepareReturnInterrupt();
     return immediateGc(n);
 }
 
-inline fn returnFromCompiledCode(code: c_long) Action {
+inline fn returnFromCompiledCode(code: isize) Action {
     return switch (code) {
         abi.prim_done => .@"return",
         abi.prim_apply => .apply,
@@ -459,7 +459,7 @@ inline fn applyPrimitive(proc: obj.SchemeObject) Action {
     const arity = primitiveArity(proc);
     if (arity == abi.lexpr_primitive_arity) {
         setLexprActuals(n_args);
-    } else if (arity < 0 or @as(c_ulong, @intCast(arity)) != n_args) {
+    } else if (arity < 0 or @as(usize, @intCast(arity)) != n_args) {
         return applyError(abi.err_wrong_number_of_arguments);
     }
 
@@ -530,7 +530,7 @@ inline fn applyExtendedProcedure(proc: obj.SchemeObject) Action {
     }
 
     const size = 1 + nfixed + rest;
-    const rest_words: c_ulong = if (nargs > nfixed) 2 * (nargs - nfixed) else 0;
+    const rest_words: usize = if (nargs > nfixed) 2 * (nargs - nfixed) else 0;
     const nwords = 1 + size + rest_words;
     if (abi.gcNeededP(nwords)) {
         return applyImmediateGc(nwords);
@@ -543,7 +543,7 @@ inline fn applyExtendedProcedure(proc: obj.SchemeObject) Action {
     if (nargs <= nfixed) {
         scan[0] = abi.stackPop();
         scan += 1;
-        var i: c_ulong = 0;
+        var i: usize = 0;
         while (i < nargs) : (i += 1) {
             scan[0] = abi.stackPop();
             scan += 1;
@@ -560,7 +560,7 @@ inline fn applyExtendedProcedure(proc: obj.SchemeObject) Action {
         const rest_list = obj.makePointerObject(obj.tc_list, scan + @as(usize, @intCast(size)));
         scan[0] = abi.stackPop();
         scan += 1;
-        var i: c_ulong = 0;
+        var i: usize = 0;
         while (i < nfixed) : (i += 1) {
             scan[0] = abi.stackPop();
             scan += 1;
@@ -742,7 +742,7 @@ inline fn returnAssignmentFinish() Action {
     const env = abi.stackPop();
     const variable = obj.assignmentName(getExp());
     var old_val: obj.SchemeObject = undefined;
-    const code: c_long = if (obj.objectType(variable) == obj.tc_variable)
+    const code: isize = if (obj.objectType(variable) == obj.tc_variable)
         lookup.assign_variable(env, obj.variableName(variable), getVal(), &old_val)
     else
         abi.err_bad_frame;
@@ -959,7 +959,7 @@ fn applyCont(variant: Variant) Action {
     };
 }
 
-fn handleThrow(code: c_long) Action {
+fn handleThrow(code: isize) Action {
     return switch (code) {
         abi.prim_apply => blk: {
             setPrimitive(obj.sharp_f);

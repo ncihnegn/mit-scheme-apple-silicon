@@ -12,7 +12,7 @@ const abi = @import("prim_abi.zig");
 // Perform the Keccak-f[1600] permutation on a byte vector.")
 pub export fn Prim_bytevector_keccak_f1600() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    var n: c_ulong = 0;
+    var n: usize = 0;
     const state_ptr = abi.arg_bytevector(1, &n);
     if (n != 200) abi.error_bad_range_arg(1);
 

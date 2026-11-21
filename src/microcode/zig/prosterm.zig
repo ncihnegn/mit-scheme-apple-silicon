@@ -191,7 +191,7 @@ test "prosterm terminal modes, baud rates, and state primitives" {
     try std.testing.expectEqual(obj.sharp_t, Prim_terminal_buffered_p());
 
     const st = Prim_terminal_get_state();
-    try std.testing.expectEqual(@as(c_ulong, 4), obj.legacyStringLength(st));
+    try std.testing.expectEqual(@as(usize, 4), obj.legacyStringLength(st));
     stubs.setArgs(&.{ obj.ulongToFixnum(1), st });
     _ = Prim_terminal_set_state();
 

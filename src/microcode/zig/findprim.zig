@@ -465,13 +465,13 @@ const State = struct {
             \\const SchemeObject = obj.SchemeObject;
             \\const PrimitiveProcedure = *const fn () callconv(.c) SchemeObject;
             \\
-            \\extern "c" fn signal_error_from_primitive(c_long) noreturn;
+            \\extern "c" fn signal_error_from_primitive(isize) noreturn;
             \\extern "c" fn record_primitive_entry(SchemeObject) void;
             \\extern "c" var Registers: [16]SchemeObject;
             \\
             \\
         );
-        try out.print(gpa, "pub export var {s}: c_long = {d};\n\n", .{ self.the_variable, max_index });
+        try out.print(gpa, "pub export var {s}: isize = {d};\n\n", .{ self.the_variable, max_index });
 
         var seen_externs: std.StringHashMapUnmanaged(void) = .empty;
         for (self.descriptors.items) |desc| {
@@ -767,7 +767,7 @@ test "findprim parses C and Zig primitive definitions, sorts case-insensitively,
 
     const sample_zig =
         \\// DEFINE_PRIMITIVE ("mid-prim", Prim_mid, 2, 2, "Zig doc.")
-        \\pub export fn Prim_mid() callconv(.c) c_ulong { return 0; }
+        \\pub export fn Prim_mid() callconv(.c) usize { return 0; }
         \\
     ;
 
@@ -811,7 +811,7 @@ test "findprim matches C output byte-for-byte on multiline zig docstring" {
         \\//   "(OUTPUT OFFSET INPUT KEY CONSTANT)\n\
         \\// Compute the ChaCha8 core hash function:\n\
         \\// OUTPUT[OFFSET, OFFSET+1, ..., OFFSET+63] := ChaCha8(INPUT, KEY, CONST).")
-        \\pub export fn Prim_chacha8_core() callconv(.c) c_ulong { return 0; }
+        \\pub export fn Prim_chacha8_core() callconv(.c) usize { return 0; }
         \\
     ;
 
@@ -840,9 +840,9 @@ test "findprim emitZig generates valid Zig tables, multiline docstrings, and LEX
         \\// DEFINE_PRIMITIVE ("Zebra-Prim", Prim_zebra, 0, LEXPR,
         \\//   "(X ...)\n\
         \\// Multiline \"quoted\" doc.")
-        \\pub export fn Prim_zebra() callconv(.c) c_ulong { return 0; }
+        \\pub export fn Prim_zebra() callconv(.c) usize { return 0; }
         \\// DEFINE_PRIMITIVE ("alpha-prim", Prim_alpha, 1, 1, 0)
-        \\pub export fn Prim_alpha() callconv(.c) c_ulong { return 0; }
+        \\pub export fn Prim_alpha() callconv(.c) usize { return 0; }
         \\
     ;
 
@@ -853,7 +853,7 @@ test "findprim emitZig generates valid Zig tables, multiline docstrings, and LEX
     var out: std.ArrayList(u8) = .empty;
     try state.emitZig(&out, arena);
 
-    try std.testing.expect(std.mem.indexOf(u8, out.items, "pub export var MAX_STATIC_PRIMITIVE: c_long = 1;") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "pub export var MAX_STATIC_PRIMITIVE: isize = 1;") != null);
     try std.testing.expect(std.mem.indexOf(u8, out.items, "extern \"c\" fn Prim_zebra() SchemeObject;") != null);
     try std.testing.expect(std.mem.indexOf(u8, out.items, "extern \"c\" fn Prim_alpha() SchemeObject;") != null);
     try std.testing.expect(std.mem.indexOf(u8, out.items, "\"ALPHA-PRIM\",\n    \"ZEBRA-PRIM\",\n    \"INEXISTENT-PRIMITIVE\",") != null);

@@ -121,7 +121,7 @@ pub export fn Prim_channel_type_name() callconv(.c) obj.SchemeObject {
 // Return the number of characters actually read from CHANNEL.")
 pub export fn Prim_channel_read() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    var length: c_ulong = undefined;
+    var length: usize = undefined;
     const buffer = abi.arg_extended_string(2, &length);
     const end = abi.arg_ulong_index_integer(4, length + 1);
     const start = abi.arg_ulong_index_integer(3, end + 1);
@@ -138,7 +138,7 @@ pub export fn Prim_channel_read() callconv(.c) obj.SchemeObject {
 // Third and fourth args START and END specify the substring to use.")
 pub export fn Prim_channel_write() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    var length: c_ulong = undefined;
+    var length: usize = undefined;
     const buffer = abi.arg_extended_string(2, &length);
     const end = abi.arg_ulong_index_integer(4, length + 1);
     const start = abi.arg_ulong_index_integer(3, end + 1);
@@ -325,7 +325,7 @@ test "prosio channel, pipe, table, and select registry primitives" {
     // CHANNEL-TABLE lists open channels (2 and 4)
     stubs.setArgs(&.{});
     const tbl = Prim_channel_table();
-    try std.testing.expectEqual(@as(c_ulong, 2), obj.vectorLength(tbl));
+    try std.testing.expectEqual(@as(usize, 2), obj.vectorLength(tbl));
     try std.testing.expectEqual(obj.ulongToFixnum(2), obj.vectorRef(tbl, 0));
     try std.testing.expectEqual(obj.ulongToFixnum(4), obj.vectorRef(tbl, 1));
 

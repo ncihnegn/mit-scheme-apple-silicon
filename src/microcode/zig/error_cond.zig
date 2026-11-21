@@ -9,7 +9,7 @@ const wind = @import("wind.zig");
 extern "c" fn OS_malloc(size: usize) ?*anyopaque;
 
 pub const ConditionType = extern struct {
-    index: c_ulong,
+    index: usize,
     name: ?*anyopaque,
     generalizations: *ptrvec.Ptrvec,
     reporter: ?*const fn (*Condition) callconv(.c) void,
@@ -45,7 +45,7 @@ comptime {
     }
 }
 
-var next_condition_type_index: c_ulong = 0;
+var next_condition_type_index: usize = 0;
 var current_handler_record: ?*HandlerRecord = null;
 var current_restart_record: ?*RestartRecord = null;
 

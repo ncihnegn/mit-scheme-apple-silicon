@@ -28,14 +28,14 @@ pub const regblock_length: usize = switch (build_options.compiler_processor_type
     else => 14,
 };
 
-pub const int_stack_overflow: c_ulong = 0x0001;
-pub const int_gc: c_ulong = 0x0004;
-pub const int_character: c_ulong = 0x0010;
-pub const int_timer: c_ulong = 0x0040;
-pub const int_global_3: c_ulong = 0x0080;
-pub const int_suspend: c_ulong = 0x0100;
-pub const int_mask: c_ulong = (@as(c_ulong, 1) << 16) - 1;
-pub const max_interrupt_number: c_ulong = 0xF;
+pub const int_stack_overflow: usize = 0x0001;
+pub const int_gc: usize = 0x0004;
+pub const int_character: usize = 0x0010;
+pub const int_timer: usize = 0x0040;
+pub const int_global_3: usize = 0x0080;
+pub const int_suspend: usize = 0x0100;
+pub const int_mask: usize = (@as(usize, 1) << 16) - 1;
+pub const max_interrupt_number: usize = 0xF;
 
 pub const term_halt: c_int = 0x00;
 pub const term_disk_restore: c_int = 0x01;
@@ -55,101 +55,101 @@ pub const term_signal: c_int = 0x16;
 pub const term_trap: c_int = 0x19;
 pub const max_termination: c_int = 0x1A;
 pub const max_error: c_int = 0x3F;
-pub const err_bad_error_code: c_long = 0x00;
-pub const err_unbound_variable: c_long = 0x01;
-pub const err_unassigned_variable: c_long = 0x02;
-pub const err_inapplicable_object: c_long = 0x03;
-pub const err_in_system_call: c_long = 0x04;
-pub const err_with_argument: c_long = 0x05;
-pub const err_bad_frame: c_long = 0x06;
-pub const err_undefined_primitive: c_long = 0x09;
-pub const err_external_return: c_long = 0x0A;
-pub const err_execute_manifest_vector: c_long = 0x0B;
-pub const err_wrong_number_of_arguments: c_long = 0x0C;
-pub const err_arg_1_wrong_type: c_long = 0x0D;
-pub const err_arg_2_wrong_type: c_long = 0x0E;
-pub const err_arg_3_wrong_type: c_long = 0x0F;
-pub const err_arg_1_bad_range: c_long = 0x10;
-pub const err_arg_2_bad_range: c_long = 0x11;
-pub const err_arg_3_bad_range: c_long = 0x12;
-pub const err_macro_binding: c_long = 0x13;
-pub const err_fasdump_object_too_large: c_long = 0x14;
-pub const err_syntax_error: c_long = 0x15;
-pub const err_fasl_file_too_big: c_long = 0x17;
-pub const err_fasl_file_bad_data: c_long = 0x18;
-pub const err_out_of_file_handles: c_long = 0x20;
-pub const err_arg_4_bad_range: c_long = 0x22;
-pub const err_arg_5_bad_range: c_long = 0x23;
-pub const err_arg_6_bad_range: c_long = 0x24;
-pub const err_arg_7_bad_range: c_long = 0x25;
-pub const err_arg_8_bad_range: c_long = 0x26;
-pub const err_arg_9_bad_range: c_long = 0x27;
-pub const err_arg_10_bad_range: c_long = 0x28;
-pub const err_arg_4_wrong_type: c_long = 0x29;
-pub const err_arg_5_wrong_type: c_long = 0x2A;
-pub const err_arg_6_wrong_type: c_long = 0x2B;
-pub const err_arg_7_wrong_type: c_long = 0x2C;
-pub const err_arg_8_wrong_type: c_long = 0x2D;
-pub const err_arg_9_wrong_type: c_long = 0x2E;
-pub const err_arg_10_wrong_type: c_long = 0x2F;
-pub const err_inapplicable_continuation: c_long = 0x30;
-pub const err_compiled_code_error: c_long = 0x31;
-pub const err_floating_overflow: c_long = 0x32;
-pub const err_unimplemented_primitive: c_long = 0x33;
-pub const err_illegal_reference_trap: c_long = 0x34;
-pub const err_wrong_arity_primitives: c_long = 0x36;
-pub const err_fasdump_environment: c_long = 0x38;
-pub const err_fasload_band: c_long = 0x39;
-pub const err_fasload_compiled_mismatch: c_long = 0x3A;
-pub const err_stack_has_slipped: c_long = 0x3D;
-pub const err_cannot_recurse: c_long = 0x3E;
-pub const err_process_terminated: c_long = 0x3F;
-pub const prim_done: c_long = -1;
-pub const prim_do_expression: c_long = -2;
-pub const prim_apply: c_long = -3;
-pub const prim_interrupt: c_long = -4;
-pub const prim_no_trap_eval: c_long = -5;
-pub const prim_no_trap_apply: c_long = -6;
-pub const prim_pop_return: c_long = -7;
-pub const prim_apply_interrupt: c_long = -9;
-pub const prim_apply_error: c_long = -10;
-pub const prim_no_trap_pop_return: c_long = -11;
-pub const prim_return_to_c: c_long = -12;
-pub const max_return_code: c_ulong = 0x5E;
-pub const rc_end_of_computation: c_ulong = 0x00;
-pub const rc_join_stacklets: c_ulong = 0x01;
-pub const rc_internal_apply: c_ulong = 0x03;
-pub const rc_restore_history: c_ulong = 0x05;
-pub const rc_execute_assignment_finish: c_ulong = 0x08;
-pub const rc_execute_definition_finish: c_ulong = 0x09;
-pub const rc_execute_access_finish: c_ulong = 0x0A;
-pub const rc_execute_sequence_finish: c_ulong = 0x0C;
-pub const rc_conditional_decide: c_ulong = 0x0F;
-pub const rc_disjunction_decide: c_ulong = 0x10;
-pub const rc_comb_apply_function: c_ulong = 0x12;
-pub const rc_comb_save_value: c_ulong = 0x15;
-pub const rc_snap_need_thunk: c_ulong = 0x1C;
-pub const rc_reenter_compiled_code: c_ulong = 0x1D;
-pub const rc_normal_gc_done: c_ulong = 0x20;
-pub const rc_pop_from_compiled_code: c_ulong = 0x29;
-pub const rc_restore_value: c_ulong = 0x2E;
-pub const rc_restore_dont_copy_history: c_ulong = 0x2F;
-pub const rc_pop_return_error: c_ulong = 0x40;
-pub const rc_eval_error: c_ulong = 0x41;
-pub const rc_stack_marker: c_ulong = 0x42;
-pub const rc_comp_interrupt_restart: c_ulong = 0x43;
-pub const rc_restore_int_mask: c_ulong = 0x45;
-pub const rc_halt: c_ulong = 0x46;
-pub const rc_comp_lookup_trap_restart: c_ulong = 0x53;
-pub const rc_comp_assignment_trap_restart: c_ulong = 0x54;
-pub const rc_comp_op_ref_trap_restart: c_ulong = 0x56;
-pub const rc_comp_cache_ref_apply_restart: c_ulong = 0x57;
-pub const rc_comp_safe_ref_trap_restart: c_ulong = 0x58;
-pub const rc_comp_unassigned_trap_restart: c_ulong = 0x59;
-pub const rc_comp_link_caches_restart: c_ulong = 0x5B;
-pub const rc_hardware_trap: c_ulong = 0x5C;
-pub const rc_internal_apply_val: c_ulong = 0x5D;
-pub const rc_comp_error_restart: c_ulong = 0x5E;
+pub const err_bad_error_code: isize = 0x00;
+pub const err_unbound_variable: isize = 0x01;
+pub const err_unassigned_variable: isize = 0x02;
+pub const err_inapplicable_object: isize = 0x03;
+pub const err_in_system_call: isize = 0x04;
+pub const err_with_argument: isize = 0x05;
+pub const err_bad_frame: isize = 0x06;
+pub const err_undefined_primitive: isize = 0x09;
+pub const err_external_return: isize = 0x0A;
+pub const err_execute_manifest_vector: isize = 0x0B;
+pub const err_wrong_number_of_arguments: isize = 0x0C;
+pub const err_arg_1_wrong_type: isize = 0x0D;
+pub const err_arg_2_wrong_type: isize = 0x0E;
+pub const err_arg_3_wrong_type: isize = 0x0F;
+pub const err_arg_1_bad_range: isize = 0x10;
+pub const err_arg_2_bad_range: isize = 0x11;
+pub const err_arg_3_bad_range: isize = 0x12;
+pub const err_macro_binding: isize = 0x13;
+pub const err_fasdump_object_too_large: isize = 0x14;
+pub const err_syntax_error: isize = 0x15;
+pub const err_fasl_file_too_big: isize = 0x17;
+pub const err_fasl_file_bad_data: isize = 0x18;
+pub const err_out_of_file_handles: isize = 0x20;
+pub const err_arg_4_bad_range: isize = 0x22;
+pub const err_arg_5_bad_range: isize = 0x23;
+pub const err_arg_6_bad_range: isize = 0x24;
+pub const err_arg_7_bad_range: isize = 0x25;
+pub const err_arg_8_bad_range: isize = 0x26;
+pub const err_arg_9_bad_range: isize = 0x27;
+pub const err_arg_10_bad_range: isize = 0x28;
+pub const err_arg_4_wrong_type: isize = 0x29;
+pub const err_arg_5_wrong_type: isize = 0x2A;
+pub const err_arg_6_wrong_type: isize = 0x2B;
+pub const err_arg_7_wrong_type: isize = 0x2C;
+pub const err_arg_8_wrong_type: isize = 0x2D;
+pub const err_arg_9_wrong_type: isize = 0x2E;
+pub const err_arg_10_wrong_type: isize = 0x2F;
+pub const err_inapplicable_continuation: isize = 0x30;
+pub const err_compiled_code_error: isize = 0x31;
+pub const err_floating_overflow: isize = 0x32;
+pub const err_unimplemented_primitive: isize = 0x33;
+pub const err_illegal_reference_trap: isize = 0x34;
+pub const err_wrong_arity_primitives: isize = 0x36;
+pub const err_fasdump_environment: isize = 0x38;
+pub const err_fasload_band: isize = 0x39;
+pub const err_fasload_compiled_mismatch: isize = 0x3A;
+pub const err_stack_has_slipped: isize = 0x3D;
+pub const err_cannot_recurse: isize = 0x3E;
+pub const err_process_terminated: isize = 0x3F;
+pub const prim_done: isize = -1;
+pub const prim_do_expression: isize = -2;
+pub const prim_apply: isize = -3;
+pub const prim_interrupt: isize = -4;
+pub const prim_no_trap_eval: isize = -5;
+pub const prim_no_trap_apply: isize = -6;
+pub const prim_pop_return: isize = -7;
+pub const prim_apply_interrupt: isize = -9;
+pub const prim_apply_error: isize = -10;
+pub const prim_no_trap_pop_return: isize = -11;
+pub const prim_return_to_c: isize = -12;
+pub const max_return_code: usize = 0x5E;
+pub const rc_end_of_computation: usize = 0x00;
+pub const rc_join_stacklets: usize = 0x01;
+pub const rc_internal_apply: usize = 0x03;
+pub const rc_restore_history: usize = 0x05;
+pub const rc_execute_assignment_finish: usize = 0x08;
+pub const rc_execute_definition_finish: usize = 0x09;
+pub const rc_execute_access_finish: usize = 0x0A;
+pub const rc_execute_sequence_finish: usize = 0x0C;
+pub const rc_conditional_decide: usize = 0x0F;
+pub const rc_disjunction_decide: usize = 0x10;
+pub const rc_comb_apply_function: usize = 0x12;
+pub const rc_comb_save_value: usize = 0x15;
+pub const rc_snap_need_thunk: usize = 0x1C;
+pub const rc_reenter_compiled_code: usize = 0x1D;
+pub const rc_normal_gc_done: usize = 0x20;
+pub const rc_pop_from_compiled_code: usize = 0x29;
+pub const rc_restore_value: usize = 0x2E;
+pub const rc_restore_dont_copy_history: usize = 0x2F;
+pub const rc_pop_return_error: usize = 0x40;
+pub const rc_eval_error: usize = 0x41;
+pub const rc_stack_marker: usize = 0x42;
+pub const rc_comp_interrupt_restart: usize = 0x43;
+pub const rc_restore_int_mask: usize = 0x45;
+pub const rc_halt: usize = 0x46;
+pub const rc_comp_lookup_trap_restart: usize = 0x53;
+pub const rc_comp_assignment_trap_restart: usize = 0x54;
+pub const rc_comp_op_ref_trap_restart: usize = 0x56;
+pub const rc_comp_cache_ref_apply_restart: usize = 0x57;
+pub const rc_comp_safe_ref_trap_restart: usize = 0x58;
+pub const rc_comp_unassigned_trap_restart: usize = 0x59;
+pub const rc_comp_link_caches_restart: usize = 0x5B;
+pub const rc_hardware_trap: usize = 0x5C;
+pub const rc_internal_apply_val: usize = 0x5D;
+pub const rc_comp_error_restart: usize = 0x5E;
 pub const hist_rib: usize = 0;
 pub const hist_next_subproblem: usize = 1;
 pub const hist_prev_subproblem: usize = 2;
@@ -158,10 +158,10 @@ pub const rib_exp: usize = 0;
 pub const rib_env: usize = 1;
 pub const rib_next_reduction: usize = 2;
 pub const rib_mark: usize = 2;
-pub const constant_space_fudge: c_ulong = 128;
-pub const default_heap_reserved: c_ulong = 4500;
-pub const stack_guard_size: c_ulong = 4096;
-pub const ephemeron_size: c_ulong = 5;
+pub const constant_space_fudge: usize = 128;
+pub const default_heap_reserved: usize = 4500;
+pub const stack_guard_size: usize = 4096;
+pub const ephemeron_size: usize = 5;
 pub const ephemeron_key: usize = 1;
 pub const ephemeron_datum: usize = 2;
 pub const ephemeron_list: usize = 3;
@@ -275,10 +275,10 @@ pub const fixobj_primitive_profiling_table: usize = 0x23;
 pub const fixobj_arity_dispatcher_tag: usize = 0x33;
 pub const fixobj_cc_bkpt_procedure: usize = 0x3F;
 pub const fixobj_callback_handler: usize = 0x41;
-pub const n_fixed_objects: c_ulong = 0x45;
-pub const obarray_size: c_ulong = 32771;
-pub const fasdump_record_marker_start: c_ulong = 0x100;
-pub const fasdump_record_marker_end: c_ulong = 0x200;
+pub const n_fixed_objects: usize = 0x45;
+pub const obarray_size: usize = 32771;
+pub const fasdump_record_marker_start: usize = 0x100;
+pub const fasdump_record_marker_end: usize = 0x200;
 
 pub const compiler_none_type: c_uint = 0;
 pub const compiler_ia32_type: c_uint = 9;
@@ -366,12 +366,12 @@ pub const CcEntryType = extern struct {
             rest_p: bool,
         },
         for_continuation: extern struct {
-            offset: c_ulong,
+            offset: usize,
         },
     },
 };
 
-pub const CcEntryTypeGroup = enum(c_ulong) {
+pub const CcEntryTypeGroup = enum(usize) {
     procedure = 0,
     continuation = 1,
     expression = 2,
@@ -380,7 +380,7 @@ pub const CcEntryTypeGroup = enum(c_ulong) {
 };
 
 pub const CcEntryOffset = extern struct {
-    offset: c_ulong,
+    offset: usize,
     continued_p: bool,
 };
 
@@ -483,7 +483,7 @@ else if (builtin.os.tag == .linux and builtin.cpu.arch == .x86_64)
         atim: std.c.timespec,
         mtim: std.c.timespec,
         ctim: std.c.timespec,
-        __glibc_reserved: [3]c_long,
+        __glibc_reserved: [3]isize,
 
         pub fn atime(self: @This()) std.c.timespec {
             return self.atim;
@@ -545,8 +545,8 @@ pub const PidT = std.c.pid_t;
 
 pub const Process = extern struct {
     id: PidT,
-    tick: c_long,
-    sync_tick: c_long,
+    tick: isize,
+    sync_tick: isize,
     raw_reason: c_ushort,
     reason: c_ushort,
     raw_status: ProcessStatus,
@@ -710,7 +710,7 @@ pub inline fn openFdRetry(path: [*:0]const u8, oflags: std.c.O, mode: c_uint) c_
 }
 
 pub extern var ephemeron_array: obj.SchemeObject;
-pub extern var ephemeron_count: c_ulong;
+pub extern var ephemeron_count: usize;
 
 pub extern var Registers: [regblock_length]obj.SchemeObject;
 pub extern var Free: [*]obj.SchemeObject;
@@ -724,13 +724,13 @@ pub extern var stack_start: [*]obj.SchemeObject;
 pub extern var stack_end: [*]obj.SchemeObject;
 pub extern var memory_block_start: [*]obj.SchemeObject;
 pub extern var fixed_objects: obj.SchemeObject;
-pub extern var heap_reserved: c_ulong;
-pub extern var gc_space_needed: c_ulong;
+pub extern var heap_reserved: usize;
+pub extern var gc_space_needed: usize;
 pub extern var critical_section_name: ?[*:0]const u8;
 pub extern var current_gc_table: ?*anyopaque;
 pub extern var history_register: [*]obj.SchemeObject;
 pub extern var last_return_code: ?[*]obj.SchemeObject;
-pub extern var prev_restore_history_offset: c_ulong;
+pub extern var prev_restore_history_offset: usize;
 pub extern var ERROR_OUTPUT: OutfChannel;
 pub extern var FATAL_OUTPUT: OutfChannel;
 pub extern var trapping: bool;
@@ -751,11 +751,11 @@ pub extern var option_show_version: bool;
 pub extern var option_library_path: [*]?[*:0]const u8;
 pub extern var option_band_file: ?[*:0]const u8;
 pub extern var option_fasl_file: ?[*:0]const u8;
-pub extern var option_heap_size: c_ulong;
-pub extern var option_constant_size: c_ulong;
-pub extern var option_stack_size: c_ulong;
-pub extern var option_code_size: c_ulong;
-pub extern var MAX_PRIMITIVE: c_ulong;
+pub extern var option_heap_size: usize;
+pub extern var option_constant_size: usize;
+pub extern var option_stack_size: usize;
+pub extern var option_code_size: usize;
+pub extern var MAX_PRIMITIVE: usize;
 pub extern var Primitive_Arity_Table: ?[*]c_int;
 pub extern var Primitive_Name_Table: ?[*]?[*:0]const u8;
 pub extern var Primitive_Documentation_Table: ?[*]?[*:0]const u8;
@@ -787,7 +787,7 @@ pub inline fn cStderr() *std.c.FILE {
     }).stderr;
 }
 pub extern "c" fn error_external_return() noreturn;
-pub extern "c" fn signal_error_from_primitive(c_long) noreturn;
+pub extern "c" fn signal_error_from_primitive(isize) noreturn;
 pub extern "c" fn signal_interrupt_from_primitive() noreturn;
 pub extern "c" fn Microcode_Termination(c_int) noreturn;
 pub extern "c" fn termination_init_error() noreturn;
@@ -827,8 +827,8 @@ pub extern "c" fn OS_channel_close(Tchannel) void;
 pub extern "c" fn OS_channel_close_on_abort(Tchannel) void;
 pub extern "c" fn OS_channel_synchronize(Tchannel) void;
 pub extern "c" fn OS_channel_type(Tchannel) c_uint;
-pub extern "c" fn OS_channel_read(Tchannel, ?*anyopaque, usize) c_long;
-pub extern "c" fn OS_channel_write(Tchannel, ?*const anyopaque, usize) c_long;
+pub extern "c" fn OS_channel_read(Tchannel, ?*anyopaque, usize) isize;
+pub extern "c" fn OS_channel_write(Tchannel, ?*const anyopaque, usize) isize;
 pub extern "c" fn OS_make_pipe(*Tchannel, *Tchannel) void;
 pub extern "c" fn OS_channel_nonblocking_p(Tchannel) c_int;
 pub extern "c" fn OS_channel_nonblocking(Tchannel) void;
@@ -1008,9 +1008,9 @@ pub extern var stop_signal_hook: ?*const fn (c_int) callconv(.c) void;
 pub extern var subprocess_death_hook: ?*const fn (PidT, *c_int) callconv(.c) void;
 pub extern "c" fn UX_channel_descriptor(Tchannel) c_int;
 pub extern "c" fn OS_open_tcp_stream_socket(?*anyopaque, c_uint) Tchannel;
-pub extern "c" fn OS_shutdown_socket(Tchannel, c_ulong) void;
+pub extern "c" fn OS_shutdown_socket(Tchannel, usize) void;
 pub extern "c" fn OS_get_service_by_name([*:0]const u8, [*:0]const u8) c_int;
-pub extern "c" fn OS_get_service_by_number(c_ulong) c_ulong;
+pub extern "c" fn OS_get_service_by_number(usize) usize;
 pub extern "c" fn OS_host_address_length() c_uint;
 pub extern "c" fn OS_get_host_by_name([*:0]const u8) ?[*]?[*]u8;
 pub extern "c" fn OS_get_host_name() ?[*:0]const u8;
@@ -1028,7 +1028,7 @@ pub extern "c" fn OS_tcp_server_connection_accept(Tchannel, ?*anyopaque, ?*c_uin
 pub extern "c" fn UX_prim_check_errno(c_int) void;
 pub extern "c" fn OS_current_user_name() [*:0]const u8;
 pub extern "c" fn OS_current_user_home_directory() [*:0]const u8;
-pub extern "c" fn find_ccblock(c_ulong) obj.SchemeObject;
+pub extern "c" fn find_ccblock(usize) obj.SchemeObject;
 pub extern "c" fn UX_read_fd_status(c_int, *Stat) void;
 pub extern "c" fn UX_read_file_status([*:0]const u8, *Stat) c_int;
 pub extern "c" fn UX_read_file_status_indirect([*:0]const u8, *Stat) c_int;
@@ -1044,15 +1044,15 @@ pub extern "c" fn OS_under_emacs_p() c_int;
 pub extern "c" fn OS_set_trap_state(c_int) c_int;
 pub extern "c" fn OS_tty_x_size() c_uint;
 pub extern "c" fn OS_tty_y_size() c_uint;
-pub extern "c" fn OS_syscall_names(*c_ulong, *[*]?[*:0]const u8) void;
-pub extern "c" fn OS_syserr_names(*c_ulong, *[*]?[*:0]const u8) void;
+pub extern "c" fn OS_syscall_names(*usize, *[*]?[*:0]const u8) void;
+pub extern "c" fn OS_syserr_names(*usize, *[*]?[*:0]const u8) void;
 pub extern "c" fn initialize_history() obj.SchemeObject;
 pub extern "c" fn initialize_interrupt_handler_vector() obj.SchemeObject;
 pub extern "c" fn initialize_interrupt_mask_vector() obj.SchemeObject;
 pub extern "c" fn make_reflect_code_table() obj.SchemeObject;
 pub extern "c" fn cc_block_linkage_info(obj.SchemeObject) obj.SchemeObject;
 pub extern "c" fn return_address_p(obj.SchemeObject) bool;
-pub extern "c" fn cpoint_next_frame(obj.SchemeObject, c_ulong) c_ulong;
+pub extern "c" fn cpoint_next_frame(obj.SchemeObject, usize) usize;
 pub extern "c" fn return_frame_type([*]obj.SchemeObject) c_int;
 pub extern "c" fn return_code_frame_type(obj.SchemeObject) c_int;
 
@@ -1060,9 +1060,9 @@ pub extern var return_to_interpreter: obj.SchemeObject;
 pub extern var reflect_to_interface: obj.SchemeObject;
 pub extern "c" fn cc_return_address_p(obj.SchemeObject) bool;
 pub extern "c" fn reflect_to_interface_frame_type([*]obj.SchemeObject) c_int;
-pub extern "c" fn cpoint_compiled_code_next(obj.SchemeObject, c_ulong) c_ulong;
-pub extern "c" fn cpoint_compiled_address_next(obj.SchemeObject, c_ulong) c_ulong;
-pub extern "c" fn cpoint_reflect_to_interface_next(obj.SchemeObject, c_ulong) c_ulong;
+pub extern "c" fn cpoint_compiled_code_next(obj.SchemeObject, usize) usize;
+pub extern "c" fn cpoint_compiled_address_next(obj.SchemeObject, usize) usize;
+pub extern "c" fn cpoint_reflect_to_interface_next(obj.SchemeObject, usize) usize;
 
 pub extern "c" fn open_tospace([*]obj.SchemeObject) void;
 pub extern "c" fn initialize_weak_chain() void;
@@ -1070,29 +1070,29 @@ pub extern "c" fn get_newspace_ptr() [*]obj.SchemeObject;
 pub extern "c" fn add_to_tospace(obj.SchemeObject) void;
 pub extern "c" fn std_gc_table() ?*anyopaque;
 pub extern "c" fn gc_scan_tospace([*]obj.SchemeObject, ?[*]obj.SchemeObject) void;
-pub extern "c" fn increment_tospace_ptr(c_ulong) void;
+pub extern "c" fn increment_tospace_ptr(usize) void;
 pub extern "c" fn std_gc_pt1() void;
 pub extern "c" fn std_gc_pt2() void;
-pub extern "c" fn resize_tospace(c_ulong) void;
+pub extern "c" fn resize_tospace(usize) void;
 
-pub extern "c" fn lookup_variable(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) c_long;
-pub extern "c" fn safe_lookup_variable(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) c_long;
-pub extern "c" fn assign_variable(obj.SchemeObject, obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) c_long;
-pub extern "c" fn define_variable(obj.SchemeObject, obj.SchemeObject, obj.SchemeObject) c_long;
-pub extern "c" fn variable_unassigned_p(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) c_long;
-pub extern "c" fn variable_unbound_p(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) c_long;
-pub extern "c" fn variable_unreferenceable_p(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) c_long;
-pub extern "c" fn link_variables(obj.SchemeObject, obj.SchemeObject, obj.SchemeObject, obj.SchemeObject) c_long;
-pub extern "c" fn unbind_variable(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) c_long;
+pub extern "c" fn lookup_variable(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) isize;
+pub extern "c" fn safe_lookup_variable(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) isize;
+pub extern "c" fn assign_variable(obj.SchemeObject, obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) isize;
+pub extern "c" fn define_variable(obj.SchemeObject, obj.SchemeObject, obj.SchemeObject) isize;
+pub extern "c" fn variable_unassigned_p(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) isize;
+pub extern "c" fn variable_unbound_p(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) isize;
+pub extern "c" fn variable_unreferenceable_p(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) isize;
+pub extern "c" fn link_variables(obj.SchemeObject, obj.SchemeObject, obj.SchemeObject, obj.SchemeObject) isize;
+pub extern "c" fn unbind_variable(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) isize;
 
 pub extern "c" fn make_dummy_history() [*]obj.SchemeObject;
-pub extern "c" fn save_history(c_ulong) void;
+pub extern "c" fn save_history(usize) void;
 pub extern "c" fn stop_history() void;
 pub extern "c" fn preserve_interrupt_mask() void;
 pub extern "c" fn back_out_of_primitive() void;
-pub extern "c" fn apply_compiled_from_primitive(c_ulong, obj.SchemeObject) void;
+pub extern "c" fn apply_compiled_from_primitive(usize, obj.SchemeObject) void;
 pub extern "c" fn compiled_with_stack_marker(obj.SchemeObject) void;
-pub extern "c" fn compiled_with_interrupt_mask(c_ulong, obj.SchemeObject, c_ulong) void;
+pub extern "c" fn compiled_with_interrupt_mask(usize, obj.SchemeObject, usize) void;
 pub extern "c" fn termination_no_error_handler() noreturn;
 pub extern "c" fn OS_error_code_to_syserr(c_int) c_int;
 pub extern "c" fn guarantee_interp_return() void;
@@ -1100,7 +1100,7 @@ pub extern "c" fn update_weak_pointers() void;
 pub extern "c" fn read_cc_entry_type(*CcEntryType, ?*anyopaque) bool;
 pub extern "c" fn record_applicator(obj.SchemeObject) obj.SchemeObject;
 
-pub const GcTospaceAllocator = *const fn (c_ulong, *?[*]obj.SchemeObject, *?[*]obj.SchemeObject) callconv(.c) void;
+pub const GcTospaceAllocator = *const fn (usize, *?[*]obj.SchemeObject, *?[*]obj.SchemeObject) callconv(.c) void;
 pub const GcAbortHandler = *const fn () callconv(.c) noreturn;
 pub const GcWalkProc = *const fn ([*]obj.SchemeObject, [*]obj.SchemeObject, ?*anyopaque) callconv(.c) bool;
 pub const GcHandler = *const fn ([*]obj.SchemeObject, obj.SchemeObject) callconv(.c) [*]obj.SchemeObject;
@@ -1108,7 +1108,7 @@ pub const GcTupleHandler = *const fn (obj.SchemeObject, c_uint) callconv(.c) obj
 pub const GcVectorHandler = *const fn (obj.SchemeObject, bool) callconv(.c) obj.SchemeObject;
 pub const GcObjectHandler = *const fn (obj.SchemeObject) callconv(.c) obj.SchemeObject;
 pub const GcPrecheckFrom = *const fn ([*]obj.SchemeObject) callconv(.c) ?[*]obj.SchemeObject;
-pub const GcTransportWords = *const fn ([*]obj.SchemeObject, c_ulong, bool) callconv(.c) [*]obj.SchemeObject;
+pub const GcTransportWords = *const fn ([*]obj.SchemeObject, usize, bool) callconv(.c) [*]obj.SchemeObject;
 pub const GcIgnoreObjectP = *const fn (obj.SchemeObject) callconv(.c) bool;
 pub const GcRawAddressToObject = *const fn (c_uint, [*]obj.SchemeObject) callconv(.c) obj.SchemeObject;
 pub const GcObjectToRawAddress = *const fn (obj.SchemeObject) callconv(.c) [*]obj.SchemeObject;
@@ -1138,7 +1138,7 @@ pub extern var compiler_utilities: obj.SchemeObject;
 pub extern var compiler_interface_version: c_uint;
 pub extern "c" fn OS_malloc_init(usize) ?*anyopaque;
 pub extern "c" fn outf_flush_fatal() void;
-pub extern "c" fn initialize_gc(c_ulong, *?[*]obj.SchemeObject, *?[*]obj.SchemeObject, GcTospaceAllocator, GcAbortHandler) void;
+pub extern "c" fn initialize_gc(usize, *?[*]obj.SchemeObject, *?[*]obj.SchemeObject, GcTospaceAllocator, GcAbortHandler) void;
 pub extern "c" fn save_tospace(GcWalkProc, ?*anyopaque) bool;
 pub extern "c" fn tospace_to_newspace(?*anyopaque) ?*anyopaque;
 pub extern "c" fn gc_scan_oldspace([*]obj.SchemeObject, [*]obj.SchemeObject) void;
@@ -1164,12 +1164,12 @@ pub extern "c" fn code_arena_write_end() void;
 pub extern "c" fn cc_entry_address_to_block_address(?*anyopaque) [*]obj.SchemeObject;
 pub extern "c" fn cc_return_address_to_block_address(?*anyopaque) [*]obj.SchemeObject;
 pub extern "c" fn linkage_section_type(obj.SchemeObject) c_uint;
-pub extern "c" fn linkage_section_count(obj.SchemeObject) c_ulong;
+pub extern "c" fn linkage_section_count(obj.SchemeObject) usize;
 pub extern "c" fn read_uuo_target([*]obj.SchemeObject) ?*anyopaque;
 pub extern "c" fn write_uuo_target(?*anyopaque, [*]obj.SchemeObject) void;
 pub extern "c" fn start_closure_relocation([*]obj.SchemeObject, *RelocRef) void;
 pub extern "c" fn compiled_closure_start([*]obj.SchemeObject) ?*anyopaque;
-pub extern "c" fn compiled_closure_count([*]obj.SchemeObject) c_ulong;
+pub extern "c" fn compiled_closure_count([*]obj.SchemeObject) usize;
 pub extern "c" fn compiled_closure_next(?*anyopaque) ?*anyopaque;
 pub extern "c" fn read_compiled_closure_target(?*anyopaque, ?*RelocRef) ?*anyopaque;
 pub extern "c" fn write_compiled_closure_target(?*anyopaque, ?*anyopaque) void;
@@ -1177,9 +1177,9 @@ pub extern "c" fn skip_compiled_closure_padding(?*anyopaque) [*]obj.SchemeObject
 pub extern "c" fn decode_old_style_format_word(*CcEntryType, u16) bool;
 pub extern "c" fn encode_old_style_format_word(*CcEntryType, *u16) bool;
 pub extern "c" fn make_compiled_procedure_type(*CcEntryType, c_uint, c_uint, bool) void;
-pub extern "c" fn make_compiled_continuation_type(*CcEntryType, c_ulong) void;
+pub extern "c" fn make_compiled_continuation_type(*CcEntryType, usize) void;
 pub extern "c" fn make_cc_entry_type(*CcEntryType, CcEntryTypeMarker) void;
-pub extern "c" fn declare_builtin(c_ulong, [*:0]const u8) void;
+pub extern "c" fn declare_builtin(usize, [*:0]const u8) void;
 pub extern "c" fn jit_force_execute_mode() void;
 pub extern "c" fn jit_flush_icache(?*anyopaque, usize) void;
 pub extern "c" fn code_arena_flush_icache() void;
@@ -1195,21 +1195,21 @@ pub extern "c" fn gc_handle_unaligned_vector([*]obj.SchemeObject, obj.SchemeObje
 pub extern "c" fn gc_handle_manifest_closure([*]obj.SchemeObject, obj.SchemeObject) [*]obj.SchemeObject;
 pub extern "c" fn gc_handle_linkage_section([*]obj.SchemeObject, obj.SchemeObject) [*]obj.SchemeObject;
 pub extern "c" fn gc_handle_broken_heart([*]obj.SchemeObject, obj.SchemeObject) [*]obj.SchemeObject;
-pub extern "c" fn gc_transport_words([*]obj.SchemeObject, c_ulong, bool) [*]obj.SchemeObject;
+pub extern "c" fn gc_transport_words([*]obj.SchemeObject, usize, bool) [*]obj.SchemeObject;
 pub extern "c" fn gc_no_cc_support() noreturn;
-pub extern "c" fn tospace_available_p(c_ulong) bool;
+pub extern "c" fn tospace_available_p(usize) bool;
 pub extern "c" fn read_tospace([*]obj.SchemeObject) obj.SchemeObject;
 pub extern "c" fn write_tospace([*]obj.SchemeObject, obj.SchemeObject) void;
 pub extern "c" fn newspace_to_tospace(?*anyopaque) ?*anyopaque;
 pub extern "c" fn discard_tospace() void;
-pub extern "c" fn open_code_tospace(c_ulong) bool;
+pub extern "c" fn open_code_tospace(usize) bool;
 pub extern "c" fn discard_code_tospace() void;
 pub extern "c" fn get_code_newspace_start() [*]obj.SchemeObject;
 pub extern "c" fn get_code_newspace_ptr() [*]obj.SchemeObject;
-pub extern "c" fn code_tospace_available_p(c_ulong) bool;
-pub extern "c" fn gc_transport_words_to_code_tospace([*]obj.SchemeObject, c_ulong, bool) [*]obj.SchemeObject;
+pub extern "c" fn code_tospace_available_p(usize) bool;
+pub extern "c" fn gc_transport_words_to_code_tospace([*]obj.SchemeObject, usize, bool) [*]obj.SchemeObject;
 pub extern "c" fn gc_scan_code_tospace([*]obj.SchemeObject, [*]obj.SchemeObject) void;
-pub extern "c" fn open_stage_tospace([*]obj.SchemeObject, [*]obj.SchemeObject, c_ulong) void;
+pub extern "c" fn open_stage_tospace([*]obj.SchemeObject, [*]obj.SchemeObject, usize) void;
 pub extern "c" fn close_stage_tospace() void;
 pub extern "c" fn gc_scan_stage_tospace() void;
 pub extern "c" fn OS_file_remove([*:0]const u8) void;
@@ -1223,9 +1223,9 @@ pub extern "c" fn reset_interruptable_extent() void;
 pub extern "c" fn termination_trap() noreturn;
 pub extern "c" fn userio_choose_option([*:0]const u8, [*:0]const u8, [*]const ?[*:0]const u8) u8;
 pub extern "c" fn plausible_cc_block_p([*]obj.SchemeObject) c_int;
-pub extern "c" fn pc_to_builtin_index(c_ulong) c_int;
-pub extern "c" fn pc_to_utility_index(c_ulong) c_int;
-pub extern "c" fn svm_export_instruction_pointer(c_ulong) c_ulong;
+pub extern "c" fn pc_to_builtin_index(usize) c_int;
+pub extern "c" fn pc_to_utility_index(usize) c_int;
+pub extern "c" fn svm_export_instruction_pointer(usize) usize;
 pub extern var CONSOLE_OUTPUT: OutfChannel;
 pub extern "c" fn FILE_OUTPUT(*std.c.FILE) OutfChannel;
 pub extern "c" fn enter_interruption_extent() c_int;
@@ -1252,11 +1252,11 @@ pub extern "c" fn macosx_main_bundle_dir() ?[*:0]const u8;
 
 pub extern "c" fn cc_entry_to_block(obj.SchemeObject) obj.SchemeObject;
 pub extern "c" fn cc_return_to_block(obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn cc_entry_to_block_offset(obj.SchemeObject) c_ulong;
-pub extern "c" fn cc_return_to_block_offset(obj.SchemeObject) c_ulong;
+pub extern "c" fn cc_entry_to_block_offset(obj.SchemeObject) usize;
+pub extern "c" fn cc_return_to_block_offset(obj.SchemeObject) usize;
 pub extern "c" fn cc_entry_to_block_address(obj.SchemeObject) [*]obj.SchemeObject;
 pub extern "c" fn cc_return_address_to_entry_address(?*anyopaque) ?*anyopaque;
-pub extern "c" fn coerce_to_compiled(obj.SchemeObject, c_uint, *obj.SchemeObject) c_long;
+pub extern "c" fn coerce_to_compiled(obj.SchemeObject, c_uint, *obj.SchemeObject) isize;
 pub extern "c" fn cc_entry_closure_p(obj.SchemeObject) bool;
 pub extern "c" fn cc_block_closure_p(obj.SchemeObject) bool;
 pub extern "c" fn cc_closure_to_entry(obj.SchemeObject) obj.SchemeObject;
@@ -1269,7 +1269,7 @@ pub extern "c" fn bkpt_remove(?*anyopaque, obj.SchemeObject) void;
 pub extern "c" fn bkpt_p(?*anyopaque) bool;
 pub const tat_always: c_int = 2;
 
-pub extern var prim_apply_error_code: c_long;
+pub extern var prim_apply_error_code: isize;
 pub extern var Primitive_Procedure_Table: ?[*]PrimitiveProcedure;
 pub extern "c" fn Prim_unimplemented() obj.SchemeObject;
 pub extern "c" fn apply_primitive_external(obj.SchemeObject) void;
@@ -1281,19 +1281,19 @@ pub extern "c" fn dstack_alloc(c_uint) ?*anyopaque;
 pub extern "c" fn transaction_begin() void;
 pub extern "c" fn transaction_commit() void;
 pub extern "c" fn transaction_record_action(c_int, *const fn (?*anyopaque) callconv(.c) void, ?*anyopaque) void;
-pub extern "c" fn code_arena_alloc(c_ulong) ?[*]obj.SchemeObject;
+pub extern "c" fn code_arena_alloc(usize) ?[*]obj.SchemeObject;
 pub extern "c" fn code_arena_write_scope_begin() ?*anyopaque;
 pub extern "c" fn code_arena_write_scope_end(?*anyopaque) void;
-pub extern "c" fn compiler_cache_operator(obj.SchemeObject, obj.SchemeObject, c_ulong) c_long;
-pub extern "c" fn compiler_cache_global_operator(obj.SchemeObject, obj.SchemeObject, c_ulong) c_long;
-pub extern "c" fn compiler_cache_lookup(obj.SchemeObject, obj.SchemeObject, c_ulong) c_long;
-pub extern "c" fn compiler_cache_assignment(obj.SchemeObject, obj.SchemeObject, c_ulong) c_long;
+pub extern "c" fn compiler_cache_operator(obj.SchemeObject, obj.SchemeObject, usize) isize;
+pub extern "c" fn compiler_cache_global_operator(obj.SchemeObject, obj.SchemeObject, usize) isize;
+pub extern "c" fn compiler_cache_lookup(obj.SchemeObject, obj.SchemeObject, usize) isize;
+pub extern "c" fn compiler_cache_assignment(obj.SchemeObject, obj.SchemeObject, usize) isize;
 pub extern "c" fn compiler_var_error(obj.SchemeObject, obj.SchemeObject, CacheRefKind) obj.SchemeObject;
-pub extern "c" fn compiler_assignment_trap(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) c_long;
-pub extern "c" fn compiler_lookup_trap(obj.SchemeObject, *obj.SchemeObject) c_long;
-pub extern "c" fn compiler_safe_lookup_trap(obj.SchemeObject, *obj.SchemeObject) c_long;
-pub extern "c" fn compiler_unassigned_p_trap(obj.SchemeObject, *obj.SchemeObject) c_long;
-pub extern "c" fn compiler_operator_reference_trap(obj.SchemeObject, *obj.SchemeObject) c_long;
+pub extern "c" fn compiler_assignment_trap(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) isize;
+pub extern "c" fn compiler_lookup_trap(obj.SchemeObject, *obj.SchemeObject) isize;
+pub extern "c" fn compiler_safe_lookup_trap(obj.SchemeObject, *obj.SchemeObject) isize;
+pub extern "c" fn compiler_unassigned_p_trap(obj.SchemeObject, *obj.SchemeObject) isize;
+pub extern "c" fn compiler_operator_reference_trap(obj.SchemeObject, *obj.SchemeObject) isize;
 pub extern "c" fn write_cc_entry_type(*CcEntryType, ?*anyopaque) bool;
 pub extern "c" fn write_cc_entry_offset(*CcEntryOffset, ?*anyopaque) bool;
 pub extern "c" fn compiled_closure_entry(?*anyopaque) ?*anyopaque;
@@ -1301,9 +1301,9 @@ pub extern "c" fn compiled_closure_entry_to_target(?*anyopaque) obj.SchemeObject
 pub extern "c" fn read_uuo_symbol([*]obj.SchemeObject) obj.SchemeObject;
 pub extern "c" fn read_uuo_frame_size([*]obj.SchemeObject) c_uint;
 pub extern "c" fn read_uuo_target_no_reloc([*]obj.SchemeObject) ?*anyopaque;
-pub extern "c" fn trampoline_entry_size(c_ulong) c_ulong;
-pub extern "c" fn trampoline_entry_addr([*]obj.SchemeObject, c_ulong) ?*anyopaque;
-pub extern "c" fn trampoline_return_addr([*]obj.SchemeObject, c_ulong) ?*anyopaque;
+pub extern "c" fn trampoline_entry_size(usize) usize;
+pub extern "c" fn trampoline_entry_addr([*]obj.SchemeObject, usize) ?*anyopaque;
+pub extern "c" fn trampoline_return_addr([*]obj.SchemeObject, usize) ?*anyopaque;
 pub extern "c" fn store_trampoline_insns(?*anyopaque, u8) bool;
 pub extern "c" fn store_trampoline_to_interface_insns(?*anyopaque) bool;
 pub extern "c" fn aarch64_reset_hook() void;
@@ -1312,49 +1312,49 @@ pub extern "c" fn initialize_svm1() void;
 
 pub extern "c" fn bkpt_proceed(?*anyopaque, obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
 pub extern "c" fn cc_block_environment(obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn write_variable_cache(obj.SchemeObject, obj.SchemeObject, c_ulong) void;
-pub extern "c" fn make_uuo_link(obj.SchemeObject, obj.SchemeObject, obj.SchemeObject, c_ulong) c_long;
+pub extern "c" fn write_variable_cache(obj.SchemeObject, obj.SchemeObject, usize) void;
+pub extern "c" fn make_uuo_link(obj.SchemeObject, obj.SchemeObject, obj.SchemeObject, usize) isize;
 
-pub extern "c" fn arg_integer(c_int) c_long;
-pub extern "c" fn arg_nonnegative_integer(c_int) c_long;
-pub extern "c" fn arg_index_integer(c_int, c_long) c_long;
-pub extern "c" fn arg_ulong_integer(c_int) c_ulong;
-pub extern "c" fn arg_ulong_index_integer(c_int, c_ulong) c_ulong;
+pub extern "c" fn arg_integer(c_int) isize;
+pub extern "c" fn arg_nonnegative_integer(c_int) isize;
+pub extern "c" fn arg_index_integer(c_int, isize) isize;
+pub extern "c" fn arg_ulong_integer(c_int) usize;
+pub extern "c" fn arg_ulong_index_integer(c_int, usize) usize;
 pub extern "c" fn arg_flonum(c_int) f64;
 
-pub extern "c" fn long_to_integer(c_long) obj.SchemeObject;
-pub extern "c" fn ulong_to_integer(c_ulong) obj.SchemeObject;
+pub extern "c" fn long_to_integer(isize) obj.SchemeObject;
+pub extern "c" fn ulong_to_integer(usize) obj.SchemeObject;
 pub extern "c" fn double_to_flonum(f64) obj.SchemeObject;
 
-pub extern "c" fn allocate_non_marked_vector(c_uint, c_ulong, bool) obj.SchemeObject;
-pub extern "c" fn allocate_marked_vector(c_uint, c_ulong, bool) obj.SchemeObject;
-pub extern "c" fn allocate_vector(c_ulong, bool) obj.SchemeObject;
-pub extern "c" fn make_vector(c_ulong, obj.SchemeObject, bool) obj.SchemeObject;
+pub extern "c" fn allocate_non_marked_vector(c_uint, usize, bool) obj.SchemeObject;
+pub extern "c" fn allocate_marked_vector(c_uint, usize, bool) obj.SchemeObject;
+pub extern "c" fn allocate_vector(usize, bool) obj.SchemeObject;
+pub extern "c" fn make_vector(usize, obj.SchemeObject, bool) obj.SchemeObject;
 
-pub extern "c" fn arg_bytevector(c_int, *c_ulong) [*]u8;
-pub extern "c" fn allocate_bytevector(c_ulong) obj.SchemeObject;
-pub extern "c" fn memory_to_bytevector(c_ulong, ?*const anyopaque) obj.SchemeObject;
+pub extern "c" fn arg_bytevector(c_int, *usize) [*]u8;
+pub extern "c" fn allocate_bytevector(usize) obj.SchemeObject;
+pub extern "c" fn memory_to_bytevector(usize, ?*const anyopaque) obj.SchemeObject;
 pub extern "c" fn OS_get_entropy(*[32]u8) void;
 
 pub extern "c" fn canonicalize_primitive_context() void;
-pub extern "c" fn abort_to_interpreter(c_long) noreturn;
+pub extern "c" fn abort_to_interpreter(isize) noreturn;
 pub extern "c" fn stack_death([*:0]const u8) noreturn;
 pub extern "c" fn cons(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
 
-pub extern "c" fn arg_integer_in_range(c_int, c_long, c_long) c_long;
+pub extern "c" fn arg_integer_in_range(c_int, isize, isize) isize;
 pub extern "c" fn arg_index_integer_to_intmax(c_int, i64) i64;
 pub extern "c" fn error_unimplemented_primitive() noreturn;
 pub extern "c" fn Mul(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
 pub extern "c" fn string_p(obj.SchemeObject) bool;
-pub extern "c" fn allocate_string(c_ulong) obj.SchemeObject;
-pub extern "c" fn system_pair_cons(c_long, obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn memory_hash(c_ulong, ?*const anyopaque) u32;
-pub extern "c" fn arg_ascii_char(c_int) c_long;
-pub extern "c" fn arg_ascii_integer(c_int) c_long;
-pub extern "c" fn char_upcase(c_long) c_long;
-pub extern "c" fn char_downcase(c_long) c_long;
-pub extern "c" fn string_to_char_pointer(obj.SchemeObject, ?*c_ulong) [*]u8;
-pub extern "c" fn arg_extended_string(c_uint, ?*c_ulong) [*]u8;
+pub extern "c" fn allocate_string(usize) obj.SchemeObject;
+pub extern "c" fn system_pair_cons(isize, obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn memory_hash(usize, ?*const anyopaque) u32;
+pub extern "c" fn arg_ascii_char(c_int) isize;
+pub extern "c" fn arg_ascii_integer(c_int) isize;
+pub extern "c" fn char_upcase(isize) isize;
+pub extern "c" fn char_downcase(isize) isize;
+pub extern "c" fn string_to_char_pointer(obj.SchemeObject, ?*usize) [*]u8;
+pub extern "c" fn arg_extended_string(c_uint, ?*usize) [*]u8;
 
 pub const BignumComparison = enum(c_int) {
     equal = 0,
@@ -1362,9 +1362,9 @@ pub const BignumComparison = enum(c_int) {
     greater = 2,
 };
 
-pub const dbl_min_exp: c_long = -1021;
-pub const dbl_max_exp: c_long = 1024;
-pub const dbl_mant_dig: c_long = 53;
+pub const dbl_min_exp: isize = -1021;
+pub const dbl_max_exp: isize = 1024;
+pub const dbl_mant_dig: isize = 53;
 
 pub extern "c" fn bignum_equal_p(obj.SchemeObject, obj.SchemeObject) c_int;
 pub extern "c" fn bignum_test(obj.SchemeObject) c_int;
@@ -1376,22 +1376,22 @@ pub extern "c" fn bignum_multiply(obj.SchemeObject, obj.SchemeObject) obj.Scheme
 pub extern "c" fn bignum_divide(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject, *obj.SchemeObject) c_int;
 pub extern "c" fn bignum_quotient(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
 pub extern "c" fn bignum_remainder(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn long_to_bignum(c_long) obj.SchemeObject;
-pub extern "c" fn ulong_to_bignum(c_ulong) obj.SchemeObject;
-pub extern "c" fn bignum_to_long(obj.SchemeObject) c_long;
-pub extern "c" fn bignum_to_ulong(obj.SchemeObject) c_ulong;
+pub extern "c" fn long_to_bignum(isize) obj.SchemeObject;
+pub extern "c" fn ulong_to_bignum(usize) obj.SchemeObject;
+pub extern "c" fn bignum_to_long(obj.SchemeObject) isize;
+pub extern "c" fn bignum_to_ulong(obj.SchemeObject) usize;
 pub extern "c" fn intmax_to_bignum(i64) obj.SchemeObject;
 pub extern "c" fn uintmax_to_bignum(u64) obj.SchemeObject;
 pub extern "c" fn bignum_to_intmax(obj.SchemeObject) i64;
 pub extern "c" fn bignum_to_uintmax(obj.SchemeObject) u64;
 pub extern "c" fn double_to_bignum(f64) obj.SchemeObject;
 pub extern "c" fn bignum_to_double(obj.SchemeObject) f64;
-pub extern "c" fn bignum_fits_in_word_p(obj.SchemeObject, c_long, c_int) c_int;
-pub extern "c" fn bignum_length_in_bits(obj.SchemeObject) c_ulong;
-pub extern "c" fn bignum_integer_length(obj.SchemeObject) c_ulong;
-pub extern "c" fn bignum_first_set_bit(obj.SchemeObject) c_long;
-pub extern "c" fn bignum_bit_count(obj.SchemeObject) c_ulong;
-pub extern "c" fn bignum_hamming_distance(obj.SchemeObject, obj.SchemeObject) c_long;
+pub extern "c" fn bignum_fits_in_word_p(obj.SchemeObject, isize, c_int) c_int;
+pub extern "c" fn bignum_length_in_bits(obj.SchemeObject) usize;
+pub extern "c" fn bignum_integer_length(obj.SchemeObject) usize;
+pub extern "c" fn bignum_first_set_bit(obj.SchemeObject) isize;
+pub extern "c" fn bignum_bit_count(obj.SchemeObject) usize;
+pub extern "c" fn bignum_hamming_distance(obj.SchemeObject, obj.SchemeObject) isize;
 pub extern "c" fn bignum_bitwise_not(obj.SchemeObject) obj.SchemeObject;
 pub extern "c" fn bignum_bitwise_and(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
 pub extern "c" fn bignum_bitwise_andc2(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
@@ -1403,11 +1403,11 @@ pub extern "c" fn bignum_bitwise_eqv(obj.SchemeObject, obj.SchemeObject) obj.Sch
 pub extern "c" fn bignum_bitwise_orc2(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
 pub extern "c" fn bignum_bitwise_orc1(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
 pub extern "c" fn bignum_bitwise_nand(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn bignum_nonnegative_one_bits(c_ulong, c_ulong) obj.SchemeObject;
-pub extern "c" fn bignum_negative_zero_bits(c_ulong, c_ulong) obj.SchemeObject;
-pub extern "c" fn bignum_shift_right(obj.SchemeObject, c_ulong) obj.SchemeObject;
-pub extern "c" fn bignum_shift_left(obj.SchemeObject, c_ulong) obj.SchemeObject;
-pub extern "c" fn unsigned_long_to_shifted_bignum(c_ulong, c_ulong, c_int) obj.SchemeObject;
+pub extern "c" fn bignum_nonnegative_one_bits(usize, usize) obj.SchemeObject;
+pub extern "c" fn bignum_negative_zero_bits(usize, usize) obj.SchemeObject;
+pub extern "c" fn bignum_shift_right(obj.SchemeObject, usize) obj.SchemeObject;
+pub extern "c" fn bignum_shift_left(obj.SchemeObject, usize) obj.SchemeObject;
+pub extern "c" fn unsigned_long_to_shifted_bignum(usize, usize, c_int) obj.SchemeObject;
 pub extern "c" fn digit_stream_to_bignum(
     c_uint,
     *const fn (?*anyopaque) callconv(.c) c_uint,
@@ -1418,10 +1418,10 @@ pub extern "c" fn digit_stream_to_bignum(
 pub extern "c" fn bignum_to_digit_stream(
     obj.SchemeObject,
     c_uint,
-    *const fn (?*anyopaque, c_long) callconv(.c) void,
+    *const fn (?*anyopaque, isize) callconv(.c) void,
     ?*anyopaque,
 ) void;
-pub extern "c" fn bignum_max_digit_stream_radix() c_long;
+pub extern "c" fn bignum_max_digit_stream_radix() isize;
 
 pub inline fn bignumZeroP(b: obj.SchemeObject) bool {
     return bignum_test(b) == @intFromEnum(BignumComparison.equal);
@@ -1440,11 +1440,11 @@ pub inline fn bignumLessP(x: obj.SchemeObject, y: obj.SchemeObject) bool {
 }
 
 pub inline fn bignumToLongP(b: obj.SchemeObject) bool {
-    return bignum_fits_in_word_p(b, @bitSizeOf(c_long), 1) != 0;
+    return bignum_fits_in_word_p(b, @bitSizeOf(isize), 1) != 0;
 }
 
 pub inline fn bignumToUlongP(b: obj.SchemeObject) bool {
-    return bignum_fits_in_word_p(b, @bitSizeOf(c_ulong), 0) != 0;
+    return bignum_fits_in_word_p(b, @bitSizeOf(usize), 0) != 0;
 }
 
 pub inline fn bignumToIntmaxP(b: obj.SchemeObject) bool {
@@ -1464,7 +1464,7 @@ pub inline fn losslessBignumToDoubleP(b: obj.SchemeObject) bool {
 }
 
 pub inline fn bignumToFixnumP(b: obj.SchemeObject) bool {
-    return bignum_fits_in_word_p(b, @as(c_long, obj.fixnum_length) + 1, 1) != 0;
+    return bignum_fits_in_word_p(b, @as(isize, obj.fixnum_length) + 1, 1) != 0;
 }
 
 pub inline fn fixnumToBignum(f: obj.SchemeObject) obj.SchemeObject {
@@ -1523,7 +1523,7 @@ pub inline fn booleanArg(n: usize) bool {
     return argRef(n) != obj.sharp_f;
 }
 
-pub inline fn getLexprActuals() c_ulong {
+pub inline fn getLexprActuals() usize {
     return @intCast(Registers[regblock_lexpr_actuals]);
 }
 
@@ -1543,7 +1543,7 @@ pub inline fn gcTypeVector(o: obj.SchemeObject) bool {
     return gcType(o) == @intFromEnum(GcType.vector);
 }
 
-pub inline fn interruptEnabledP(mask: c_ulong) bool {
+pub inline fn interruptEnabledP(mask: usize) bool {
     return (Registers[regblock_int_mask] & mask) != 0;
 }
 
@@ -1551,11 +1551,11 @@ pub inline fn gcEnabledP() bool {
     return interruptEnabledP(int_gc);
 }
 
-pub inline fn pendingInterrupts() c_ulong {
+pub inline fn pendingInterrupts() usize {
     return Registers[regblock_int_mask] & Registers[regblock_int_code];
 }
 
-pub inline fn interruptPendingP(mask: c_ulong) bool {
+pub inline fn interruptPendingP(mask: usize) bool {
     return (pendingInterrupts() & mask) != 0;
 }
 
@@ -1563,12 +1563,12 @@ pub inline fn addressInConstantP(addr: [*]const obj.SchemeObject) bool {
     return @intFromPtr(addr) >= @intFromPtr(constant_start) and @intFromPtr(addr) < @intFromPtr(constant_end);
 }
 
-pub inline fn requestInterrupt(code: c_ulong) void {
+pub inline fn requestInterrupt(code: usize) void {
     Registers[regblock_int_code] |= code;
     compilerSetupInterrupt();
 }
 
-pub inline fn setInterruptMask(mask: c_ulong) void {
+pub inline fn setInterruptMask(mask: usize) void {
     Registers[regblock_int_mask] = mask;
     compilerSetupInterrupt();
 }
@@ -1577,13 +1577,13 @@ pub inline fn freeOkP(free: [*]const obj.SchemeObject) bool {
     return @intFromPtr(free) >= @intFromPtr(heap_start) and @intFromPtr(free) < @intFromPtr(heap_alloc_limit);
 }
 
-pub inline fn heapAvailableP(n_words: c_ulong) bool {
+pub inline fn heapAvailableP(n_words: usize) bool {
     if (!freeOkP(Free)) return false;
-    const avail_words: c_ulong = @intCast((@intFromPtr(heap_alloc_limit) - @intFromPtr(Free)) / @sizeOf(obj.SchemeObject));
+    const avail_words: usize = @intCast((@intFromPtr(heap_alloc_limit) - @intFromPtr(Free)) / @sizeOf(obj.SchemeObject));
     return n_words <= avail_words;
 }
 
-pub inline fn gcNeededP(n_words: c_ulong) bool {
+pub inline fn gcNeededP(n_words: usize) bool {
     return !heapAvailableP(n_words) and gcEnabledP();
 }
 
@@ -1603,13 +1603,13 @@ pub inline fn compilerSetupInterrupt() void {
     Registers[regblock_stack_guard] = @intCast(@intFromPtr(stack_guard_ptr));
 }
 
-pub inline fn requestGc(n_words: c_ulong) void {
+pub inline fn requestGc(n_words: usize) void {
     Registers[regblock_int_code] |= int_gc;
     compilerSetupInterrupt();
     gc_space_needed = n_words;
 }
 
-pub fn primitiveGc(amount: c_ulong) noreturn {
+pub fn primitiveGc(amount: usize) noreturn {
     const free_prim = Free_primitive orelse {
         outf_fatal("\nMicrocode requested primitive GC outside primitive!\n");
         Microcode_Termination(term_exit);
@@ -1622,12 +1622,12 @@ pub fn primitiveGc(amount: c_ulong) noreturn {
         outf_fatal("\nFree has gone backwards!\n");
         Microcode_Termination(term_exit);
     }
-    const used_words: c_ulong = @intCast((@intFromPtr(Free) - @intFromPtr(free_prim)) / @sizeOf(obj.SchemeObject));
+    const used_words: usize = @intCast((@intFromPtr(Free) - @intFromPtr(free_prim)) / @sizeOf(obj.SchemeObject));
     requestGc(amount + used_words);
     signal_interrupt_from_primitive();
 }
 
-pub inline fn primitiveGcIfNeeded(amount: c_ulong) void {
+pub inline fn primitiveGcIfNeeded(amount: usize) void {
     if (gcNeededP(amount)) {
         primitiveGc(amount);
     }
@@ -1670,26 +1670,26 @@ pub inline fn stackCheckFatal(s: [*:0]const u8) void {
     if (stackOverflowedP()) stack_death(s);
 }
 
-pub inline fn pushCont(rc: c_ulong, exp: obj.SchemeObject) void {
+pub inline fn pushCont(rc: usize, exp: obj.SchemeObject) void {
     stackPush(exp);
     stackPush(obj.makeObject(obj.tc_return_code, rc));
 }
 
-pub inline fn makeApplyFrameHeader(size: c_ulong) obj.SchemeObject {
+pub inline fn makeApplyFrameHeader(size: usize) obj.SchemeObject {
     return obj.makeObject(obj.tc_manifest_vector, size);
 }
 
-pub inline fn applyFrameHeaderNArgs(header: obj.SchemeObject) c_ulong {
+pub inline fn applyFrameHeaderNArgs(header: obj.SchemeObject) usize {
     return obj.objectDatum(header) - 1;
 }
 
-pub inline fn heapAvailable() c_ulong {
+pub inline fn heapAvailable() usize {
     if (!freeOkP(Free)) return 0;
     return @intCast((@intFromPtr(heap_alloc_limit) - @intFromPtr(Free)) / @sizeOf(obj.SchemeObject));
 }
 
-pub inline fn argHeapReserved(n: c_int) c_ulong {
-    const words: c_ulong = @intCast((@intFromPtr(heap_end) - @intFromPtr(heap_start)) / @sizeOf(obj.SchemeObject));
+pub inline fn argHeapReserved(n: c_int) usize {
+    const words: usize = @intCast((@intFromPtr(heap_end) - @intFromPtr(heap_start)) / @sizeOf(obj.SchemeObject));
     return arg_ulong_index_integer(n, words / 2);
 }
 
@@ -1707,11 +1707,11 @@ pub inline fn stackRef(offset: usize) obj.SchemeObject {
     return stack_pointer[offset];
 }
 
-pub inline fn stackNPushed() c_ulong {
+pub inline fn stackNPushed() usize {
     return @intCast((@intFromPtr(stack_end) - @intFromPtr(stack_pointer)) / @sizeOf(obj.SchemeObject));
 }
 
-pub inline fn clearInterrupt(code: c_ulong) void {
+pub inline fn clearInterrupt(code: usize) void {
     Registers[regblock_int_code] &= ~code;
     compilerSetupInterrupt();
 }
@@ -1724,12 +1724,12 @@ pub inline fn contFrameExp(frame: [*]const obj.SchemeObject) obj.SchemeObject {
     return frame[1];
 }
 
-pub inline fn primitiveNArgs(prim: obj.SchemeObject) c_ulong {
+pub inline fn primitiveNArgs(prim: obj.SchemeObject) usize {
     const arity = Primitive_Arity_Table.?[@intCast(obj.objectDatum(prim))];
     return if (arity == lexpr_primitive_arity) getLexprActuals() else @intCast(arity);
 }
 
-pub inline fn pushEnvCont(rc: c_ulong, exp: obj.SchemeObject, env: obj.SchemeObject) void {
+pub inline fn pushEnvCont(rc: usize, exp: obj.SchemeObject, env: obj.SchemeObject) void {
     stackPush(env);
     pushCont(rc, exp);
 }
@@ -1738,7 +1738,7 @@ pub inline fn addressInHeapP(addr: [*]const obj.SchemeObject) bool {
     return @intFromPtr(addr) >= @intFromPtr(heap_start) and @intFromPtr(addr) < @intFromPtr(heap_end);
 }
 
-pub inline fn spaceBeforeGc() c_ulong {
+pub inline fn spaceBeforeGc() usize {
     if (gcEnabledP()) return heapAvailable();
     if (addressInHeapP(Free)) {
         return @intCast((@intFromPtr(heap_end) - @intFromPtr(Free)) / @sizeOf(obj.SchemeObject));
@@ -1755,7 +1755,7 @@ pub inline fn resetHeapAllocLimit() void {
     compilerSetupInterrupt();
 }
 
-pub inline fn setStackLimits(start: [*]obj.SchemeObject, size: c_ulong) void {
+pub inline fn setStackLimits(start: [*]obj.SchemeObject, size: usize) void {
     stack_start = start;
     stack_end = start + @as(usize, @intCast(size));
 }
@@ -1767,7 +1767,7 @@ pub inline fn initializeStack() void {
     compilerSetupInterrupt();
 }
 
-pub inline fn initializeInterrupts(mask: c_ulong) void {
+pub inline fn initializeInterrupts(mask: usize) void {
     Registers[regblock_int_mask] = mask;
     Registers[regblock_int_code] = 0;
     compilerSetupInterrupt();
@@ -1777,6 +1777,6 @@ pub inline fn addressInStackP(addr: [*]const obj.SchemeObject) bool {
     return @intFromPtr(addr) >= @intFromPtr(stack_start) and @intFromPtr(addr) < @intFromPtr(stack_end);
 }
 
-pub inline fn spToNPushed(sp: [*]const obj.SchemeObject, _: [*]const obj.SchemeObject, end: [*]const obj.SchemeObject) c_ulong {
+pub inline fn spToNPushed(sp: [*]const obj.SchemeObject, _: [*]const obj.SchemeObject, end: [*]const obj.SchemeObject) usize {
     return @intCast((@intFromPtr(end) - @intFromPtr(sp)) / @sizeOf(obj.SchemeObject));
 }

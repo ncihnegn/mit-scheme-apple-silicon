@@ -33,7 +33,7 @@ const LoadBandTerminationState = struct {
 
 const CodeLoadAbortState = struct {
     start: [*]obj.SchemeObject,
-    n_words: c_ulong,
+    n_words: usize,
 };
 
 var fasl_header: fasl.FaslHeader = undefined;
@@ -46,12 +46,12 @@ var new_stack_start: ?[*]obj.SchemeObject = null;
 var new_stack_end: ?[*]obj.SchemeObject = null;
 var new_utilities: ?[*]obj.SchemeObject = null;
 var new_prim_table: ?[*]obj.SchemeObject = null;
-var failed_heap_length: c_ulong = 0;
+var failed_heap_length: usize = 0;
 
 var reload_band_name: ?[*:0]const u8 = null;
 var reload_cleanups: ?*ptrvec.Ptrvec = null;
-var reload_heap_size: c_ulong = 0;
-var reload_constant_size: c_ulong = 0;
+var reload_heap_size: usize = 0;
+var reload_constant_size: usize = 0;
 
 var relocate_table_initialized: bool = false;
 var relocate_table: abi.GcTable = undefined;
@@ -73,7 +73,7 @@ inline fn stringArg(n: c_int) [*:0]const u8 {
     return @ptrCast(obj.legacyStringData(val));
 }
 
-inline fn requiredHeap(h: *fasl.FaslHeader) c_ulong {
+inline fn requiredHeap(h: *fasl.FaslHeader) usize {
     return fasl.ptrRangeWords(h.heap_end, h.heap_start) +
         h.n_primitives +
         h.primitive_table_size;
@@ -109,8 +109,8 @@ pub export fn Prim_binary_fasload() callconv(.c) obj.SchemeObject {
     }
 
     const heap_length = requiredHeap(fh);
-    var n_ephemerons: c_ulong = 0;
-    var extra_ephemeron_space: c_ulong = 0;
+    var n_ephemerons: usize = 0;
+    var extra_ephemeron_space: usize = 0;
     if (fh.version >= fasl.fasl_version_ephemerons) {
         n_ephemerons = fh.ephemeron_count;
         extra_ephemeron_space = memmag.compute_extra_ephemeron_space(storage.ephemeron_count + n_ephemerons);
@@ -234,7 +234,7 @@ fn readBandFile(s: obj.SchemeObject) obj.SchemeObject {
     var handle: fasl.FaslFileHandle = null;
     initFaslFile(file_name, true, &handle);
 
-    const extra_eph: c_ulong = if (fh.version >= fasl.fasl_version_ephemerons)
+    const extra_eph: usize = if (fh.version >= fasl.fasl_version_ephemerons)
         memmag.compute_extra_ephemeron_space(fh.ephemeron_count)
     else
         0;
@@ -280,9 +280,9 @@ fn terminateBandLoad(ap: ?*anyopaque) callconv(.c) void {
         else
             null;
         if (message) |msg| {
-            abi.outf_fatal("Error %#lx (%s)", @as(c_ulong, @intCast(abort_value)), msg);
+            abi.outf_fatal("Error %#zx (%s)", @as(usize, @intCast(abort_value)), msg);
         } else {
-            abi.outf_fatal("Unknown error %#lx", @as(c_ulong, @intCast(abort_value)));
+            abi.outf_fatal("Unknown error %#zx", @as(usize, @intCast(abort_value)));
         }
     } else {
         abort_value = (-abort_value) - 1;
@@ -315,7 +315,7 @@ pub export fn Prim_reload_band_name() callconv(.c) obj.SchemeObject {
     return obj.sharp_f;
 }
 
-pub export fn get_band_parameters(heap_size: *c_ulong, const_size: *c_ulong) callconv(.c) void {
+pub export fn get_band_parameters(heap_size: *usize, const_size: *usize) callconv(.c) void {
     heap_size.* = reload_heap_size;
     const_size.* = reload_constant_size;
 }
@@ -349,7 +349,7 @@ fn abortCodeLoad(ap: ?*anyopaque) callconv(.c) void {
     code_arena.code_arena_rebuild_free_list();
 }
 
-fn loadFile(handle: fasl.FaslFileHandle, old_ephemeron_count: c_ulong) obj.SchemeObject {
+fn loadFile(handle: fasl.FaslFileHandle, old_ephemeron_count: usize) obj.SchemeObject {
     new_heap_start = abi.Free;
     new_constant_start = abi.constant_alloc_next;
     new_code_start = null;
@@ -586,17 +586,17 @@ fn relocateAddress(vaddr: ?*anyopaque) *anyopaque {
     else if (caddr >= stack_start_addr and caddr < stack_end_addr)
         ptrAddr(new_stack_end) - (stack_end_addr - caddr)
     else {
-        abi.outf_fatal("Pointer out of range: %#lx\n", @as(c_ulong, @intCast(caddr)));
+        abi.outf_fatal("Pointer out of range: %#zx\n", @as(usize, @intCast(caddr)));
         abi.outf_fatal(
-            "Heap: %#lx-%#lx, Constant: %#lx-%#lx, Code: %#lx-%#lx, Stack: %#lx-%#lx\n",
-            @as(c_ulong, @intCast(heap_start_addr)),
-            @as(c_ulong, @intCast(heap_end_addr)),
-            @as(c_ulong, @intCast(const_start_addr)),
-            @as(c_ulong, @intCast(const_end_addr)),
-            @as(c_ulong, @intCast(code_start_addr)),
-            @as(c_ulong, @intCast(code_end_addr)),
-            @as(c_ulong, @intCast(stack_start_addr)),
-            @as(c_ulong, @intCast(stack_end_addr)),
+            "Heap: %#zx-%#zx, Constant: %#zx-%#zx, Code: %#zx-%#zx, Stack: %#zx-%#zx\n",
+            @as(usize, @intCast(heap_start_addr)),
+            @as(usize, @intCast(heap_end_addr)),
+            @as(usize, @intCast(const_start_addr)),
+            @as(usize, @intCast(const_end_addr)),
+            @as(usize, @intCast(code_start_addr)),
+            @as(usize, @intCast(code_end_addr)),
+            @as(usize, @intCast(stack_start_addr)),
+            @as(usize, @intCast(stack_end_addr)),
         );
         abi.signal_error_from_primitive(abi.err_fasl_file_bad_data);
     };
@@ -683,11 +683,11 @@ test "fasload reload cleanups, band name, relocation regions, primitives, intern
     transact.transaction_initialize();
 
     // 1. get_band_parameters and execute_reload_cleanups before registration
-    var h_sz: c_ulong = 999;
-    var c_sz: c_ulong = 888;
+    var h_sz: usize = 999;
+    var c_sz: usize = 888;
     get_band_parameters(&h_sz, &c_sz);
-    try std.testing.expectEqual(@as(c_ulong, 0), h_sz);
-    try std.testing.expectEqual(@as(c_ulong, 0), c_sz);
+    try std.testing.expectEqual(@as(usize, 0), h_sz);
+    try std.testing.expectEqual(@as(usize, 0), c_sz);
     execute_reload_cleanups();
 
     const CleanupTracker = struct {
@@ -776,7 +776,7 @@ test "fasload reload cleanups, band name, relocation regions, primitives, intern
     new_prim_table = &ptab;
     var prim_slot: [2]obj.SchemeObject = .{
         obj.makePrimitiveObject(1),
-        obj.makePrimitiveObject((@as(c_ulong, 2) << obj.half_datum_length) | 1),
+        obj.makePrimitiveObject((@as(usize, 2) << obj.half_datum_length) | 1),
     };
     _ = handlePrimitive(prim_slot[0..].ptr, prim_slot[0]);
     _ = handlePrimitive(prim_slot[1..].ptr, prim_slot[1]);

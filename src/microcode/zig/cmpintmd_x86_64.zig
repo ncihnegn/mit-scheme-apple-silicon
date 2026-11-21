@@ -57,7 +57,7 @@ pub fn readCcEntryOffset(ceo: *abi.CcEntryOffset, address: [*]u8) callconv(.c) b
 
 pub fn writeCcEntryOffset(ceo: *abi.CcEntryOffset, address: [*]u8) callconv(.c) bool {
     if (!(ceo.offset < 0x4000)) return true;
-    const encoded: u16 = @intCast((ceo.offset << 1) | @as(c_ulong, @intFromBool(ceo.continued_p)));
+    const encoded: u16 = @intCast((ceo.offset << 1) | @as(usize, @intFromBool(ceo.continued_p)));
     writeUnaligned(u16, @intFromPtr(address) - 10, encoded);
     return false;
 }
@@ -101,7 +101,7 @@ pub fn writeCompiledClosureTarget(target: [*]u8, start: [*]u8) callconv(.c) void
     writeUnaligned(i64, @intFromPtr(addr) - @sizeOf(i64), @intCast(to_bytes -% from_bytes));
 }
 
-pub fn compiledClosureCount(block: [*]obj.SchemeObject) callconv(.c) c_ulong {
+pub fn compiledClosureCount(block: [*]obj.SchemeObject) callconv(.c) usize {
     return @intCast(readUnaligned(u32, @intFromPtr(block)));
 }
 
@@ -180,16 +180,16 @@ pub fn writeUuoTarget(target: [*]u8, saddr: [*]obj.SchemeObject) callconv(.c) vo
     }
 }
 
-pub fn trampolineEntrySize(n_entries: c_ulong) callconv(.c) c_ulong {
+pub fn trampolineEntrySize(n_entries: usize) callconv(.c) usize {
     return n_entries * objects_per_trampoline_entry;
 }
 
-pub fn trampolineEntryAddr(block: [*]obj.SchemeObject, index: c_ulong) callconv(.c) [*]u8 {
+pub fn trampolineEntryAddr(block: [*]obj.SchemeObject, index: usize) callconv(.c) [*]u8 {
     const base: [*]u8 = @ptrCast(block + 2 + (@as(usize, @intCast(index)) * objects_per_trampoline_entry));
     return base + bytes_per_trampoline_entry_padding + cc_entry_header_size;
 }
 
-pub fn trampolineReturnAddr(block: [*]obj.SchemeObject, index: c_ulong) callconv(.c) [*]u8 {
+pub fn trampolineReturnAddr(block: [*]obj.SchemeObject, index: usize) callconv(.c) [*]u8 {
     return trampolineEntryAddr(block, index);
 }
 
@@ -212,7 +212,7 @@ pub const HookSpec = struct {
 pub fn installHooks(
     rsi_value: [*]u8,
     hooks: []const HookSpec,
-    declare_fn: *const fn (c_ulong, [*:0]const u8) callconv(.c) void,
+    declare_fn: *const fn (usize, [*:0]const u8) callconv(.c) void,
 ) void {
     var offset: usize = compiler_regblock_n_fixed * @sizeOf(obj.SchemeObject);
     for (hooks, 0..) |hook, idx| {
@@ -220,7 +220,7 @@ pub fn installHooks(
             abi.outf_fatal("\nx86_64_reset_hook: RSI_TRAMPOLINE_TO_INTERFACE_OFFSET\n");
             abi.Microcode_Termination(abi.term_exit);
         }
-        writeUnaligned(c_ulong, @intFromPtr(rsi_value + offset), @intCast(hook.addr));
+        writeUnaligned(usize, @intFromPtr(rsi_value + offset), @intCast(hook.addr));
         offset += compiler_hook_size * @sizeOf(obj.SchemeObject);
         declare_fn(@intCast(hook.addr), hook.name);
     }
@@ -380,13 +380,13 @@ test "x86_64 cc_entry, jmp target decoding, closures, uuo, trampolines, and hook
     var got_cet: abi.CcEntryType = undefined;
     try std.testing.expect(!readCcEntryType(&got_cet, entry));
     try std.testing.expectEqual(abi.CcEntryTypeMarker.continuation, got_cet.marker);
-    try std.testing.expectEqual(@as(c_ulong, 123), got_cet.args.for_continuation.offset);
+    try std.testing.expectEqual(@as(usize, 123), got_cet.args.for_continuation.offset);
 
     var ceo: abi.CcEntryOffset = .{ .offset = 24, .continued_p = true };
     try std.testing.expect(!writeCcEntryOffset(&ceo, entry));
     var got_ceo: abi.CcEntryOffset = undefined;
     try std.testing.expect(!readCcEntryOffset(&got_ceo, entry));
-    try std.testing.expectEqual(@as(c_ulong, 24), got_ceo.offset);
+    try std.testing.expectEqual(@as(usize, 24), got_ceo.offset);
     try std.testing.expect(got_ceo.continued_p);
 
     var bad_ceo: abi.CcEntryOffset = .{ .offset = 0x4000, .continued_p = false };
@@ -414,7 +414,7 @@ test "x86_64 cc_entry, jmp target decoding, closures, uuo, trampolines, and hook
     const target_entry: [*]u8 = @as([*]u8, @ptrCast(&code_target)) + 24;
 
     const cstart = compiledClosureStart(closure_block[1..].ptr);
-    try std.testing.expectEqual(@as(c_ulong, 1), compiledClosureCount(closure_block[1..].ptr));
+    try std.testing.expectEqual(@as(usize, 1), compiledClosureCount(closure_block[1..].ptr));
     const entry0 = compiledClosureEntry(cstart);
     try std.testing.expectEqual(@as(usize, @intFromPtr(&closure_block[3])), @intFromPtr(entry0));
     const next0 = compiledClosureNext(cstart);
@@ -453,7 +453,7 @@ test "x86_64 cc_entry, jmp target decoding, closures, uuo, trampolines, and hook
 
     // Trampoline encoding
     var tramp: [8]obj.SchemeObject align(16) = @splat(0);
-    try std.testing.expectEqual(@as(c_ulong, 4), trampolineEntrySize(1));
+    try std.testing.expectEqual(@as(usize, 4), trampolineEntrySize(1));
     const te = trampolineEntryAddr(&tramp, 0);
     try std.testing.expectEqual(te, trampolineReturnAddr(&tramp, 0));
     try std.testing.expect(!storeTrampolineInsns(te, abi.trampoline_k_apply));
@@ -471,7 +471,7 @@ test "x86_64 cc_entry, jmp target decoding, closures, uuo, trampolines, and hook
     }
     const Ctx = struct {
         var count: usize = 0;
-        fn declare(_: c_ulong, _: [*:0]const u8) callconv(.c) void {
+        fn declare(_: usize, _: [*:0]const u8) callconv(.c) void {
             count += 1;
         }
     };

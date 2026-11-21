@@ -188,7 +188,7 @@ pub fn osEncodeTime(buffer: *abi.TimeStructure) callconv(.c) abi.TimeT {
         t = mktime(&ts);
     }
     if (buffer.time_zone != std.math.maxInt(c_int)) {
-        var assumed_zone: c_long = -ts.tm_gmtoff;
+        var assumed_zone: isize = -ts.tm_gmtoff;
         if (ts.tm_isdst > 0) assumed_zone += 3600;
         if (buffer.time_zone != assumed_zone) {
             t = (t - assumed_zone) + @as(abi.TimeT, buffer.time_zone);

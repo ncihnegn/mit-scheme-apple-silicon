@@ -98,7 +98,7 @@ test "prmd5 oneshot and streaming primitives match RFC1321" {
     // One-shot MD5
     stubs.setArgs(&.{abc});
     const digest1 = Prim_md5();
-    try std.testing.expectEqual(@as(c_ulong, 16), obj.bytevectorLength(digest1));
+    try std.testing.expectEqual(@as(usize, 16), obj.bytevectorLength(digest1));
     try std.testing.expectEqualSlices(u8, &expected_abc, obj.bytevectorData(digest1)[0..16]);
 
     // Streaming MD5-INIT -> MD5-UPDATE -> MD5-FINAL

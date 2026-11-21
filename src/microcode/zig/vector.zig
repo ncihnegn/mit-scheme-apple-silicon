@@ -31,7 +31,7 @@ fn argVectorIndex(argument_number: c_int, vector: obj.SchemeObject) usize {
 pub export fn allocate_vector_internal(
     vec_type: c_uint,
     manifest_type: c_uint,
-    length: c_ulong,
+    length: usize,
     fp: *[*]obj.SchemeObject,
 ) callconv(.c) obj.SchemeObject {
     const base = fp.*;
@@ -43,7 +43,7 @@ pub export fn allocate_vector_internal(
 
 pub export fn allocate_non_marked_vector(
     vec_type: c_uint,
-    length: c_ulong,
+    length: usize,
     gc_check_p: bool,
 ) callconv(.c) obj.SchemeObject {
     if (gc_check_p) abi.primitiveGcIfNeeded(1 + length);
@@ -52,20 +52,20 @@ pub export fn allocate_non_marked_vector(
 
 pub export fn allocate_marked_vector(
     vec_type: c_uint,
-    length: c_ulong,
+    length: usize,
     gc_check_p: bool,
 ) callconv(.c) obj.SchemeObject {
     if (gc_check_p) abi.primitiveGcIfNeeded(1 + length);
     return allocate_vector_internal(vec_type, @intCast(obj.tc_manifest_vector), length, &abi.Free);
 }
 
-pub export fn allocate_vector(length: c_ulong, gc_check_p: bool) callconv(.c) obj.SchemeObject {
+pub export fn allocate_vector(length: usize, gc_check_p: bool) callconv(.c) obj.SchemeObject {
     return allocate_marked_vector(@intCast(obj.tc_vector), length, gc_check_p);
 }
 
 pub export fn make_marked_vector(
     vec_type: c_uint,
-    length: c_ulong,
+    length: usize,
     fill_value: obj.SchemeObject,
     gc_check_p: bool,
 ) callconv(.c) obj.SchemeObject {
@@ -80,7 +80,7 @@ pub export fn make_marked_vector(
 }
 
 pub export fn make_vector(
-    length: c_ulong,
+    length: usize,
     filler: obj.SchemeObject,
     gc_check_p: bool,
 ) callconv(.c) obj.SchemeObject {
@@ -91,14 +91,14 @@ pub export fn make_vector(
 pub export fn Prim_allocate_nm_vector() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     const vec_type: c_uint = @intCast(abi.arg_ulong_index_integer(1, obj.n_type_codes));
-    const length = abi.arg_ulong_index_integer(2, @as(c_ulong, 1) << obj.datum_length);
+    const length = abi.arg_ulong_index_integer(2, @as(usize, 1) << obj.datum_length);
     return allocate_non_marked_vector(vec_type, length, true);
 }
 
 // DEFINE_PRIMITIVE ("VECTOR-CONS", Prim_vector_cons, 2, 2, 0)
 pub export fn Prim_vector_cons() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    const length: c_ulong = @intCast(abi.arg_nonnegative_integer(1));
+    const length: usize = @intCast(abi.arg_nonnegative_integer(1));
     return make_vector(length, abi.argRef(2), true);
 }
 
@@ -115,7 +115,7 @@ pub export fn Prim_vector() callconv(.c) obj.SchemeObject {
 // DEFINE_PRIMITIVE ("%MAKE-RECORD", Prim_make_record, 2, 2, 0)
 pub export fn Prim_make_record() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    const length = abi.arg_ulong_index_integer(1, @as(c_ulong, 1) << obj.datum_length);
+    const length = abi.arg_ulong_index_integer(1, @as(usize, 1) << obj.datum_length);
     return make_marked_vector(@intCast(obj.tc_record), length, abi.argRef(2), true);
 }
 
@@ -216,7 +216,7 @@ pub export fn Prim_sys_vec_set() callconv(.c) obj.SchemeObject {
     return obj.unspecific;
 }
 
-fn subvectorToList(vector: obj.SchemeObject, start: c_long, end: c_long) obj.SchemeObject {
+fn subvectorToList(vector: obj.SchemeObject, start: isize, end: isize) obj.SchemeObject {
     if (start == end) return obj.empty_list;
     const count: usize = @intCast(end - start);
     abi.primitiveGcIfNeeded(@intCast(2 * count));
@@ -241,7 +241,7 @@ fn subvectorToListPrimitive(comptime arg_fn: fn (c_int) obj.SchemeObject) obj.Sc
     const vector = arg_fn(1);
     const start = abi.arg_nonnegative_integer(2);
     const end = abi.arg_nonnegative_integer(3);
-    if (end > @as(c_long, @intCast(obj.vectorLength(vector)))) abi.error_bad_range_arg(3);
+    if (end > @as(isize, @intCast(obj.vectorLength(vector)))) abi.error_bad_range_arg(3);
     if (start > end) abi.error_bad_range_arg(2);
     return subvectorToList(vector, start, end);
 }
@@ -256,9 +256,9 @@ pub export fn Prim_sys_subvector_to_list() callconv(.c) obj.SchemeObject {
     return subvectorToListPrimitive(argGcVector);
 }
 
-fn listToVector(result_type: c_ulong, argument_number: c_int) obj.SchemeObject {
+fn listToVector(result_type: usize, argument_number: c_int) obj.SchemeObject {
     var list = abi.argRef(@intCast(argument_number));
-    var count: c_ulong = 0;
+    var count: usize = 0;
     const result = abi.Free;
     abi.Free += 1;
     while (obj.pairP(list)) {
@@ -306,11 +306,11 @@ fn subvectorMovePrefix() MoveRange {
     const end1 = abi.arg_nonnegative_integer(3);
     const vector2 = argVector(4);
     const start2 = abi.arg_nonnegative_integer(5);
-    if (end1 > @as(c_long, @intCast(obj.vectorLength(vector1)))) abi.error_bad_range_arg(3);
+    if (end1 > @as(isize, @intCast(obj.vectorLength(vector1)))) abi.error_bad_range_arg(3);
     if (start1 > end1) abi.error_bad_range_arg(2);
     const length = end1 - start1;
     const end2 = start2 + length;
-    if (end2 > @as(c_long, @intCast(obj.vectorLength(vector2)))) abi.error_bad_range_arg(5);
+    if (end2 > @as(isize, @intCast(obj.vectorLength(vector2)))) abi.error_bad_range_arg(5);
     return .{
         .vector1 = vector1,
         .start1 = @intCast(start1),
@@ -354,7 +354,7 @@ pub export fn Prim_vector_fill() callconv(.c) obj.SchemeObject {
     const start = abi.arg_nonnegative_integer(2);
     const end = abi.arg_nonnegative_integer(3);
     const fill_value = abi.argRef(4);
-    if (end > @as(c_long, @intCast(obj.vectorLength(vector)))) abi.error_bad_range_arg(3);
+    if (end > @as(isize, @intCast(obj.vectorLength(vector)))) abi.error_bad_range_arg(3);
     if (start > end) abi.error_bad_range_arg(2);
     const start_u: usize = @intCast(start);
     const len_u: usize = @intCast(end - start);
@@ -422,7 +422,7 @@ test "vector, record, subvector, list->vector, and record_applicator" {
     const sub_list = Prim_subvector_to_list();
     stubs.setArgs(&.{sub_list});
     const round_trip = Prim_list_to_vector();
-    try std.testing.expectEqual(@as(c_ulong, 3), obj.vectorLength(round_trip));
+    try std.testing.expectEqual(@as(usize, 3), obj.vectorLength(round_trip));
     try std.testing.expectEqual(obj.ulongToFixnum(10), obj.vectorRef(round_trip, 0));
     try std.testing.expectEqual(obj.ulongToFixnum(20), obj.vectorRef(round_trip, 1));
     try std.testing.expectEqual(obj.ulongToFixnum(30), obj.vectorRef(round_trip, 2));

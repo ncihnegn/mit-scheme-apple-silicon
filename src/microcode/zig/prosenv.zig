@@ -203,8 +203,8 @@ pub export fn Prim_setup_timer_interrupt() callconv(.c) obj.SchemeObject {
     if (abi.argRef(1) == obj.sharp_f and abi.argRef(2) == obj.sharp_f) {
         abi.OS_process_timer_clear();
     } else {
-        const days: c_ulong = @intCast(abi.arg_nonnegative_integer(1));
-        const centisec: c_ulong = @intCast(abi.arg_nonnegative_integer(2));
+        const days: usize = @intCast(abi.arg_nonnegative_integer(1));
+        const centisec: usize = @intCast(abi.arg_nonnegative_integer(2));
         abi.OS_process_timer_set(@intCast(((days * 24 * 60 * 60 * 100) + centisec) * 10), 0);
     }
     return obj.unspecific;

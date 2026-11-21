@@ -112,7 +112,7 @@ pub fn writeCompiledClosureTarget(target: [*]u32, start: [*]u32) callconv(.c) vo
     writeUnalignedI64(@intFromPtr(addr) - @sizeOf(i64), offset);
 }
 
-pub fn compiledClosureCount(block: [*]obj.SchemeObject) callconv(.c) c_ulong {
+pub fn compiledClosureCount(block: [*]obj.SchemeObject) callconv(.c) usize {
     return @intCast(@as(*const u32, @ptrCast(block)).*);
 }
 
@@ -191,16 +191,16 @@ pub fn writeUuoTarget(target: [*]u32, saddr: [*]obj.SchemeObject) callconv(.c) v
     }
 }
 
-pub fn trampolineEntrySize(n_entries: c_ulong) callconv(.c) c_ulong {
+pub fn trampolineEntrySize(n_entries: usize) callconv(.c) usize {
     return n_entries * objects_per_trampoline_entry;
 }
 
-pub fn trampolineEntryAddr(block: [*]obj.SchemeObject, index: c_ulong) callconv(.c) [*]u32 {
+pub fn trampolineEntryAddr(block: [*]obj.SchemeObject, index: usize) callconv(.c) [*]u32 {
     const base: [*]u32 = @ptrCast(block + 2 + (@as(usize, @intCast(index)) * objects_per_trampoline_entry));
     return base + trampoline_entry_padding_size + cc_entry_header_size;
 }
 
-pub fn trampolineReturnAddr(block: [*]obj.SchemeObject, index: c_ulong) callconv(.c) [*]u32 {
+pub fn trampolineReturnAddr(block: [*]obj.SchemeObject, index: usize) callconv(.c) [*]u32 {
     return trampolineEntryAddr(block, index);
 }
 
@@ -299,7 +299,7 @@ test "aarch64 cc_entry type, offset, and branch target decoding" {
     try std.testing.expect(!writeCcEntryOffset(&ceo, entry));
     var decoded_ceo: abi.CcEntryOffset = undefined;
     try std.testing.expect(!readCcEntryOffset(&decoded_ceo, entry));
-    try std.testing.expectEqual(@as(c_ulong, 6), decoded_ceo.offset);
+    try std.testing.expectEqual(@as(usize, 6), decoded_ceo.offset);
     try std.testing.expect(decoded_ceo.continued_p);
 
     const too_far: abi.CcEntryOffset = .{ .offset = 0x4000, .continued_p = false };
@@ -328,7 +328,7 @@ test "aarch64 closures, uuo links, and trampolines" {
     // Direct entry has pc_offset == 0 at i64[-1]
 
     const start = compiledClosureStart(closure_block[1..].ptr);
-    try std.testing.expectEqual(@as(c_ulong, 1), compiledClosureCount(closure_block[1..].ptr));
+    try std.testing.expectEqual(@as(usize, 1), compiledClosureCount(closure_block[1..].ptr));
     const entry0 = compiledClosureEntry(start);
     try std.testing.expectEqual(@as(usize, @intFromPtr(&closure_block[3])), @intFromPtr(entry0));
     try std.testing.expectEqual(entry0, compiledClosureNext(start));
@@ -367,7 +367,7 @@ test "aarch64 closures, uuo links, and trampolines" {
 
     // Trampoline encoding
     var tramp_block: [12]obj.SchemeObject align(16) = @splat(0);
-    try std.testing.expectEqual(@as(c_ulong, 8), trampolineEntrySize(2));
+    try std.testing.expectEqual(@as(usize, 8), trampolineEntrySize(2));
     try std.testing.expectEqual(tramp_block[0..].ptr, @as([*]obj.SchemeObject, @ptrCast(&tramp_block)));
     const t0 = trampolineEntryAddr(&tramp_block, 0);
     try std.testing.expectEqual(t0, trampolineReturnAddr(&tramp_block, 0));

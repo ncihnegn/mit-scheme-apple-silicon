@@ -14,7 +14,7 @@ fn floatingVectorIndexArg(arg_num: c_int, vector: obj.SchemeObject) usize {
 pub export fn Prim_floating_vector_cons() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     const length: usize = @intCast(abi.arg_nonnegative_integer(1));
-    const length_in_words: c_ulong = @as(c_ulong, @intCast(length)) * obj.flonum_size;
+    const length_in_words: usize = @as(usize, @intCast(length)) * obj.flonum_size;
     obj.alignFloat(&abi.Free);
     abi.primitiveGcIfNeeded(length_in_words + 1);
     const result = obj.makePointerObject(obj.tc_big_flonum, abi.Free);

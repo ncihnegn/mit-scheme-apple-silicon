@@ -42,7 +42,7 @@ var fh: *fasl.FaslHeader = &fasl_header;
 var current_env_mode: EnvMode = .fe_error;
 var current_pr: ?*primutl.PrimRenumber = null;
 var cc_seen_p: bool = false;
-var dumped_ephemeron_count: c_ulong = 0;
+var dumped_ephemeron_count: usize = 0;
 
 var fasdump_table_initialized: bool = false;
 var fasdump_table_storage: abi.GcTable = undefined;
@@ -393,7 +393,7 @@ fn fasdumpPrecheckFrom(from: [*]obj.SchemeObject) callconv(.c) ?[*]obj.SchemeObj
     return if (obj.brokenHeartP(from[0])) obj.objectAddress(from[0]) else null;
 }
 
-fn fasdumpTransportWords(from: [*]obj.SchemeObject, n_words: c_ulong, align_p: bool) callconv(.c) [*]obj.SchemeObject {
+fn fasdumpTransportWords(from: [*]obj.SchemeObject, n_words: usize, align_p: bool) callconv(.c) [*]obj.SchemeObject {
     // Signal error here if insufficient space -- otherwise gc_transport_words() might terminate the microcode.
     if (!abi.tospace_available_p(n_words)) {
         abi.signal_error_from_primitive(abi.err_fasdump_object_too_large);
@@ -402,7 +402,7 @@ fn fasdumpTransportWords(from: [*]obj.SchemeObject, n_words: c_ulong, align_p: b
     return abi.gc_transport_words(from, n_words, align_p);
 }
 
-fn fasdumpTransportCodeWords(from: [*]obj.SchemeObject, n_words: c_ulong, align_p: bool) callconv(.c) [*]obj.SchemeObject {
+fn fasdumpTransportCodeWords(from: [*]obj.SchemeObject, n_words: usize, align_p: bool) callconv(.c) [*]obj.SchemeObject {
     if (!abi.code_tospace_available_p(n_words)) {
         abi.signal_error_from_primitive(abi.err_fasdump_object_too_large);
     }
@@ -552,7 +552,7 @@ fn bandCompactTable() *abi.GcTable {
     return &band_compact_table_storage;
 }
 
-fn bandCompactTransportBlock(block: [*]obj.SchemeObject, n_words: c_ulong, _: ?*anyopaque) callconv(.c) void {
+fn bandCompactTransportBlock(block: [*]obj.SchemeObject, n_words: usize, _: ?*anyopaque) callconv(.c) void {
     if (!abi.code_tospace_available_p(n_words)) {
         abi.signal_error_from_primitive(abi.err_fasdump_object_too_large);
     }
@@ -766,7 +766,7 @@ fn initializeFaslHeader(cc_p: bool, band_p: bool) void {
     fh.utilities_end = null;
 }
 
-fn finalizeFaslHeader(ephemeron_cnt: c_ulong) void {
+fn finalizeFaslHeader(ephemeron_cnt: usize) void {
     fh.ephemeron_count = ephemeron_cnt;
     if (fasl.ptrRangeWords(fh.code_end, fh.code_start) != 0) {
         fh.version = fasl.fasl_version_code_space;
@@ -840,7 +840,7 @@ test "fasdump header transitions, fixups growth/restore, ccNewBlock, staged code
     try std.testing.expectEqual(abi.compiler_processor_type, fh.cc_arch);
     finalizeFaslHeader(2);
     try std.testing.expectEqual(fasl.fasl_version_ephemerons, fh.version);
-    try std.testing.expectEqual(@as(c_ulong, 2), fh.ephemeron_count);
+    try std.testing.expectEqual(@as(usize, 2), fh.ephemeron_count);
 
     var code_buf: [8]obj.SchemeObject = @splat(0);
     initializeFaslHeader(false, true);
@@ -944,10 +944,10 @@ test "fasdump header transitions, fixups growth/restore, ccNewBlock, staged code
     dumped_ephemeron_count = 0;
     var eph_scan: [1]obj.SchemeObject = .{eph};
     _ = handleEphemeron(&eph_scan, eph);
-    try std.testing.expectEqual(@as(c_ulong, 1), dumped_ephemeron_count);
+    try std.testing.expectEqual(@as(usize, 1), dumped_ephemeron_count);
     eph_cell[0] = obj.makeBrokenHeart(abi.heap_start);
     _ = handleEphemeron(&eph_scan, eph);
-    try std.testing.expectEqual(@as(c_ulong, 1), dumped_ephemeron_count);
+    try std.testing.expectEqual(@as(usize, 1), dumped_ephemeron_count);
 
     abi.discard_tospace();
     transact.transaction_commit();

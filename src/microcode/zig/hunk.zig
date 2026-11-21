@@ -7,7 +7,7 @@ const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
 
 fn systemHunk3Cons(
-    hunk_type: c_ulong,
+    hunk_type: usize,
     cxr0: obj.SchemeObject,
     cxr1: obj.SchemeObject,
     cxr2: obj.SchemeObject,

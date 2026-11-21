@@ -62,11 +62,11 @@ var gc_to_trap: ?[*]obj.SchemeObject = null;
 
 var gc_object_referenced: obj.SchemeObject = obj.sharp_f;
 var gc_object_references: obj.SchemeObject = obj.sharp_f;
-var gc_object_references_count: c_ulong = 0;
+var gc_object_references_count: usize = 0;
 var gc_object_references_scan: ?[*]obj.SchemeObject = null;
 var gc_object_references_end: ?[*]obj.SchemeObject = null;
 
-var weak_chain_length: c_ulong = 0;
+var weak_chain_length: usize = 0;
 
 inline fn ptrWords(start: ?[*]const obj.SchemeObject, end: ?[*]const obj.SchemeObject) usize {
     if (start == null or end == null) return 0;
@@ -116,9 +116,9 @@ fn gcDeath(comptime fmt: []const u8, args: anytype) noreturn {
 pub export fn std_gc_death(msg: [*:0]const u8) callconv(.c) noreturn {
     abi.outf_fatal("\n%s\n", msg);
     if (current_scan) |scan| {
-        abi.outf_fatal("scan = 0x%lx", @as(c_ulong, @intCast(@intFromPtr(scan))));
+        abi.outf_fatal("scan = 0x%zx", @as(usize, @intCast(@intFromPtr(scan))));
         if (tospace_next) |to| {
-            abi.outf_fatal("; to = 0x%lx", @as(c_ulong, @intCast(@intFromPtr(to))));
+            abi.outf_fatal("; to = 0x%zx", @as(usize, @intCast(@intFromPtr(to))));
         }
         abi.outf_fatal("\n");
     }
@@ -261,7 +261,7 @@ comptime {
 }
 
 pub export fn initialize_gc(
-    n_words: c_ulong,
+    n_words: usize,
     pf_start: *?[*]obj.SchemeObject,
     pf_end: *?[*]obj.SchemeObject,
     allocator: abi.GcTospaceAllocator,
@@ -277,7 +277,7 @@ pub export fn initialize_gc(
     allocator(n_words, &tospace_start, &tospace_end);
 }
 
-pub export fn resize_tospace(n_words: c_ulong) callconv(.c) void {
+pub export fn resize_tospace(n_words: usize) callconv(.c) void {
     guaranteeTospaceClosed();
     gc_tospace_allocator.?(n_words, &tospace_start, &tospace_end);
 }
@@ -306,7 +306,7 @@ pub export fn discard_tospace() callconv(.c) void {
     closeTospace();
 }
 
-pub export fn tospace_available_p(n_words: c_ulong) callconv(.c) bool {
+pub export fn tospace_available_p(n_words: usize) callconv(.c) bool {
     guaranteeTospaceOpen();
     return ptrWords(tospace_next, tospace_end) >= @as(usize, @intCast(n_words));
 }
@@ -331,7 +331,7 @@ pub export fn write_tospace(addr: [*]obj.SchemeObject, object: obj.SchemeObject)
     translated[0] = object;
 }
 
-pub export fn increment_tospace_ptr(n_words: c_ulong) callconv(.c) void {
+pub export fn increment_tospace_ptr(n_words: usize) callconv(.c) void {
     guaranteeTospaceOpen();
     const n: usize = @intCast(n_words);
     tospace_next = tospace_next.? + n;
@@ -401,7 +401,7 @@ inline fn maxAddr(a: usize, p: ?*const anyopaque) usize {
     return @max(a, b);
 }
 
-pub export fn open_code_tospace(n_words: c_ulong) callconv(.c) bool {
+pub export fn open_code_tospace(n_words: usize) callconv(.c) bool {
     if (code_tospace_next != null) {
         discard_code_tospace();
     }
@@ -461,12 +461,12 @@ pub export fn get_code_newspace_ptr() callconv(.c) ?[*]obj.SchemeObject {
     return code_newspace_next;
 }
 
-pub export fn code_tospace_available_p(n_words: c_ulong) callconv(.c) bool {
+pub export fn code_tospace_available_p(n_words: usize) callconv(.c) bool {
     if (code_tospace_next == null) tospaceClosed();
     return ptrWords(code_tospace_next, code_tospace_end) >= @as(usize, @intCast(n_words)) + 1;
 }
 
-pub export fn open_stage_tospace(orig_start: [*]obj.SchemeObject, buf: [*]obj.SchemeObject, n_words: c_ulong) callconv(.c) void {
+pub export fn open_stage_tospace(orig_start: [*]obj.SchemeObject, buf: [*]obj.SchemeObject, n_words: usize) callconv(.c) void {
     const n: usize = @intCast(n_words);
     stage_tospace_start = buf;
     stage_tospace_end = buf + n;
@@ -498,7 +498,7 @@ pub export fn initialize_gc_table(table: *abi.GcTable, transport_p: bool) callco
             .compiled_entry => &gc_handle_cc_entry,
             .compiled_return => &gc_handle_cc_return,
             .undefined => &gc_handle_undefined,
-            .special => switch (@as(c_ulong, idx)) {
+            .special => switch (@as(usize, idx)) {
                 obj.tc_broken_heart => &gc_handle_broken_heart,
                 obj.tc_reference_trap => &gc_handle_reference_trap,
                 obj.tc_linkage_section => &gc_handle_linkage_section,
@@ -715,7 +715,7 @@ pub export fn gc_precheck_from_no_transport(from: [*]obj.SchemeObject) callconv(
 
 fn transportWordsInto(
     from_start: [*]obj.SchemeObject,
-    n_words: c_ulong,
+    n_words: usize,
     align_p: bool,
     p_to_next: *?[*]obj.SchemeObject,
     to_end: [*]obj.SchemeObject,
@@ -765,17 +765,17 @@ fn transportWordsInto(
     return new_address;
 }
 
-pub export fn gc_transport_words(from: [*]obj.SchemeObject, n_words: c_ulong, align_p: bool) callconv(.c) [*]obj.SchemeObject {
+pub export fn gc_transport_words(from: [*]obj.SchemeObject, n_words: usize, align_p: bool) callconv(.c) [*]obj.SchemeObject {
     guaranteeTospaceOpen();
     return transportWordsInto(from, n_words, align_p, &tospace_next, tospace_end.?, &newspace_next, false);
 }
 
-pub export fn gc_transport_words_to_code_tospace(from: [*]obj.SchemeObject, n_words: c_ulong, align_p: bool) callconv(.c) [*]obj.SchemeObject {
+pub export fn gc_transport_words_to_code_tospace(from: [*]obj.SchemeObject, n_words: usize, align_p: bool) callconv(.c) [*]obj.SchemeObject {
     if (code_tospace_next == null) tospaceClosed();
     return transportWordsInto(from, n_words, align_p, &code_tospace_next, code_tospace_end.?, &code_newspace_next, true);
 }
 
-pub export fn gc_no_transport_words(from: [*]obj.SchemeObject, _: c_ulong, _: bool) callconv(.c) [*]obj.SchemeObject {
+pub export fn gc_no_transport_words(from: [*]obj.SchemeObject, _: usize, _: bool) callconv(.c) [*]obj.SchemeObject {
     _ = from;
     tospaceClosed();
 }
@@ -994,7 +994,7 @@ inline fn ephemeronP(object: obj.SchemeObject) bool {
 
 fn queueEphemeronsForKey(addr: [*]obj.SchemeObject) void {
     const ht = abi.ephemeron_array;
-    const index: c_ulong = @intCast(@intFromPtr(addr) % @as(usize, @intCast(obj.vectorLength(ht))));
+    const index: usize = @intCast(@intFromPtr(addr) % @as(usize, @intCast(obj.vectorLength(ht))));
     var entry_loc: [*]obj.SchemeObject = obj.vectorLoc(ht, index);
 
     if (comptime build_options.debugging) {
@@ -1065,7 +1065,7 @@ fn gcTransportEphemeron(old_ephemeron: obj.SchemeObject) obj.SchemeObject {
     write_tospace(new_addr, abi.unmarked_ephemeron_manifest);
 
     // Map key back to ephemeron.
-    const index: c_ulong = @intCast(@intFromPtr(old_key_addr.?) % @as(usize, @intCast(obj.vectorLength(ht))));
+    const index: usize = @intCast(@intFromPtr(old_key_addr.?) % @as(usize, @intCast(obj.vectorLength(ht))));
     write_tospace(new_addr + abi.ephemeron_next, obj.vectorRef(ht, index));
     obj.vectorSet(ht, index, new_ephemeron);
 

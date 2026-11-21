@@ -16,24 +16,24 @@ comptime {
 
 const bit_string_length_offset: usize = 1;
 const bit_string_first_word: usize = 2;
-const object_length: c_ulong = @bitSizeOf(obj.SchemeObject);
+const object_length: usize = @bitSizeOf(obj.SchemeObject);
 
-inline fn bitStringLengthToGcLength(n_bits: c_ulong) c_ulong {
+inline fn bitStringLengthToGcLength(n_bits: usize) usize {
     return (n_bits + (object_length - 1)) / object_length;
 }
 
-inline fn lowMask(nbits: c_ulong) obj.SchemeObject {
+inline fn lowMask(nbits: usize) obj.SchemeObject {
     if (nbits == 0) return 0;
     if (nbits >= object_length) return ~@as(obj.SchemeObject, 0);
     return (@as(obj.SchemeObject, 1) << @intCast(nbits)) - 1;
 }
 
-inline fn anyMask(nbits: c_ulong, offset: c_ulong) obj.SchemeObject {
+inline fn anyMask(nbits: usize, offset: usize) obj.SchemeObject {
     if (nbits == 0 or offset >= object_length) return 0;
     return lowMask(nbits) << @intCast(offset);
 }
 
-inline fn bitStringLength(bs: obj.SchemeObject) c_ulong {
+inline fn bitStringLength(bs: obj.SchemeObject) usize {
     return obj.memoryRef(bs, bit_string_length_offset);
 }
 
@@ -54,11 +54,11 @@ inline fn bitStringWordPtr(ptr: [*]obj.SchemeObject) *obj.SchemeObject {
 }
 
 // Off by one so bitStringWord(ptr) reads the indexed word via (ptr - 1)[0].
-inline fn bitStringIndexToWord(index: c_ulong) usize {
+inline fn bitStringIndexToWord(index: usize) usize {
     return (bit_string_first_word + 1) + @as(usize, @intCast(index / object_length));
 }
 
-pub export fn allocate_bit_string(length: c_ulong) callconv(.c) obj.SchemeObject {
+pub export fn allocate_bit_string(length: usize) callconv(.c) obj.SchemeObject {
     const total_pointers = 1 + bitStringLengthToGcLength(length);
     const result = abi.allocate_non_marked_vector(@intCast(obj.tc_bit_string), total_pointers, true);
     obj.memorySet(result, bit_string_length_offset, length);
@@ -79,8 +79,8 @@ pub export fn clear_bit_string(bit_string: obj.SchemeObject) callconv(.c) void {
     fill_bit_string(bit_string, 0);
 }
 
-pub export fn bit_string_set(bitstr: obj.SchemeObject, index: c_long, value: c_int) callconv(.c) void {
-    const idx: c_ulong = @intCast(index);
+pub export fn bit_string_set(bitstr: obj.SchemeObject, index: isize, value: c_int) callconv(.c) void {
+    const idx: usize = @intCast(index);
     const ptr = obj.memoryLoc(bitstr, bitStringIndexToWord(idx));
     const mask: obj.SchemeObject = @as(obj.SchemeObject, 1) << @intCast(idx % object_length);
     if (value == 0) {
@@ -137,7 +137,7 @@ fn refInit() struct { word_ptr: *obj.SchemeObject, mask: obj.SchemeObject } {
     abi.primitiveHeader();
     abi.checkArg(1, obj.bitStringP);
     const bit_string = abi.argRef(1);
-    const index: c_ulong = @intCast(abi.arg_nonnegative_integer(2));
+    const index: usize = @intCast(abi.arg_nonnegative_integer(2));
     if (index >= bitStringLength(bit_string)) abi.error_bad_range_arg(2);
     const ptr = obj.memoryLoc(bit_string, bitStringIndexToWord(index));
     const mask: obj.SchemeObject = @as(obj.SchemeObject, 1) << @intCast(index % object_length);
@@ -291,8 +291,8 @@ pub export fn Prim_bit_string_xor_x() callconv(.c) obj.SchemeObject {
 inline fn maskedTransfer(
     source: [*]const obj.SchemeObject,
     destination: [*]obj.SchemeObject,
-    nbits: c_ulong,
-    offset: c_ulong,
+    nbits: usize,
+    offset: usize,
 ) void {
     const mask = anyMask(nbits, offset);
     const dst = bitStringWordPtr(destination);
@@ -301,10 +301,10 @@ inline fn maskedTransfer(
 
 fn copyBits(
     source_in: [*]const obj.SchemeObject,
-    source_offset: c_ulong,
+    source_offset: usize,
     destination_in: [*]obj.SchemeObject,
-    destination_offset: c_ulong,
-    nbits_in: c_ulong,
+    destination_offset: usize,
+    nbits_in: usize,
 ) void {
     if (nbits_in == 0) return;
 
@@ -424,11 +424,11 @@ pub export fn Prim_bit_substring_move_right_x() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     abi.checkArg(1, obj.bitStringP);
     const bs1 = abi.argRef(1);
-    const start1: c_ulong = @intCast(abi.arg_nonnegative_integer(2));
-    const end1: c_ulong = @intCast(abi.arg_nonnegative_integer(3));
+    const start1: usize = @intCast(abi.arg_nonnegative_integer(2));
+    const end1: usize = @intCast(abi.arg_nonnegative_integer(3));
     abi.checkArg(4, obj.bitStringP);
     const bs2 = abi.argRef(4);
-    const start2: c_ulong = @intCast(abi.arg_nonnegative_integer(5));
+    const start2: usize = @intCast(abi.arg_nonnegative_integer(5));
     if (start1 > end1) abi.error_bad_range_arg(2);
     if (end1 > bitStringLength(bs1)) abi.error_bad_range_arg(3);
     const nbits = end1 - start1;
@@ -451,17 +451,17 @@ pub export fn Prim_bit_substring_move_right_x() callconv(.c) obj.SchemeObject {
 
 // Integer <-> Bit-string Conversions
 
-inline fn ulongSignificantBits(number: c_ulong) c_ulong {
+inline fn ulongSignificantBits(number: usize) usize {
     return if (number == 0) 1 else bits.ulongLengthInBits(number);
 }
 
-fn zeroToBitString(length: c_ulong) obj.SchemeObject {
+fn zeroToBitString(length: usize) obj.SchemeObject {
     const result = allocate_bit_string(length);
     clear_bit_string(result);
     return result;
 }
 
-fn ulongToBitString(length: c_ulong, number: c_ulong) obj.SchemeObject {
+fn ulongToBitString(length: usize, number: usize) obj.SchemeObject {
     if (number == 0) return zeroToBitString(length);
     if (length < ulongSignificantBits(number)) abi.error_bad_range_arg(2);
     const result = zeroToBitString(length);
@@ -469,18 +469,18 @@ fn ulongToBitString(length: c_ulong, number: c_ulong) obj.SchemeObject {
     return result;
 }
 
-fn btbsConsumer(result_ptr_raw: ?*anyopaque, digit: c_long) callconv(.c) void {
+fn btbsConsumer(result_ptr_raw: ?*anyopaque, digit: isize) callconv(.c) void {
     const ptr_slot: *[*]u8 = @ptrCast(@alignCast(result_ptr_raw.?));
-    ptr_slot.*[0] = @truncate(@as(c_ulong, @bitCast(digit)));
+    ptr_slot.*[0] = @truncate(@as(usize, @bitCast(digit)));
     ptr_slot.* += 1;
 }
 
-fn bignumToBitString(length: c_ulong, bignum: obj.SchemeObject) obj.SchemeObject {
+fn bignumToBitString(length: usize, bignum: obj.SchemeObject) obj.SchemeObject {
     return switch (@as(abi.BignumComparison, @enumFromInt(abi.bignum_test(bignum)))) {
         .equal => zeroToBitString(length),
         .less => abi.error_bad_range_arg(2),
         .greater => blk: {
-            if (length == 0 or (length <= std.math.maxInt(c_long) and abi.bignum_fits_in_word_p(bignum, @intCast(length), 0) == 0)) {
+            if (length == 0 or (length <= std.math.maxInt(isize) and abi.bignum_fits_in_word_p(bignum, @intCast(length), 0) == 0)) {
                 abi.error_bad_range_arg(2);
             }
             const result = zeroToBitString(length);
@@ -504,9 +504,9 @@ fn bstbProducer(context_raw: ?*anyopaque) callconv(.c) c_uint {
     return result;
 }
 
-fn bitStringToBignum(nbits: c_ulong, bitstr: obj.SchemeObject) obj.SchemeObject {
+fn bitStringToBignum(nbits: usize, bitstr: obj.SchemeObject) obj.SchemeObject {
     const ndigits = (nbits + 7) / 8;
-    const word_bytes: c_ulong = @sizeOf(obj.SchemeObject);
+    const word_bytes: usize = @sizeOf(obj.SchemeObject);
     var context = BitstrToBignumContext{
         .mask = @intCast(lowMask(((nbits - 1) % 8) + 1)),
         .source_ptr = @ptrCast(obj.memoryLoc(bitstr, bitStringIndexToWord(nbits - 1))),
@@ -576,7 +576,7 @@ pub export fn Prim_read_bits_x() callconv(.c) obj.SchemeObject {
     abi.checkArg(3, obj.bitStringP);
     const bit_string = abi.argRef(3);
     const end = bitStringLength(bit_string);
-    const offset: c_ulong = @intCast(abi.arg_nonnegative_integer(2));
+    const offset: usize = @intCast(abi.arg_nonnegative_integer(2));
     if (end == 0) return obj.unspecific;
 
     const end_mod = end % object_length;
@@ -600,7 +600,7 @@ pub export fn Prim_write_bits_x() callconv(.c) obj.SchemeObject {
     abi.checkArg(3, obj.bitStringP);
     const bit_string = abi.argRef(3);
     const end = bitStringLength(bit_string);
-    const offset: c_ulong = @intCast(abi.arg_nonnegative_integer(2));
+    const offset: usize = @intCast(abi.arg_nonnegative_integer(2));
     if (end == 0) return obj.unspecific;
 
     const end_mod = end % object_length;
@@ -624,8 +624,8 @@ pub export fn Prim_bitstr_find_next_set_bit() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     abi.checkArg(1, obj.bitStringP);
     const bit_string = abi.argRef(1);
-    const start: c_ulong = @intCast(abi.arg_nonnegative_integer(2));
-    const end: c_ulong = @intCast(abi.arg_nonnegative_integer(3));
+    const start: usize = @intCast(abi.arg_nonnegative_integer(2));
+    const end: usize = @intCast(abi.arg_nonnegative_integer(3));
     if (end > bitStringLength(bit_string)) abi.error_bad_range_arg(3);
     if (start > end) abi.error_bad_range_arg(2);
     if (start == end) return obj.sharp_f;
@@ -642,7 +642,7 @@ pub export fn Prim_bitstr_find_next_set_bit() callconv(.c) obj.SchemeObject {
         if (w == start_w) word &= (~@as(obj.SchemeObject, 0)) << start_bit;
         if (w == end_w) word &= lowMask(end_bit);
         if (word != 0) {
-            const idx = @as(c_ulong, @intCast(w)) * object_length + @as(c_ulong, @ctz(word));
+            const idx = @as(usize, @intCast(w)) * object_length + @as(usize, @ctz(word));
             return obj.longToUnsignedFixnum(@intCast(idx));
         }
     }
@@ -686,14 +686,14 @@ test "bitstr allocation, excess MSB masking, copy_bits alignments, integer conve
     // Test copy_bits across equal, source < dest, source > dest, and exact word-boundary remainder (nbits == 0)
     stubs.setArgs(&.{ obj.ulongToFixnum(150), obj.sharp_f });
     const src = Prim_make_bit_string();
-    const set_bits = [_]c_long{ 0, 5, 63, 64, 65, 99, 127, 131, 149 };
+    const set_bits = [_]isize{ 0, 5, 63, 64, 65, 99, 127, 131, 149 };
     for (set_bits) |b| {
         bit_string_set(src, b, 1);
     }
 
-    const src_offsets = [_]c_ulong{ 0, 3, 17, 63, 64 };
-    const dst_offsets = [_]c_ulong{ 0, 5, 19, 63, 64 };
-    const lengths = [_]c_ulong{ 0, 1, 7, 45, 64, 70 };
+    const src_offsets = [_]usize{ 0, 3, 17, 63, 64 };
+    const dst_offsets = [_]usize{ 0, 5, 19, 63, 64 };
+    const lengths = [_]usize{ 0, 1, 7, 45, 64, 70 };
     for (src_offsets) |so| {
         for (dst_offsets) |do| {
             for (lengths) |len| {
@@ -702,7 +702,7 @@ test "bitstr allocation, excess MSB masking, copy_bits alignments, integer conve
                 const dst = Prim_make_bit_string();
                 stubs.setArgs(&.{ src, obj.ulongToFixnum(so), obj.ulongToFixnum(so + len), dst, obj.ulongToFixnum(do) });
                 _ = Prim_bit_substring_move_right_x();
-                var k: c_ulong = 0;
+                var k: usize = 0;
                 while (k < 150) : (k += 1) {
                     stubs.setArgs(&.{ dst, obj.ulongToFixnum(k) });
                     const got = Prim_bit_string_ref();

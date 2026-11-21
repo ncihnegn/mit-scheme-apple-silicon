@@ -40,7 +40,7 @@ inline fn bignumQr(comptime op: anytype) obj.SchemeObject {
     return result;
 }
 
-fn listifyBignumConsumer(previous_cdr: ?*anyopaque, digit: c_long) callconv(.c) void {
+fn listifyBignumConsumer(previous_cdr: ?*anyopaque, digit: isize) callconv(.c) void {
     const cdr_ptr: *obj.SchemeObject = @ptrCast(@alignCast(previous_cdr.?));
     cdr_ptr.* = abi.cons(obj.longToUnsignedFixnum(digit), cdr_ptr.*);
 }
@@ -173,14 +173,14 @@ test "bigprm primitives handle conversions, arithmetic, and digit streaming" {
 
     stubs.setArgs(&.{ b255, obj.longToFixnum(16) });
     const digits = Prim_listify_bignum();
-    try std.testing.expectEqual(@as(c_long, 15), obj.unsignedFixnumToLong(obj.pairCar(digits)));
-    try std.testing.expectEqual(@as(c_long, 15), obj.unsignedFixnumToLong(obj.pairCar(obj.pairCdr(digits))));
+    try std.testing.expectEqual(@as(isize, 15), obj.unsignedFixnumToLong(obj.pairCar(digits)));
+    try std.testing.expectEqual(@as(isize, 15), obj.unsignedFixnumToLong(obj.pairCar(obj.pairCdr(digits))));
     try std.testing.expectEqual(obj.empty_list, obj.pairCdr(obj.pairCdr(digits)));
 
     const b10 = abi.long_to_bignum(10);
     const b3 = abi.long_to_bignum(3);
     stubs.setArgs(&.{ b10, b3 });
     const qr = Prim_bignum_divide();
-    try std.testing.expectEqual(@as(c_long, 3), abi.bignum_to_long(obj.pairCar(qr)));
-    try std.testing.expectEqual(@as(c_long, 1), abi.bignum_to_long(obj.pairCdr(qr)));
+    try std.testing.expectEqual(@as(isize, 3), abi.bignum_to_long(obj.pairCar(qr)));
+    try std.testing.expectEqual(@as(isize, 1), abi.bignum_to_long(obj.pairCdr(qr)));
 }

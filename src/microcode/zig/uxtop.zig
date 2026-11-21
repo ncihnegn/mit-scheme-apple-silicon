@@ -352,7 +352,7 @@ var syscall_names_table = [_]?[*:0]const u8{
 };
 
 /// Populate `length` and `names` with the static table of MIT/GNU Scheme Unix syscall names.
-pub fn osSyscallNames(length: *c_ulong, names: *[*]?[*:0]const u8) callconv(.c) void {
+pub fn osSyscallNames(length: *usize, names: *[*]?[*:0]const u8) callconv(.c) void {
     length.* = syscall_names_table.len;
     names.* = &syscall_names_table;
 }
@@ -405,7 +405,7 @@ var syserr_names_table = [_]?[*:0]const u8{
 };
 
 /// Populate `length` and `names` with the static table of MIT/GNU Scheme system error names.
-pub fn osSyserrNames(length: *c_ulong, names: *[*]?[*:0]const u8) callconv(.c) void {
+pub fn osSyserrNames(length: *usize, names: *[*]?[*:0]const u8) callconv(.c) void {
     length.* = syserr_names_table.len;
     names.* = &syserr_names_table;
 }
@@ -497,17 +497,17 @@ comptime {
 test "uxtop syscall/syserr tables, error translation, page hints, and Darwin bundle check" {
     stubs.resetMockRuntime();
 
-    var sc_len: c_ulong = 0;
+    var sc_len: usize = 0;
     var sc_names: [*]?[*:0]const u8 = undefined;
     osSyscallNames(&sc_len, &sc_names);
-    try std.testing.expectEqual(@as(c_ulong, 70), sc_len);
+    try std.testing.expectEqual(@as(usize, 70), sc_len);
     try std.testing.expectEqualStrings("accept", std.mem.span(sc_names[0].?));
     try std.testing.expectEqualStrings("write", std.mem.span(sc_names[69].?));
 
-    var se_len: c_ulong = 0;
+    var se_len: usize = 0;
     var se_names: [*]?[*:0]const u8 = undefined;
     osSyserrNames(&se_len, &se_names);
-    try std.testing.expectEqual(@as(c_ulong, 44), se_len);
+    try std.testing.expectEqual(@as(usize, 44), se_len);
     try std.testing.expectEqualStrings("unknown", std.mem.span(se_names[0].?));
     try std.testing.expectEqualStrings("too-many-open-files", std.mem.span(se_names[43].?));
 

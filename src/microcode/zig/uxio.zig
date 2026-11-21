@@ -219,7 +219,7 @@ pub fn osChannelType(channel: abi.Tchannel) callconv(.c) abi.ChannelType {
 }
 
 /// Read up to `nbytes` into `buffer`, returning -1 when a nonblocking read would block.
-pub fn osChannelRead(channel: abi.Tchannel, buffer: ?*anyopaque, nbytes: usize) callconv(.c) c_long {
+pub fn osChannelRead(channel: abi.Tchannel, buffer: ?*anyopaque, nbytes: usize) callconv(.c) isize {
     if (nbytes == 0) return 0;
     const entry = &channel_table_ptr.?[channel];
     const dst: [*]u8 = @ptrCast(buffer.?);
@@ -240,7 +240,7 @@ pub fn osChannelRead(channel: abi.Tchannel, buffer: ?*anyopaque, nbytes: usize) 
 }
 
 /// Write up to `nbytes` from `buffer`, returning -1 if nonblocking or 0 bytes written.
-pub fn osChannelWrite(channel: abi.Tchannel, buffer: ?*const anyopaque, nbytes: usize) callconv(.c) c_long {
+pub fn osChannelWrite(channel: abi.Tchannel, buffer: ?*const anyopaque, nbytes: usize) callconv(.c) isize {
     if (nbytes == 0) return 0;
     const fd = channel_table_ptr.?[channel].descriptor;
     const src: [*]const u8 = @ptrCast(buffer.?);
@@ -277,7 +277,7 @@ pub fn osChannelWriteDumpFile(channel: abi.Tchannel, buffer: ?*const anyopaque, 
 /// Write NUL-terminated `string` completely to `channel` or abort via `error_external_return`.
 pub fn osChannelWriteString(channel: abi.Tchannel, string: [*:0]const u8) callconv(.c) void {
     const length = std.mem.len(string);
-    if (osChannelWrite(channel, @ptrCast(string), length) != @as(c_long, @intCast(length))) {
+    if (osChannelWrite(channel, @ptrCast(string), length) != @as(isize, @intCast(length))) {
         abi.error_external_return();
     }
 }
@@ -776,7 +776,7 @@ test "uxio pipe channels nonblocking sync select registry and pause" {
     osChannelNonblocking(r_ch);
     try std.testing.expectEqual(@as(c_int, 1), osChannelNonblockingP(r_ch));
     var buf: [16]u8 = @splat(0);
-    try std.testing.expectEqual(@as(c_long, -1), osChannelRead(r_ch, &buf, buf.len));
+    try std.testing.expectEqual(@as(isize, -1), osChannelRead(r_ch, &buf, buf.len));
 
     osChannelBlocking(r_ch);
     try std.testing.expectEqual(@as(c_int, 0), osChannelNonblockingP(r_ch));
@@ -800,7 +800,7 @@ test "uxio pipe channels nonblocking sync select registry and pause" {
     try std.testing.expectEqual(@as(c_uint, 0), osSelectRegistryLength(reg));
 
     const nread = osChannelRead(r_ch, &buf, buf.len);
-    try std.testing.expectEqual(@as(c_long, 6), nread);
+    try std.testing.expectEqual(@as(isize, 6), nread);
     try std.testing.expectEqualStrings("zig-io", buf[0..6]);
 
     // Synchronize on a pipe (ENOTTY/EINVAL ignored cleanly) and on a real temp file.

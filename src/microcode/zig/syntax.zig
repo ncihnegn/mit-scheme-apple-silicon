@@ -27,14 +27,14 @@ pub const SyntaxCode = enum(u4) {
 
 const illegal: u8 = @intFromEnum(SyntaxCode.max);
 
-const comstart_first_a: c_ulong = 0x80;
-const comstart_first_b: c_ulong = 0x40;
-const comstart_second_a: c_ulong = 0x20;
-const comstart_second_b: c_ulong = 0x10;
-const comend_first_a: c_ulong = 0x08;
-const comend_first_b: c_ulong = 0x04;
-const comend_second_a: c_ulong = 0x02;
-const comend_second_b: c_ulong = 0x01;
+const comstart_first_a: usize = 0x80;
+const comstart_first_b: usize = 0x40;
+const comstart_second_a: usize = 0x20;
+const comstart_second_b: usize = 0x10;
+const comend_first_a: usize = 0x08;
+const comend_first_b: usize = 0x04;
+const comend_second_a: usize = 0x02;
+const comend_second_b: usize = 0x01;
 
 const comment_style_a: c_uint = 0xAA;
 const comment_style_b: c_uint = 0x55;
@@ -106,7 +106,7 @@ pub export fn Prim_string_to_syntax_entry() callconv(.c) obj.SchemeObject {
     const s = abi.argRef(1);
     var length = obj.legacyStringLength(s);
     var scan = obj.legacyStringLoc(s, 0);
-    var result: c_ulong = undefined;
+    var result: usize = undefined;
 
     if (length > 0) {
         const c = scan[0];
@@ -123,11 +123,11 @@ pub export fn Prim_string_to_syntax_entry() callconv(.c) obj.SchemeObject {
         const c = scan[0];
         scan += 1;
         length -= 1;
-        if (c != ' ') result |= @as(c_ulong, c) << 4;
+        if (c != ' ') result |= @as(usize, c) << 4;
     }
 
     const mergeBit = struct {
-        inline fn apply(res: *c_ulong, bit: c_ulong) void {
+        inline fn apply(res: *usize, bit: usize) void {
             if ((res.* & bit) != 0) abi.error_bad_range_arg(1);
             res.* |= bit;
         }
@@ -151,7 +151,7 @@ pub export fn Prim_string_to_syntax_entry() callconv(.c) obj.SchemeObject {
                 @intFromEnum(SyntaxCode.endcomment) => mergeBit(&result, comend_first_b << 12),
                 else => {},
             },
-            'p' => mergeBit(&result, @as(c_ulong, 1) << 20),
+            'p' => mergeBit(&result, @as(usize, 1) << 20),
             ' ' => {},
             else => abi.error_bad_range_arg(1),
         }
@@ -174,7 +174,7 @@ pub export fn Prim_string_to_syntax_entry() callconv(.c) obj.SchemeObject {
 pub export fn Prim_char_to_syntax_code() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     abi.checkArg(1, syntaxTableP);
-    const ch: u8 = @truncate(@as(c_ulong, @bitCast(abi.arg_ascii_char(2))));
+    const ch: u8 = @truncate(@as(usize, @bitCast(abi.arg_ascii_char(2))));
     const entry = syntaxTableRef(abi.argRef(1), ch);
     return obj.asciiToChar(syntax_code_spec[syntaxEntryCode(entry)]);
 }
@@ -277,12 +277,12 @@ const ScanCtx = struct {
         return self.peekRight(pos.*);
     }
 
-    inline fn scanToIndex(self: *const ScanCtx, pos: usize) c_long {
+    inline fn scanToIndex(self: *const ScanCtx, pos: usize) isize {
         const logical = if (pos > self.gap_start) pos - self.gap_length else pos;
         return @intCast(logical);
     }
 
-    inline fn indexToScan(self: *const ScanCtx, idx: c_long) usize {
+    inline fn indexToScan(self: *const ScanCtx, idx: isize) usize {
         const u: usize = @intCast(idx);
         return if (u > self.gap_start) u + self.gap_length else u;
     }
@@ -393,7 +393,7 @@ pub export fn Prim_scan_word_backward() callconv(.c) obj.SchemeObject {
 pub export fn Prim_scan_list_forward() callconv(.c) obj.SchemeObject {
     var ctx = ScanCtx.initForward();
     var depth = abi.arg_integer(5);
-    const min_depth: c_long = if (depth >= 0) 0 else depth;
+    const min_depth: isize = if (depth >= 0) 0 else depth;
     const sexp_flag = obj.objectToBoolean(abi.argRef(6));
     var math_exit = false;
 
@@ -508,7 +508,7 @@ pub export fn Prim_scan_list_backward() callconv(.c) obj.SchemeObject {
     const ignore_comments = obj.objectToBoolean(abi.argRef(7));
     var ctx = ScanCtx.initBackward();
     var depth = abi.arg_integer(5);
-    const min_depth: c_long = if (depth >= 0) 0 else depth;
+    const min_depth: isize = if (depth >= 0) 0 else depth;
     const sexp_flag = obj.objectToBoolean(abi.argRef(6));
     var math_exit = false;
 
@@ -622,7 +622,7 @@ const LevelStruct = struct {
     previous: ?usize = null,
 };
 
-const ssf_state_length: c_ulong = 9;
+const ssf_state_length: usize = 9;
 const ssf_state_depth: usize = 0;
 const ssf_state_in_string_p: usize = 1;
 const ssf_state_comment_state: usize = 2;
@@ -654,8 +654,8 @@ pub export fn Prim_scan_sexps_forward() callconv(.c) obj.SchemeObject {
     const stop_before = obj.objectToBoolean(abi.argRef(6));
     const state_argument = abi.argRef(7);
 
-    var depth: c_long = 0;
-    var in_string: c_long = -1;
+    var depth: isize = 0;
+    var in_string: isize = -1;
     var in_comment: c_uint = 0;
     var comment_style: c_uint = comment_style_a;
     var comment_start: usize = 0;
@@ -682,7 +682,7 @@ pub export fn Prim_scan_sexps_forward() callconv(.c) obj.SchemeObject {
         temp = obj.vectorRef(state_argument, ssf_state_in_string_p);
         if (temp == obj.sharp_f) {
             in_string = -1;
-        } else if (obj.unsignedFixnumP(temp) and @as(c_ulong, @intCast(obj.unsignedFixnumToLong(temp))) < obj.max_ascii) {
+        } else if (obj.unsignedFixnumP(temp) and @as(usize, @intCast(obj.unsignedFixnumToLong(temp))) < obj.max_ascii) {
             in_string = obj.unsignedFixnumToLong(temp);
         } else {
             abi.error_bad_range_arg(7);
@@ -953,8 +953,8 @@ pub fn makeTestSyntaxTable() obj.SchemeObject {
     obj.vectorSet(tbl, '\'', obj.ulongToFixnum(@intFromEnum(SyntaxCode.quote)));
     obj.vectorSet(tbl, ';', obj.ulongToFixnum(@intFromEnum(SyntaxCode.comment) | (comstart_first_a << 12)));
     obj.vectorSet(tbl, '\n', obj.ulongToFixnum(@intFromEnum(SyntaxCode.endcomment) | (comend_first_a << 12)));
-    obj.vectorSet(tbl, '(', obj.ulongToFixnum(@intFromEnum(SyntaxCode.open) | (@as(c_ulong, ')') << 4)));
-    obj.vectorSet(tbl, ')', obj.ulongToFixnum(@intFromEnum(SyntaxCode.close) | (@as(c_ulong, '(') << 4)));
+    obj.vectorSet(tbl, '(', obj.ulongToFixnum(@intFromEnum(SyntaxCode.open) | (@as(usize, ')') << 4)));
+    obj.vectorSet(tbl, ')', obj.ulongToFixnum(@intFromEnum(SyntaxCode.close) | (@as(usize, '(') << 4)));
     obj.vectorSet(tbl, '/', obj.ulongToFixnum(@intFromEnum(SyntaxCode.punct) | (comstart_first_b << 12) | (comend_second_b << 12)));
     obj.vectorSet(tbl, '*', obj.ulongToFixnum(@intFromEnum(SyntaxCode.punct) | (comstart_second_b << 12) | (comend_first_b << 12)));
     return tbl;
@@ -982,8 +982,8 @@ test "syntax entry encoding, word/list scans across gap, and incremental scan-se
     // STRING->SYNTAX-ENTRY & CHAR->SYNTAX-CODE
     stubs.setArgs(&.{str.char_pointer_to_string("() 12p")});
     const entry = Prim_string_to_syntax_entry();
-    const expected = @intFromEnum(SyntaxCode.open) | (@as(c_ulong, ')') << 4) |
-        ((comstart_first_b | comstart_second_b) << 12) | (@as(c_ulong, 1) << 20);
+    const expected = @intFromEnum(SyntaxCode.open) | (@as(usize, ')') << 4) |
+        ((comstart_first_b | comstart_second_b) << 12) | (@as(usize, 1) << 20);
     try std.testing.expectEqual(obj.ulongToFixnum(expected), entry);
 
     const tbl = makeTestSyntaxTable();

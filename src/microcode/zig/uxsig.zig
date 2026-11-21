@@ -815,14 +815,14 @@ fn userioReadLine(line: []u8) c_int {
     return result;
 }
 
-pub fn parseLongInput(raw: []const u8) ?c_long {
+pub fn parseLongInput(raw: []const u8) ?isize {
     const trimmed = std.mem.trim(u8, raw, " \t\r\n");
     if (trimmed.len == 0) return null;
     if (trimmed.len > 2 and trimmed[0] == '0' and (trimmed[1] == 'x' or trimmed[1] == 'X')) {
-        const uval = std.fmt.parseInt(c_ulong, trimmed[2..], 16) catch return null;
+        const uval = std.fmt.parseInt(usize, trimmed[2..], 16) catch return null;
         return @bitCast(uval);
     }
-    return std.fmt.parseInt(c_long, trimmed, 10) catch null;
+    return std.fmt.parseInt(isize, trimmed, 10) catch null;
 }
 
 fn examineMemory() void {
@@ -971,12 +971,12 @@ test "uxsig signal descriptors handlers masks parseLongInput and etaFclose" {
     _ = std.c.sigprocmask(std.c.SIG.BLOCK, &usr2_mask, null);
     transact.transaction_commit();
 
-    try std.testing.expectEqual(@as(?c_long, 0x1a), parseLongInput("0x1a"));
-    try std.testing.expectEqual(@as(?c_long, -1), parseLongInput("0xFFFFFFFFFFFFFFFF"));
-    try std.testing.expectEqual(@as(?c_long, -42), parseLongInput(" -42 "));
-    try std.testing.expectEqual(@as(?c_long, 123), parseLongInput("123"));
-    try std.testing.expectEqual(@as(?c_long, null), parseLongInput(""));
-    try std.testing.expectEqual(@as(?c_long, null), parseLongInput("nope"));
+    try std.testing.expectEqual(@as(?isize, 0x1a), parseLongInput("0x1a"));
+    try std.testing.expectEqual(@as(?isize, -1), parseLongInput("0xFFFFFFFFFFFFFFFF"));
+    try std.testing.expectEqual(@as(?isize, -42), parseLongInput(" -42 "));
+    try std.testing.expectEqual(@as(?isize, 123), parseLongInput("123"));
+    try std.testing.expectEqual(@as(?isize, null), parseLongInput(""));
+    try std.testing.expectEqual(@as(?isize, null), parseLongInput("nope"));
 
     var tmp_buf: [64]u8 = undefined;
     const pid = std.c.getpid();

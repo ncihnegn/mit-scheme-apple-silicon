@@ -7,36 +7,36 @@ const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
 const bits = @import("bits.zig");
 
-fn argFixnum(n: c_int) c_long {
+fn argFixnum(n: c_int) isize {
     const argument = abi.argRef(@intCast(n));
     if (!obj.fixnumP(argument)) abi.error_wrong_type_arg(n);
     return obj.fixnumToLong(argument);
 }
 
-fn argUnsignedFixnum(n: c_int) c_ulong {
+fn argUnsignedFixnum(n: c_int) usize {
     const argument = abi.argRef(@intCast(n));
     if (!obj.fixnumP(argument)) abi.error_wrong_type_arg(n);
     return obj.objectDatum(argument);
 }
 
-inline fn fixnumResult(result: c_long) obj.SchemeObject {
+inline fn fixnumResult(result: isize) obj.SchemeObject {
     if (!obj.longToFixnumP(result)) abi.error_bad_range_arg(1);
     return obj.longToFixnum(result);
 }
 
-inline fn logicalResult(val: c_ulong) obj.SchemeObject {
+inline fn logicalResult(val: usize) obj.SchemeObject {
     return obj.makeObject(obj.tc_fixnum, val & obj.datum_mask);
 }
 
-inline fn fixnumLsh(source: c_long, number: c_long) c_ulong {
+inline fn fixnumLsh(source: isize, number: isize) usize {
     if (number >= 0) {
         if (number > obj.datum_length) return 0;
-        return @as(c_ulong, @bitCast(source)) << @as(u6, @intCast(number));
+        return @as(usize, @bitCast(source)) << @as(u6, @intCast(number));
     } else {
         const shift_right = -number;
         if (shift_right > obj.datum_length) return 0;
         const sh: u6 = @intCast(shift_right);
-        const uval: c_ulong = @bitCast(source);
+        const uval: usize = @bitCast(source);
         return if (source < 0) ~((~uval) >> sh) else (uval >> sh);
     }
 }
@@ -222,7 +222,7 @@ pub export fn Prim_fixnum_lsh() callconv(.c) obj.SchemeObject {
 pub export fn Prim_fxbit_count() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     const n = argFixnum(1);
-    const bits_val: c_ulong = @bitCast(if (n < 0) ~n else n);
+    const bits_val: usize = @bitCast(if (n < 0) ~n else n);
     return fixnumResult(@intCast(bits.ulongBitCount(bits_val)));
 }
 
@@ -230,14 +230,14 @@ pub export fn Prim_fxbit_count() callconv(.c) obj.SchemeObject {
 pub export fn Prim_fxlength() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     const n = argFixnum(1);
-    const bits_val: c_ulong = @bitCast(if (n < 0) ~n else n);
+    const bits_val: usize = @bitCast(if (n < 0) ~n else n);
     return fixnumResult(@intCast(bits.ulongLengthInBits(bits_val)));
 }
 
 // DEFINE_PRIMITIVE ("FXFIRST-SET-BIT", fxfirst_set_bit, 1, 1, 0)
 pub export fn fxfirst_set_bit() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    const bits_val: c_ulong = @bitCast(argFixnum(1));
+    const bits_val: usize = @bitCast(argFixnum(1));
     return fixnumResult(@intCast(bits.ulongFirstSetBit(bits_val)));
 }
 
@@ -283,7 +283,7 @@ test "fixnum primitives handle Mul overflow, signed div/rem, gcd, lsh, and fx bi
     stubs.setArgs(&.{ obj.longToFixnum(-1), obj.longToFixnum(@intCast(obj.datum_length)) });
     try std.testing.expectEqual(obj.longToFixnum(0), Prim_fixnum_lsh());
 
-    stubs.setArgs(&.{ obj.longToFixnum(-5), obj.longToFixnum(-@as(c_long, @intCast(obj.datum_length + 1))) });
+    stubs.setArgs(&.{ obj.longToFixnum(-5), obj.longToFixnum(-@as(isize, @intCast(obj.datum_length + 1))) });
     try std.testing.expectEqual(obj.longToFixnum(0), Prim_fixnum_lsh());
 
     // FXBIT-COUNT, FXLENGTH, FXFIRST-SET-BIT

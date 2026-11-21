@@ -288,7 +288,7 @@ pub export fn Prim_list_to_integer() callconv(.c) obj.SchemeObject {
     abi.checkArg(1, obj.pairP);
     var digits = abi.argRef(1);
     const radix = abi.arg_ulong_integer(2);
-    const max_radix: c_ulong = @intCast(abi.bignum_max_digit_stream_radix());
+    const max_radix: usize = @intCast(abi.bignum_max_digit_stream_radix());
     if (radix < 2 or radix >= max_radix) abi.error_bad_range_arg(2);
 
     var n_digits: c_uint = 0;
@@ -296,7 +296,7 @@ pub export fn Prim_list_to_integer() callconv(.c) obj.SchemeObject {
     while (true) {
         const digit = obj.pairCar(scan);
         if (!obj.unsignedFixnumP(digit)) abi.error_wrong_type_arg(1);
-        if (@as(c_ulong, @intCast(obj.unsignedFixnumToLong(digit))) >= radix) abi.error_bad_range_arg(1);
+        if (@as(usize, @intCast(obj.unsignedFixnumToLong(digit))) >= radix) abi.error_bad_range_arg(1);
         n_digits += 1;
         scan = obj.pairCdr(scan);
         if (obj.emptyListP(scan)) break;
@@ -321,7 +321,7 @@ test "intprm primitives handle exact/lossy flonum flags, shifts, and list->integ
     const fl = Prim_integer_to_flonum();
     try std.testing.expectEqual(@as(f64, 42.0), obj.flonumToDouble(fl));
 
-    const lossy_fx = obj.longToFixnum((@as(c_long, 1) << 53) + 1);
+    const lossy_fx = obj.longToFixnum((@as(isize, 1) << 53) + 1);
     stubs.setArgs(&.{ lossy_fx, obj.longToFixnum(1) });
     try std.testing.expectEqual(obj.sharp_f, Prim_integer_to_flonum());
 

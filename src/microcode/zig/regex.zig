@@ -22,8 +22,8 @@ pub const ReBuffer = extern struct {
 };
 
 pub const ReRegisters = extern struct {
-    start: [re_nregs]c_long,
-    end: [re_nregs]c_long,
+    start: [re_nregs]isize,
+    end: [re_nregs]isize,
 };
 
 pub const RegexpCode = enum(u8) {
@@ -108,10 +108,10 @@ pub export fn re_buffer_initialize(
     translation: ?[*]const u8,
     syntax_table: obj.SchemeObject,
     text: [*]const u8,
-    text_start_index: c_ulong,
-    text_end_index: c_ulong,
-    gap_start_index: c_ulong,
-    gap_end_index: c_ulong,
+    text_start_index: usize,
+    text_end_index: usize,
+    gap_start_index: usize,
+    gap_end_index: usize,
 ) callconv(.c) void {
     const text_start = text + @as(usize, @intCast(text_start_index));
     const text_end = text + @as(usize, @intCast(text_end_index));
@@ -329,7 +329,7 @@ fn beqTranslate(scan1: [*]const u8, scan2: [*]const u8, length: usize, translati
     return true;
 }
 
-inline fn addressToIndex(address: [*]const u8, buffer: *const ReBuffer, gap_start: [*]const u8, gap_length: usize) c_long {
+inline fn addressToIndex(address: [*]const u8, buffer: *const ReBuffer, gap_start: [*]const u8, gap_length: usize) isize {
     const raw = if (@intFromPtr(address) > @intFromPtr(gap_start))
         address - gap_length
     else
@@ -837,8 +837,8 @@ test "regex compile_fastmap, match captures/backrefs, smart repeat rewrite, gap 
     var regs: ReRegisters = undefined;
     const start_pos = re_search_forward(pat_ptr, pat_end, &buf, &regs, buf.text_start, buf.text_end);
     try std.testing.expectEqual(@as(c_int, 13), start_pos); // matched "foooofoooo" logical [3..13)
-    try std.testing.expectEqual(@as(c_long, 3), regs.start[1]);
-    try std.testing.expectEqual(@as(c_long, 8), regs.end[1]);
+    try std.testing.expectEqual(@as(isize, 3), regs.start[1]);
+    try std.testing.expectEqual(@as(isize, 8), regs.end[1]);
     // Verify maybe_finalize_jump was rewritten to jump because stop_memory follows.
     try std.testing.expectEqual(@intFromEnum(RegexpCode.jump), pat[13]);
 

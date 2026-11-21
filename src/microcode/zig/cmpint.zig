@@ -44,9 +44,9 @@ const have_trampoline_to_interface: bool =
 const has_flush_icache_region: bool =
     build_options.compiler_processor_type == abi.compiler_aarch64_type;
 
-const compiler_utilities_n_entries: c_ulong = if (have_trampoline_to_interface) 3 else 2;
+const compiler_utilities_n_entries: usize = if (have_trampoline_to_interface) 3 else 2;
 
-const tc_trampoline_header: c_ulong = obj.tc_fixnum;
+const tc_trampoline_header: usize = obj.tc_fixnum;
 const trampoline_table_size: usize = 4;
 
 const trampoline_arity_table = [trampoline_table_size * trampoline_table_size]u8{
@@ -68,23 +68,23 @@ const trampoline_arity_table = [trampoline_table_size * trampoline_table_size]u8
     abi.trampoline_k_4_3,
 };
 
-const reflect_code_internal_apply: c_ulong = 0;
-const reflect_code_restore_interrupt_mask: c_ulong = 1;
-const reflect_code_stack_marker: c_ulong = 2;
-const reflect_code_cc_bkpt: c_ulong = 3;
-const reflect_code_compiled_invocation: c_ulong = 8;
-const reflect_code_limit: c_ulong = 9;
+const reflect_code_internal_apply: usize = 0;
+const reflect_code_restore_interrupt_mask: usize = 1;
+const reflect_code_stack_marker: usize = 2;
+const reflect_code_cc_bkpt: usize = 3;
+const reflect_code_compiled_invocation: usize = 8;
+const reflect_code_limit: usize = 9;
 
 pub const UtilityResult = if (build_options.cc_is_svm) extern struct {
     scheme_p: bool,
     arg: extern union {
-        interpreter_code: c_long,
+        interpreter_code: isize,
         new_pc: ?*anyopaque,
     },
 } else extern struct {
     interface_dispatch: ?*const anyopaque,
     extra: extern union {
-        code_to_interpreter: c_long,
+        code_to_interpreter: isize,
         compiled_code: extern struct {
             ptr: ?*anyopaque,
             pc: ?*anyopaque,
@@ -100,29 +100,29 @@ comptime {
     }
 }
 
-pub const UtilityProc = *const fn (*UtilityResult, c_ulong, c_ulong, c_ulong, c_ulong) callconv(.c) void;
+pub const UtilityProc = *const fn (*UtilityResult, usize, usize, usize, usize) callconv(.c) void;
 
 const NativeInterface = struct {
     extern "c" fn interface_to_C() void;
     extern "c" fn interface_to_scheme() void;
     extern "c" fn interface_to_scheme_return() void;
-    extern "c" fn C_to_interface(?*anyopaque, ?*anyopaque) c_long;
+    extern "c" fn C_to_interface(?*anyopaque, ?*anyopaque) isize;
 };
 
 const SvmInterface = struct {
-    extern "c" fn C_to_interface(?*anyopaque) c_long;
+    extern "c" fn C_to_interface(?*anyopaque) isize;
 };
 
 const LinkCcState = struct {
     block_address: [*]obj.SchemeObject,
     scan: [*]obj.SchemeObject,
-    n_sections: c_ulong,
+    n_sections: usize,
     return_address: ?*anyopaque,
-    n_linked_sections: c_ulong,
+    n_linked_sections: usize,
     scan0: [*]obj.SchemeObject,
     type: abi.LinkageSectionType,
-    n_entries: c_ulong,
-    n_linked_entries: c_ulong,
+    n_entries: usize,
+    n_linked_entries: usize,
 };
 
 var registers_storage: [abi.regblock_length]obj.SchemeObject = @splat(0);
@@ -136,7 +136,7 @@ var linking_cc_block_p: bool = false;
 
 var n_builtins: c_uint = 0;
 var s_builtins: c_uint = 0;
-var builtins: ?[*]c_ulong = null;
+var builtins: ?[*]usize = null;
 var builtin_names: ?[*][*:0]const u8 = null;
 
 pub var utility_table = [62]?UtilityProc{
@@ -204,7 +204,7 @@ pub var utility_table = [62]?UtilityProc{
     comutilCompiledClosureBkpt, // 0x3d
 };
 
-var max_trampoline_storage: c_ulong = utility_table.len;
+var max_trampoline_storage: usize = utility_table.len;
 
 inline fn loadRawGlobalPtr(ptr_to_global: anytype) usize {
     return @intFromPtr(@as(*const ?*const anyopaque, @ptrCast(ptr_to_global)).*);
@@ -222,7 +222,7 @@ inline fn ptrSubBytes(p: *anyopaque, byte_offset: usize) *anyopaque {
     return @ptrFromInt(@intFromPtr(p) - byte_offset);
 }
 
-inline fn insnDiff(hi: *const anyopaque, lo: *const anyopaque) c_ulong {
+inline fn insnDiff(hi: *const anyopaque, lo: *const anyopaque) usize {
     return @intCast((@intFromPtr(hi) - @intFromPtr(lo)) / insn_size);
 }
 
@@ -234,7 +234,7 @@ inline fn makeCcStackEnv(addr: [*]const obj.SchemeObject) obj.SchemeObject {
     return obj.makePointerObject(obj.tc_stack_environment, addr);
 }
 
-inline fn ccBlockAddrLength(addr: [*]const obj.SchemeObject) c_ulong {
+inline fn ccBlockAddrLength(addr: [*]const obj.SchemeObject) usize {
     return obj.objectDatum(addr[0]) + 1;
 }
 
@@ -299,7 +299,7 @@ inline fn ccReturnAddressToEntryAddressPtr(r: *anyopaque) *anyopaque {
     return abi.cc_return_address_to_entry_address(r).?;
 }
 
-inline fn returnToC(dsu_result: *UtilityResult, code: c_long) void {
+inline fn returnToC(dsu_result: *UtilityResult, code: isize) void {
     if (build_options.cc_is_svm) {
         dsu_result.scheme_p = false;
         dsu_result.arg = .{ .interpreter_code = code };
@@ -335,21 +335,21 @@ inline fn returnToSchemeContinuation(dsu_result: *UtilityResult, c: *anyopaque) 
     }
 }
 
-inline fn enterSchemeEntry(ep: *anyopaque) c_long {
+inline fn enterSchemeEntry(ep: *anyopaque) isize {
     if (build_options.cc_is_svm) {
         return SvmInterface.C_to_interface(ep);
     }
     return NativeInterface.C_to_interface(ep, ccEntryAddressPc(ep));
 }
 
-inline fn enterSchemeContinuation(c: *anyopaque) c_long {
+inline fn enterSchemeContinuation(c: *anyopaque) isize {
     if (build_options.cc_is_svm) {
         return SvmInterface.C_to_interface(c);
     }
     return NativeInterface.C_to_interface(c, ccReturnAddressPc(c));
 }
 
-inline fn pushReflection(code: c_ulong) void {
+inline fn pushReflection(code: usize) void {
     abi.stackPush(obj.ulongToFixnum(code));
     abi.stackPush(abi.reflect_to_interface);
 }
@@ -376,9 +376,9 @@ inline fn checkLastReturnCode() void {
     }
 }
 
-inline fn saveLastReturnCode(code: c_ulong) void {
+inline fn saveLastReturnCode(code: usize) void {
     checkLastReturnCode();
-    const offset: c_ulong = @intCast((@intFromPtr(abi.last_return_code.?) - @intFromPtr(abi.stack_pointer)) / @sizeOf(obj.SchemeObject));
+    const offset: usize = @intCast((@intFromPtr(abi.last_return_code.?) - @intFromPtr(abi.stack_pointer)) / @sizeOf(obj.SchemeObject));
     std.debug.assert(offset > 0);
     abi.pushCont(code, obj.ulongToFixnum(offset + abi.cont_size));
     abi.compiler_new_subproblem();
@@ -418,7 +418,7 @@ pub fn compilerInitialize(fasl_p: bool) callconv(.c) void {
 fn makeCompilerUtilities() obj.SchemeObject {
     var h1: obj.SchemeObject = 0;
     var h2: obj.SchemeObject = 0;
-    var n_words: c_ulong = 0;
+    var n_words: usize = 0;
 
     makeTrampolineHeaders(compiler_utilities_n_entries, 2, &h1, &h2, &n_words);
     h1 = obj.objectNewType(obj.tc_manifest_vector, h1);
@@ -471,7 +471,7 @@ fn makeCompilerUtilities() obj.SchemeObject {
 pub fn compilerReset(new_block: obj.SchemeObject) callconv(.c) void {
     var h1: obj.SchemeObject = 0;
     var h2: obj.SchemeObject = 0;
-    var n_words: c_ulong = 0;
+    var n_words: usize = 0;
 
     makeTrampolineHeaders(compiler_utilities_n_entries, 2, &h1, &h2, &n_words);
     h1 = obj.objectNewType(obj.tc_manifest_vector, h1);
@@ -496,7 +496,7 @@ pub fn compilerReset(new_block: obj.SchemeObject) callconv(.c) void {
     asmResetHook();
 }
 
-pub fn enterCompiledExpression() callconv(.c) c_long {
+pub fn enterCompiledExpression() callconv(.c) isize {
     const entry = abi.Registers[abi.regblock_expr];
     var cet: abi.CcEntryType = undefined;
     if (abi.read_cc_entry_type(&cet, ccEntryAddress(entry))) {
@@ -510,7 +510,7 @@ pub fn enterCompiledExpression() callconv(.c) c_long {
     return enterSchemeEntry(ccEntryAddress(entry));
 }
 
-pub fn applyCompiledProcedure() callconv(.c) c_long {
+pub fn applyCompiledProcedure() callconv(.c) isize {
     const n_args = abi.applyFrameHeaderNArgs(abi.stackPop());
     const procedure = abi.stackPop();
     const code = setupCompiledInvocation(procedure, n_args);
@@ -531,7 +531,7 @@ pub fn ccReturnAddressP(object: obj.SchemeObject) callconv(.c) bool {
     return compiledContinuationP(addr);
 }
 
-pub fn returnToCompiledCode() callconv(.c) c_long {
+pub fn returnToCompiledCode() callconv(.c) isize {
     restoreLastReturnCode();
     const cont = abi.stackPop();
     if (ccReturnP(cont)) {
@@ -551,7 +551,7 @@ pub fn returnToCompiledCode() callconv(.c) c_long {
     return abi.err_inapplicable_object;
 }
 
-pub fn guaranteeCcReturn(offset: c_ulong) callconv(.c) void {
+pub fn guaranteeCcReturn(offset: usize) callconv(.c) void {
     const off_u: usize = @intCast(offset);
     const frame = abi.stackLoc(off_u);
     const ret = abi.contFrameRet(frame);
@@ -609,7 +609,7 @@ fn closeStackGap(offset: usize, n_words: usize) void {
     abi.stack_pointer = sp + n_words;
 }
 
-fn recoverFromApplyError(procedure: obj.SchemeObject, n_args: c_ulong) void {
+fn recoverFromApplyError(procedure: obj.SchemeObject, n_args: usize) void {
     abi.stackPush(procedure);
     abi.stackPush(abi.makeApplyFrameHeader(n_args + 1));
     guaranteeInterpReturn();
@@ -627,13 +627,13 @@ inline fn invokeReturnAddress(dsu_result: *UtilityResult) void {
 
 pub fn comutilApply(
     dsu_result: *UtilityResult,
-    procedure_raw: c_ulong,
-    frame_size_raw: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
+    procedure_raw: usize,
+    frame_size_raw: usize,
+    _: usize,
+    _: usize,
 ) callconv(.c) void {
     var procedure: obj.SchemeObject = @intCast(procedure_raw);
-    var frame_size: c_ulong = frame_size_raw;
+    var frame_size: usize = frame_size_raw;
 
     while (true) {
         switch (obj.objectType(procedure)) {
@@ -694,7 +694,7 @@ pub fn comutilApply(
             obj.tc_primitive => {
                 if (primitiveImplementedP(procedure)) {
                     const arity = primitiveArity(procedure);
-                    if (arity >= 0 and @as(c_ulong, @intCast(arity)) == (frame_size - 1)) {
+                    if (arity >= 0 and @as(usize, @intCast(arity)) == (frame_size - 1)) {
                         comutilPrimitiveApply(dsu_result, @intCast(procedure), 0, 0, 0);
                         return;
                     } else if (arity == abi.lexpr_primitive_arity) {
@@ -722,10 +722,10 @@ pub fn comutilApply(
 
 pub fn comutilLexprApply(
     dsu_result: *UtilityResult,
-    address_raw: c_ulong,
-    n_args: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
+    address_raw: usize,
+    n_args: usize,
+    _: usize,
+    _: usize,
 ) callconv(.c) void {
     const address: *anyopaque = @ptrFromInt(@as(usize, @intCast(address_raw)));
     var cet: abi.CcEntryType = undefined;
@@ -752,10 +752,10 @@ pub fn comutilLexprApply(
 
 pub fn comutilPrimitiveApply(
     dsu_result: *UtilityResult,
-    primitive_raw: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
+    primitive_raw: usize,
+    _: usize,
+    _: usize,
+    _: usize,
 ) callconv(.c) void {
     const primitive: obj.SchemeObject = @intCast(primitive_raw);
     abi.apply_primitive_external(primitive);
@@ -765,10 +765,10 @@ pub fn comutilPrimitiveApply(
 
 pub fn comutilPrimitiveLexprApply(
     dsu_result: *UtilityResult,
-    primitive_raw: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
+    primitive_raw: usize,
+    _: usize,
+    _: usize,
+    _: usize,
 ) callconv(.c) void {
     const primitive: obj.SchemeObject = @intCast(primitive_raw);
     abi.apply_primitive_external(primitive);
@@ -778,10 +778,10 @@ pub fn comutilPrimitiveLexprApply(
 
 pub fn comutilError(
     dsu_result: *UtilityResult,
-    frame_size: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
+    frame_size: usize,
+    _: usize,
+    _: usize,
+    _: usize,
 ) callconv(.c) void {
     comutilApply(
         dsu_result,
@@ -794,10 +794,10 @@ pub fn comutilError(
 
 pub fn comutilLink(
     dsu_result: *UtilityResult,
-    return_addr_raw: c_ulong,
-    block_addr_raw: c_ulong,
-    constant_addr_raw: c_ulong,
-    n_sections: c_ulong,
+    return_addr_raw: usize,
+    block_addr_raw: usize,
+    constant_addr_raw: usize,
+    n_sections: usize,
 ) callconv(.c) void {
     const block_addr: [*]obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(block_addr_raw)));
     var s = LinkCcState{
@@ -833,7 +833,7 @@ pub fn comutilLink(
     returnToSchemeContinuation(dsu_result, s.return_address.?);
 }
 
-pub fn compLinkCachesRestart() callconv(.c) c_long {
+pub fn compLinkCachesRestart() callconv(.c) isize {
     var s: LinkCcState = undefined;
     restoreLinkCcState(&s);
     abi.Registers[abi.regblock_env] = ccBlockEnvironment(makeCcBlock(s.block_address));
@@ -848,7 +848,7 @@ pub fn compLinkCachesRestart() callconv(.c) c_long {
     return enterSchemeContinuation(s.return_address.?);
 }
 
-fn linkRemainingSections(s: *LinkCcState) c_long {
+fn linkRemainingSections(s: *LinkCcState) isize {
     while (s.n_linked_sections < s.n_sections) {
         startLinkingSection(s);
         const result = linkSection(s);
@@ -892,7 +892,7 @@ fn startLinkingSection(s: *LinkCcState) void {
     s.n_entries = linkageSectionCount(header);
 }
 
-const CacheHandlerFn = *const fn (obj.SchemeObject, obj.SchemeObject, c_ulong) callconv(.c) c_long;
+const CacheHandlerFn = *const fn (obj.SchemeObject, obj.SchemeObject, usize) callconv(.c) isize;
 
 fn linkSectionHandler(
     sec_type: abi.LinkageSectionType,
@@ -923,7 +923,7 @@ fn linkSectionHandler(
     }
 }
 
-fn linkSection(s: *LinkCcState) c_long {
+fn linkSection(s: *LinkCcState) isize {
     const scan1 = s.scan0 + 1;
     var scan = s.scan;
     const block_address = s.block_address;
@@ -931,7 +931,7 @@ fn linkSection(s: *LinkCcState) c_long {
     const n_entries = s.n_entries;
     var handler: CacheHandlerFn = undefined;
     var execute_p: bool = false;
-    var result: c_long = abi.prim_done;
+    var result: isize = abi.prim_done;
 
     if (!linkSectionHandler(s.type, &handler, &execute_p)) {
         result = abi.err_compiled_code_error;
@@ -939,7 +939,7 @@ fn linkSection(s: *LinkCcState) c_long {
         const entry_size: usize = if (execute_p) uuo_link_size else 1;
         while (n_linked < n_entries) {
             const sym = if (execute_p) abi.read_uuo_symbol(scan) else scan[0];
-            const offset: c_ulong = @intCast((@intFromPtr(scan) - @intFromPtr(block_address)) / @sizeOf(obj.SchemeObject));
+            const offset: usize = @intCast((@intFromPtr(scan) - @intFromPtr(block_address)) / @sizeOf(obj.SchemeObject));
             result = handler(sym, makeCcBlock(block_address), offset);
             if (result != abi.prim_done) break;
             scan += entry_size;
@@ -994,8 +994,8 @@ pub fn ccBlockLinkageInfo(block: obj.SchemeObject) callconv(.c) obj.SchemeObject
     const const_offset: usize = 1 + @as(usize, @intCast(obj.vectorLength(obj.makePointerObject(obj.tc_vector, header_ptr))));
     const const_addr = obj.vectorLoc(block, const_offset);
     const block_end = obj.memoryLoc(block, @intCast(ccBlockAddrLength(obj.objectAddress(block))));
-    var n_sections: c_ulong = 0;
-    var n_words: c_ulong = 0;
+    var n_sections: usize = 0;
+    var n_words: usize = 0;
 
     countLinkageSections(const_addr, block_end, &n_sections, &n_words);
     abi.primitiveGcIfNeeded(n_words);
@@ -1017,8 +1017,8 @@ fn sectionExecuteP(h: obj.SchemeObject) bool {
 fn countLinkageSections(
     const_addr: [*]const obj.SchemeObject,
     block_end: [*]const obj.SchemeObject,
-    n_sections: *c_ulong,
-    n_words: *c_ulong,
+    n_sections: *usize,
+    n_words: *usize,
 ) void {
     var scan = const_addr;
     n_sections.* = 0;
@@ -1036,8 +1036,8 @@ fn countLinkageSections(
 fn readLinkageSections(
     const_addr: [*]const obj.SchemeObject,
     _: [*]const obj.SchemeObject,
-    n_sections: c_ulong,
-    _: c_ulong,
+    n_sections: usize,
+    _: usize,
 ) obj.SchemeObject {
     var scan = const_addr;
     const sections = abi.make_vector(n_sections, obj.sharp_f, false);
@@ -1072,20 +1072,20 @@ fn readLinkageSections(
 
 pub fn comutilInterruptClosure(
     dsu_result: *UtilityResult,
-    _: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
+    _: usize,
+    _: usize,
+    _: usize,
+    _: usize,
 ) callconv(.c) void {
     compilerInterruptCommon(dsu_result, null, obj.sharp_f);
 }
 
 pub fn comutilInterruptDlink(
     dsu_result: *UtilityResult,
-    entry_point_raw: c_ulong,
-    dlink_raw: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
+    entry_point_raw: usize,
+    dlink_raw: usize,
+    _: usize,
+    _: usize,
 ) callconv(.c) void {
     const entry_point: ?*anyopaque = @ptrFromInt(@as(usize, @intCast(entry_point_raw)));
     const dlink: [*]const obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(dlink_raw)));
@@ -1094,10 +1094,10 @@ pub fn comutilInterruptDlink(
 
 pub fn comutilInterruptProcedure(
     dsu_result: *UtilityResult,
-    entry_point_raw: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
+    entry_point_raw: usize,
+    _: usize,
+    _: usize,
+    _: usize,
 ) callconv(.c) void {
     const entry_point: ?*anyopaque = @ptrFromInt(@as(usize, @intCast(entry_point_raw)));
     compilerInterruptCommon(dsu_result, entry_point, obj.sharp_f);
@@ -1105,10 +1105,10 @@ pub fn comutilInterruptProcedure(
 
 pub fn comutilInterruptContinuation(
     dsu_result: *UtilityResult,
-    entry_point_raw: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
+    entry_point_raw: usize,
+    _: usize,
+    _: usize,
+    _: usize,
 ) callconv(.c) void {
     const entry_point: ?*anyopaque = @ptrFromInt(@as(usize, @intCast(entry_point_raw)));
     compilerInterruptCommon(dsu_result, entry_point, abi.Registers[abi.regblock_val]);
@@ -1116,10 +1116,10 @@ pub fn comutilInterruptContinuation(
 
 pub fn comutilInterruptIcProcedure(
     dsu_result: *UtilityResult,
-    entry_point_raw: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
+    entry_point_raw: usize,
+    _: usize,
+    _: usize,
+    _: usize,
 ) callconv(.c) void {
     const entry_point: ?*anyopaque = @ptrFromInt(@as(usize, @intCast(entry_point_raw)));
     compilerInterruptCommon(dsu_result, entry_point, abi.Registers[abi.regblock_env]);
@@ -1127,10 +1127,10 @@ pub fn comutilInterruptIcProcedure(
 
 pub fn comutilInterruptContinuation2(
     dsu_result: *UtilityResult,
-    _: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
+    _: usize,
+    _: usize,
+    _: usize,
+    _: usize,
 ) callconv(.c) void {
     compilerInterruptReturnToEntry();
     compilerInterruptCommon(dsu_result, null, abi.Registers[abi.regblock_val]);
@@ -1149,7 +1149,7 @@ pub fn compilerInterruptCommon(
     state: obj.SchemeObject,
 ) callconv(.c) void {
     if (!abi.freeOkP(abi.Free)) {
-        const diff_words: c_ulong = @intCast((@intFromPtr(abi.Free) -% @intFromPtr(abi.heap_alloc_limit)) / @sizeOf(obj.SchemeObject));
+        const diff_words: usize = @intCast((@intFromPtr(abi.Free) -% @intFromPtr(abi.heap_alloc_limit)) / @sizeOf(obj.SchemeObject));
         abi.requestGc(diff_words);
     }
     abi.stackCheck(0);
@@ -1163,7 +1163,7 @@ pub fn compilerInterruptCommon(
     returnToC(dsu_result, abi.prim_interrupt);
 }
 
-pub fn compInterruptRestart() callconv(.c) c_long {
+pub fn compInterruptRestart() callconv(.c) isize {
     restoreLastReturnCode();
     const state = abi.stackPop();
     abi.Registers[abi.regblock_env] = state;
@@ -1173,10 +1173,10 @@ pub fn compInterruptRestart() callconv(.c) c_long {
 
 pub fn comutilAssignmentTrap(
     dsu_result: *UtilityResult,
-    ret_addr_raw: c_ulong,
-    cache_addr_raw: c_ulong,
-    new_val_raw: c_ulong,
-    _: c_ulong,
+    ret_addr_raw: usize,
+    cache_addr_raw: usize,
+    new_val_raw: usize,
+    _: usize,
 ) callconv(.c) void {
     const ret_addr: *anyopaque = @ptrFromInt(@as(usize, @intCast(ret_addr_raw)));
     const cache_addr: [*]obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(cache_addr_raw)));
@@ -1199,7 +1199,7 @@ pub fn comutilAssignmentTrap(
     returnToSchemeContinuation(dsu_result, ret_addr);
 }
 
-pub fn compAssignmentTrapRestart() callconv(.c) c_long {
+pub fn compAssignmentTrapRestart() callconv(.c) isize {
     restoreLastReturnCode();
     const name = abi.stackPop();
     const environment = abi.stackPop();
@@ -1219,10 +1219,10 @@ pub fn compAssignmentTrapRestart() callconv(.c) c_long {
 
 pub fn comutilCacheLookupApply(
     dsu_result: *UtilityResult,
-    cache_addr_raw: c_ulong,
-    block_addr_raw: c_ulong,
-    frame_size: c_ulong,
-    _: c_ulong,
+    cache_addr_raw: usize,
+    block_addr_raw: usize,
+    frame_size: usize,
+    _: usize,
 ) callconv(.c) void {
     const cache_addr: [*]obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(cache_addr_raw)));
     const block_addr: [*]obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(block_addr_raw)));
@@ -1242,7 +1242,7 @@ pub fn comutilCacheLookupApply(
     comutilApply(dsu_result, @intCast(value), frame_size, 0, 0);
 }
 
-pub fn compCacheLookupApplyRestart() callconv(.c) c_long {
+pub fn compCacheLookupApplyRestart() callconv(.c) isize {
     restoreLastReturnCode();
     const name = abi.stackPop();
     const environment = abi.stackPop();
@@ -1267,10 +1267,10 @@ pub fn compCacheLookupApplyRestart() callconv(.c) c_long {
 
 fn commonLookupTrap(
     dsu_result: *UtilityResult,
-    ret_addr_raw: c_ulong,
-    cache_addr_raw: c_ulong,
-    trap_fn: *const fn (obj.SchemeObject, *obj.SchemeObject) callconv(.c) c_long,
-    restart_rc: c_ulong,
+    ret_addr_raw: usize,
+    cache_addr_raw: usize,
+    trap_fn: *const fn (obj.SchemeObject, *obj.SchemeObject) callconv(.c) isize,
+    restart_rc: usize,
 ) void {
     const ret_addr: *anyopaque = @ptrFromInt(@as(usize, @intCast(ret_addr_raw)));
     const cache_addr: [*]obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(cache_addr_raw)));
@@ -1292,9 +1292,9 @@ fn commonLookupTrap(
 }
 
 fn commonLookupTrapRestart(
-    lookup_fn: *const fn (obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) callconv(.c) c_long,
-    restart_rc: c_ulong,
-) c_long {
+    lookup_fn: *const fn (obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) callconv(.c) isize,
+    restart_rc: usize,
+) isize {
     restoreLastReturnCode();
     const name = abi.stackPop();
     const environment = abi.stackPop();
@@ -1310,86 +1310,86 @@ fn commonLookupTrapRestart(
     return enterSchemeContinuation(ccReturnAddress(abi.stackPop()));
 }
 
-pub fn comutilLookupTrap(dsu_result: *UtilityResult, ret_addr_raw: c_ulong, cache_addr_raw: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilLookupTrap(dsu_result: *UtilityResult, ret_addr_raw: usize, cache_addr_raw: usize, _: usize, _: usize) callconv(.c) void {
     commonLookupTrap(dsu_result, ret_addr_raw, cache_addr_raw, abi.compiler_lookup_trap, abi.rc_comp_lookup_trap_restart);
 }
 
-pub fn compLookupTrapRestart() callconv(.c) c_long {
+pub fn compLookupTrapRestart() callconv(.c) isize {
     return commonLookupTrapRestart(abi.lookup_variable, abi.rc_comp_lookup_trap_restart);
 }
 
-pub fn comutilSafeLookupTrap(dsu_result: *UtilityResult, ret_addr_raw: c_ulong, cache_addr_raw: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilSafeLookupTrap(dsu_result: *UtilityResult, ret_addr_raw: usize, cache_addr_raw: usize, _: usize, _: usize) callconv(.c) void {
     commonLookupTrap(dsu_result, ret_addr_raw, cache_addr_raw, abi.compiler_safe_lookup_trap, abi.rc_comp_safe_ref_trap_restart);
 }
 
-pub fn compSafeLookupTrapRestart() callconv(.c) c_long {
+pub fn compSafeLookupTrapRestart() callconv(.c) isize {
     return commonLookupTrapRestart(abi.safe_lookup_variable, abi.rc_comp_safe_ref_trap_restart);
 }
 
-pub fn comutilUnassignedPTrap(dsu_result: *UtilityResult, ret_addr_raw: c_ulong, cache_addr_raw: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilUnassignedPTrap(dsu_result: *UtilityResult, ret_addr_raw: usize, cache_addr_raw: usize, _: usize, _: usize) callconv(.c) void {
     commonLookupTrap(dsu_result, ret_addr_raw, cache_addr_raw, abi.compiler_unassigned_p_trap, abi.rc_comp_unassigned_trap_restart);
 }
 
-pub fn compUnassignedPTrapRestart() callconv(.c) c_long {
+pub fn compUnassignedPTrapRestart() callconv(.c) isize {
     return commonLookupTrapRestart(abi.variable_unassigned_p, abi.rc_comp_unassigned_trap_restart);
 }
 
-fn arithTrampoline(dsu_result: *UtilityResult, fobj_index: usize, arity: c_ulong) void {
+fn arithTrampoline(dsu_result: *UtilityResult, fobj_index: usize, arity: usize) void {
     comutilApply(dsu_result, @intCast(obj.vectorRef(abi.fixed_objects, fobj_index)), arity, 0, 0);
 }
 
-pub fn comutilDecrement(r: *UtilityResult, _: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilDecrement(r: *UtilityResult, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     arithTrampoline(r, abi.fixobj_generic_trampoline_predecessor, 2);
 }
-pub fn comutilDivide(r: *UtilityResult, _: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilDivide(r: *UtilityResult, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     arithTrampoline(r, abi.fixobj_generic_trampoline_divide, 3);
 }
-pub fn comutilEqual(r: *UtilityResult, _: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilEqual(r: *UtilityResult, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     arithTrampoline(r, abi.fixobj_generic_trampoline_equal_p, 3);
 }
-pub fn comutilGreater(r: *UtilityResult, _: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilGreater(r: *UtilityResult, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     arithTrampoline(r, abi.fixobj_generic_trampoline_greater_p, 3);
 }
-pub fn comutilIncrement(r: *UtilityResult, _: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilIncrement(r: *UtilityResult, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     arithTrampoline(r, abi.fixobj_generic_trampoline_successor, 2);
 }
-pub fn comutilLess(r: *UtilityResult, _: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilLess(r: *UtilityResult, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     arithTrampoline(r, abi.fixobj_generic_trampoline_less_p, 3);
 }
-pub fn comutilMinus(r: *UtilityResult, _: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilMinus(r: *UtilityResult, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     arithTrampoline(r, abi.fixobj_generic_trampoline_subtract, 3);
 }
-pub fn comutilModulo(r: *UtilityResult, _: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilModulo(r: *UtilityResult, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     arithTrampoline(r, abi.fixobj_generic_trampoline_modulo, 3);
 }
-pub fn comutilMultiply(r: *UtilityResult, _: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilMultiply(r: *UtilityResult, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     arithTrampoline(r, abi.fixobj_generic_trampoline_multiply, 3);
 }
-pub fn comutilNegative(r: *UtilityResult, _: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilNegative(r: *UtilityResult, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     arithTrampoline(r, abi.fixobj_generic_trampoline_negative_p, 2);
 }
-pub fn comutilPlus(r: *UtilityResult, _: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilPlus(r: *UtilityResult, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     arithTrampoline(r, abi.fixobj_generic_trampoline_add, 3);
 }
-pub fn comutilPositive(r: *UtilityResult, _: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilPositive(r: *UtilityResult, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     arithTrampoline(r, abi.fixobj_generic_trampoline_positive_p, 2);
 }
-pub fn comutilQuotient(r: *UtilityResult, _: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilQuotient(r: *UtilityResult, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     arithTrampoline(r, abi.fixobj_generic_trampoline_quotient, 3);
 }
-pub fn comutilRemainder(r: *UtilityResult, _: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilRemainder(r: *UtilityResult, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     arithTrampoline(r, abi.fixobj_generic_trampoline_remainder, 3);
 }
-pub fn comutilZero(r: *UtilityResult, _: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilZero(r: *UtilityResult, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     arithTrampoline(r, abi.fixobj_generic_trampoline_zero_p, 2);
 }
 
 pub fn comutilPrimitiveError(
     dsu_result: *UtilityResult,
-    ret_addr_raw: c_ulong,
-    primitive_raw: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
+    ret_addr_raw: usize,
+    primitive_raw: usize,
+    _: usize,
+    _: usize,
 ) callconv(.c) void {
     const ret_addr: *anyopaque = @ptrFromInt(@as(usize, @intCast(ret_addr_raw)));
     const primitive: obj.SchemeObject = @intCast(primitive_raw);
@@ -1399,13 +1399,13 @@ pub fn comutilPrimitiveError(
     returnToC(dsu_result, abi.err_compiled_code_error);
 }
 
-pub fn compErrorRestart() callconv(.c) c_long {
+pub fn compErrorRestart() callconv(.c) isize {
     restoreLastReturnCode();
     _ = abi.stackPop();
     return enterSchemeEntry(ccEntryAddress(abi.stackPop()));
 }
 
-pub fn applyCompiledFromPrimitive(n_args_in: c_ulong, proc_in: obj.SchemeObject) callconv(.c) void {
+pub fn applyCompiledFromPrimitive(n_args_in: usize, proc_in: obj.SchemeObject) callconv(.c) void {
     var n_args = n_args_in;
     var procedure = proc_in;
     while (true) {
@@ -1450,7 +1450,7 @@ pub fn applyCompiledFromPrimitive(n_args_in: c_ulong, proc_in: obj.SchemeObject)
     }
 }
 
-pub fn compiledWithInterruptMask(old_mask: c_ulong, receiver: obj.SchemeObject, new_mask: c_ulong) callconv(.c) void {
+pub fn compiledWithInterruptMask(old_mask: usize, receiver: obj.SchemeObject, new_mask: usize) callconv(.c) void {
     abi.stackPush(obj.ulongToFixnum(old_mask));
     pushReflection(reflect_code_restore_interrupt_mask);
     abi.stackPush(obj.ulongToFixnum(new_mask));
@@ -1462,7 +1462,7 @@ pub fn compiledWithStackMarker(thunk: obj.SchemeObject) callconv(.c) void {
     setupCompiledInvocationFromPrimitive(thunk, 0);
 }
 
-fn setupCompiledInvocationFromPrimitive(procedure: obj.SchemeObject, n_args: c_ulong) void {
+fn setupCompiledInvocationFromPrimitive(procedure: obj.SchemeObject, n_args: usize) void {
     var code = setupCompiledInvocation(procedure, n_args);
     if (code != abi.prim_done) {
         if (code != abi.prim_apply_interrupt) {
@@ -1489,7 +1489,7 @@ pub fn reflectToInterfaceFrameType(frame: [*]obj.SchemeObject) callconv(.c) c_in
     });
 }
 
-pub fn cpointReflectToInterfaceNext(cpoint: obj.SchemeObject, index: c_ulong) callconv(.c) c_ulong {
+pub fn cpointReflectToInterfaceNext(cpoint: obj.SchemeObject, index: usize) callconv(.c) usize {
     const code_object = obj.vectorRef(cpoint, @intCast(index + 1));
     std.debug.assert(obj.fixnumP(code_object) and obj.fixnumToUlongP(code_object));
     const code = obj.fixnumToUlong(code_object);
@@ -1498,7 +1498,7 @@ pub fn cpointReflectToInterfaceNext(cpoint: obj.SchemeObject, index: c_ulong) ca
         reflect_code_restore_interrupt_mask => index + 3,
         reflect_code_stack_marker => index + 4,
         reflect_code_cc_bkpt, reflect_code_compiled_invocation => cpointCompiledAddressNext(cpoint, index + 2),
-        else => std.math.maxInt(c_ulong),
+        else => std.math.maxInt(usize),
     };
 }
 
@@ -1528,31 +1528,31 @@ pub fn ccEntryTypeGroup(entry: obj.SchemeObject) callconv(.c) abi.CcEntryTypeGro
     return ccEntryTypeMarkerGroup(cet.marker);
 }
 
-fn compiledEntryFrameSize(cet: *const abi.CcEntryType) c_ulong {
+fn compiledEntryFrameSize(cet: *const abi.CcEntryType) usize {
     return switch (ccEntryTypeMarkerGroup(cet.marker)) {
-        .procedure => @as(c_ulong, 1) +
-            @as(c_ulong, cet.args.for_procedure.n_required) +
-            @as(c_ulong, cet.args.for_procedure.n_optional) +
-            @as(c_ulong, @intFromBool(cet.args.for_procedure.rest_p)),
+        .procedure => @as(usize, 1) +
+            @as(usize, cet.args.for_procedure.n_required) +
+            @as(usize, cet.args.for_procedure.n_optional) +
+            @as(usize, @intFromBool(cet.args.for_procedure.rest_p)),
         .continuation => if (cet.marker == .continuation)
             1 + cet.args.for_continuation.offset
         else
-            std.math.maxInt(c_ulong),
+            std.math.maxInt(usize),
         .expression, .internal_procedure => 1,
-        .unknown => std.math.maxInt(c_ulong),
+        .unknown => std.math.maxInt(usize),
     };
 }
 
-pub fn cpointCompiledAddressNext(cpoint: obj.SchemeObject, index: c_ulong) callconv(.c) c_ulong {
+pub fn cpointCompiledAddressNext(cpoint: obj.SchemeObject, index: usize) callconv(.c) usize {
     const entry = obj.vectorRef(cpoint, @intCast(index));
     var cet: abi.CcEntryType = undefined;
-    const addr = ccEntryToAddress(entry) orelse return std.math.maxInt(c_ulong);
-    if (abi.read_cc_entry_type(&cet, addr)) return std.math.maxInt(c_ulong);
+    const addr = ccEntryToAddress(entry) orelse return std.math.maxInt(usize);
+    if (abi.read_cc_entry_type(&cet, addr)) return std.math.maxInt(usize);
     const size = compiledEntryFrameSize(&cet);
-    return if (size == std.math.maxInt(c_ulong)) size else index + size;
+    return if (size == std.math.maxInt(usize)) size else index + size;
 }
 
-pub fn cpointCompiledCodeNext(cpoint: obj.SchemeObject, index: c_ulong) callconv(.c) c_ulong {
+pub fn cpointCompiledCodeNext(cpoint: obj.SchemeObject, index: usize) callconv(.c) usize {
     const rc = obj.objectDatum(obj.vectorRef(cpoint, @intCast(index)));
     return switch (rc) {
         abi.rc_reenter_compiled_code => index + abi.cont_size,
@@ -1564,20 +1564,20 @@ pub fn cpointCompiledCodeNext(cpoint: obj.SchemeObject, index: c_ulong) callconv
                 var cet: abi.CcEntryType = undefined;
                 const addr = ccEntryToAddress(entry) orelse break :blk idx2;
                 if (abi.read_cc_entry_type(&cet, addr)) {
-                    break :blk std.math.maxInt(c_ulong);
+                    break :blk std.math.maxInt(usize);
                 }
                 switch (ccEntryTypeMarkerGroup(cet.marker)) {
                     .internal_procedure => {
                         const dlink = obj.vectorRef(cpoint, @intCast(index + abi.cont_size));
                         if (ccStackEnvP(dlink)) {
                             const se_addr = obj.objectAddress(dlink);
-                            const end_diff: c_ulong = @intCast((@intFromPtr(abi.stack_end) - @intFromPtr(se_addr)) / @sizeOf(obj.SchemeObject));
+                            const end_diff: usize = @intCast((@intFromPtr(abi.stack_end) - @intFromPtr(se_addr)) / @sizeOf(obj.SchemeObject));
                             break :blk obj.vectorLength(cpoint) - end_diff;
                         }
                     },
                     .procedure => {
                         const size = compiledEntryFrameSize(&cet);
-                        break :blk if (size == std.math.maxInt(c_ulong)) size else idx2 + size;
+                        break :blk if (size == std.math.maxInt(usize)) size else idx2 + size;
                     },
                     else => {},
                 }
@@ -1594,11 +1594,11 @@ pub fn cpointCompiledCodeNext(cpoint: obj.SchemeObject, index: c_ulong) callconv
             break :blk index + abi.cont_size + 4 + (frame_size - 1);
         },
         abi.rc_comp_error_restart => index + abi.cont_size + 1,
-        else => std.math.maxInt(c_ulong),
+        else => std.math.maxInt(usize),
     };
 }
 
-fn setupCompiledInvocation(procedure: obj.SchemeObject, n_args: c_ulong) c_long {
+fn setupCompiledInvocation(procedure: obj.SchemeObject, n_args: usize) isize {
     var cet: abi.CcEntryType = undefined;
     if (abi.read_cc_entry_type(&cet, ccEntryAddress(procedure))) {
         recoverFromApplyError(procedure, n_args);
@@ -1608,12 +1608,12 @@ fn setupCompiledInvocation(procedure: obj.SchemeObject, n_args: c_ulong) c_long 
         recoverFromApplyError(procedure, n_args);
         return abi.err_inapplicable_object;
     }
-    const n_min: c_ulong = cet.args.for_procedure.n_required;
+    const n_min: usize = cet.args.for_procedure.n_required;
     if (n_args < n_min) {
         recoverFromApplyError(procedure, n_args);
         return abi.err_wrong_number_of_arguments;
     }
-    const n_max: c_ulong = n_min + cet.args.for_procedure.n_optional;
+    const n_max: usize = n_min + cet.args.for_procedure.n_optional;
     if (cet.args.for_procedure.rest_p) {
         return setupLexprInvocation(procedure, n_args, n_max);
     }
@@ -1629,7 +1629,7 @@ fn setupCompiledInvocation(procedure: obj.SchemeObject, n_args: c_ulong) c_long 
     return abi.prim_done;
 }
 
-fn setupLexprInvocation(procedure: obj.SchemeObject, n_args: c_ulong, n_max: c_ulong) c_long {
+fn setupLexprInvocation(procedure: obj.SchemeObject, n_args: usize, n_max: usize) isize {
     if (n_args <= n_max) {
         if (openGap(@intCast(n_args), @intCast(n_max + 1))) {
             recoverFromApplyError(procedure, n_args);
@@ -1696,7 +1696,7 @@ pub fn makeCompiledProcedureType(
     } };
 }
 
-pub fn makeCompiledContinuationType(cet: *abi.CcEntryType, offset: c_ulong) callconv(.c) void {
+pub fn makeCompiledContinuationType(cet: *abi.CcEntryType, offset: usize) callconv(.c) void {
     cet.marker = .continuation;
     cet.args = .{ .for_continuation = .{ .offset = offset } };
 }
@@ -1779,18 +1779,18 @@ pub fn linkageSectionType(marker: obj.SchemeObject) callconv(.c) c_uint {
     return @intFromEnum(linkageSectionTypeEnum(marker));
 }
 
-pub fn linkageSectionCount(marker: obj.SchemeObject) callconv(.c) c_ulong {
+pub fn linkageSectionCount(marker: obj.SchemeObject) callconv(.c) usize {
     const t = linkageSectionTypeEnum(marker);
     const n_words = obj.objectDatum(marker) & 0xFFFF;
     return if (t == .operator or t == .global_operator) n_words / uuo_link_size else n_words;
 }
 
-pub fn makeLinkageSectionMarker(sec_type: abi.LinkageSectionType, count: c_ulong) callconv(.c) obj.SchemeObject {
+pub fn makeLinkageSectionMarker(sec_type: abi.LinkageSectionType, count: usize) callconv(.c) obj.SchemeObject {
     const t_val = @intFromEnum(sec_type);
     std.debug.assert(t_val < 4);
     const n_words = if (sec_type == .operator or sec_type == .global_operator) count * uuo_link_size else count;
     std.debug.assert(n_words < 0x10000);
-    return obj.makeObject(obj.tc_linkage_section, (@as(c_ulong, t_val) << 16) | n_words);
+    return obj.makeObject(obj.tc_linkage_section, (@as(usize, t_val) << 16) | n_words);
 }
 
 pub fn ccBlockDebuggingInfo(block: obj.SchemeObject) callconv(.c) obj.SchemeObject {
@@ -1801,11 +1801,11 @@ pub fn ccBlockEnvironment(block: obj.SchemeObject) callconv(.c) obj.SchemeObject
     return obj.vectorRef(block, @intCast(obj.vectorLength(block) - 1));
 }
 
-pub fn ccEntryToBlockOffset(entry: obj.SchemeObject) callconv(.c) c_ulong {
+pub fn ccEntryToBlockOffset(entry: obj.SchemeObject) callconv(.c) usize {
     return @intCast(@intFromPtr(ccEntryAddress(entry)) - @intFromPtr(ccEntryToBlockAddress(entry)));
 }
 
-pub fn ccReturnToBlockOffset(ret: obj.SchemeObject) callconv(.c) c_ulong {
+pub fn ccReturnToBlockOffset(ret: obj.SchemeObject) callconv(.c) usize {
     const entry_addr = ccReturnAddressToEntryAddressPtr(ccReturnAddress(ret));
     return @intCast(@intFromPtr(entry_addr) - @intFromPtr(ccReturnToBlockAddress(ret)));
 }
@@ -1833,7 +1833,7 @@ pub fn declareCompiledCodeBlock(block: obj.SchemeObject) callconv(.c) void {
     }
 }
 
-pub fn writeVariableCache(cache: obj.SchemeObject, block: obj.SchemeObject, offset: c_ulong) callconv(.c) void {
+pub fn writeVariableCache(cache: obj.SchemeObject, block: obj.SchemeObject, offset: usize) callconv(.c) void {
     const val: obj.SchemeObject = @intCast(@intFromPtr(obj.objectAddress(cache)));
     if (abi.code_address_p(@ptrCast(obj.objectAddress(block)))) {
         abi.code_arena_write_begin();
@@ -1844,7 +1844,7 @@ pub fn writeVariableCache(cache: obj.SchemeObject, block: obj.SchemeObject, offs
     }
 }
 
-pub fn readUuoLink(block: obj.SchemeObject, offset: c_ulong) callconv(.c) obj.SchemeObject {
+pub fn readUuoLink(block: obj.SchemeObject, offset: usize) callconv(.c) obj.SchemeObject {
     return makeCcEntry(abi.read_uuo_target_no_reloc(obj.memoryLoc(block, @intCast(offset))).?);
 }
 
@@ -1890,7 +1890,7 @@ pub fn decodeOldStyleFormatWord(cet: *abi.CcEntryType, fw: u16) callconv(.c) boo
     }
     if (low < 0x80) return true;
     if (low < 0xE0) {
-        makeCompiledContinuationType(cet, @as(c_ulong, ((low & 0x7F) << 7) | (high & 0x7F)));
+        makeCompiledContinuationType(cet, @as(usize, ((low & 0x7F) << 7) | (high & 0x7F)));
         return false;
     }
     if (high != 0xFF) return true;
@@ -1954,11 +1954,11 @@ pub fn encodeOldStyleFormatWord(cet: *abi.CcEntryType, fw_r: *u16) callconv(.c) 
     return false;
 }
 
-pub fn comutilReturnToInterpreter(dsu_result: *UtilityResult, _: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilReturnToInterpreter(dsu_result: *UtilityResult, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     returnToC(dsu_result, abi.prim_done);
 }
 
-pub fn comutilReflectToInterface(dsu_result: *UtilityResult, _: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilReflectToInterface(dsu_result: *UtilityResult, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     const code = abi.stackPop();
     switch (obj.objectDatum(code)) {
         reflect_code_compiled_invocation => {
@@ -2001,36 +2001,36 @@ pub fn comutilReflectToInterface(dsu_result: *UtilityResult, _: c_ulong, _: c_ul
     }
 }
 
-pub fn comutilOperatorApplyTrap(dsu_result: *UtilityResult, tramp_store_raw: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilOperatorApplyTrap(dsu_result: *UtilityResult, tramp_store_raw: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     const store: [*]const obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(tramp_store_raw)));
     comutilApply(dsu_result, @intCast(store[0]), obj.objectDatum(store[1]), 0, 0);
 }
 
-pub fn comutilOperatorPrimitiveTrap(dsu_result: *UtilityResult, tramp_store_raw: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilOperatorPrimitiveTrap(dsu_result: *UtilityResult, tramp_store_raw: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     const store: [*]const obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(tramp_store_raw)));
     comutilPrimitiveApply(dsu_result, @intCast(store[0]), 0, 0, 0);
 }
 
-pub fn comutilOperatorLexprTrap(dsu_result: *UtilityResult, tramp_store_raw: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilOperatorLexprTrap(dsu_result: *UtilityResult, tramp_store_raw: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     const store: [*]const obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(tramp_store_raw)));
     abi.Registers[abi.regblock_lexpr_actuals] = abi.applyFrameHeaderNArgs(store[1]);
     comutilPrimitiveLexprApply(dsu_result, @intCast(store[0]), 0, 0, 0);
 }
 
-pub fn comutilOperator10Trap(dsu_result: *UtilityResult, tramp_store_raw: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilOperator10Trap(dsu_result: *UtilityResult, tramp_store_raw: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     const store: [*]const obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(tramp_store_raw)));
     abi.stackPush(obj.default_object);
     returnToSchemeEntry(dsu_result, ccEntryAddress(store[0]));
 }
 
-pub fn comutilOperator20Trap(dsu_result: *UtilityResult, tramp_store_raw: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilOperator20Trap(dsu_result: *UtilityResult, tramp_store_raw: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     const store: [*]const obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(tramp_store_raw)));
     abi.stackPush(obj.default_object);
     abi.stackPush(obj.default_object);
     returnToSchemeEntry(dsu_result, ccEntryAddress(store[0]));
 }
 
-pub fn comutilOperator21Trap(dsu_result: *UtilityResult, tramp_store_raw: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilOperator21Trap(dsu_result: *UtilityResult, tramp_store_raw: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     const store: [*]const obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(tramp_store_raw)));
     const a1 = abi.stackPop();
     abi.stackPush(obj.default_object);
@@ -2038,7 +2038,7 @@ pub fn comutilOperator21Trap(dsu_result: *UtilityResult, tramp_store_raw: c_ulon
     returnToSchemeEntry(dsu_result, ccEntryAddress(store[0]));
 }
 
-pub fn comutilOperator30Trap(dsu_result: *UtilityResult, tramp_store_raw: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilOperator30Trap(dsu_result: *UtilityResult, tramp_store_raw: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     const store: [*]const obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(tramp_store_raw)));
     abi.stackPush(obj.default_object);
     abi.stackPush(obj.default_object);
@@ -2046,7 +2046,7 @@ pub fn comutilOperator30Trap(dsu_result: *UtilityResult, tramp_store_raw: c_ulon
     returnToSchemeEntry(dsu_result, ccEntryAddress(store[0]));
 }
 
-pub fn comutilOperator31Trap(dsu_result: *UtilityResult, tramp_store_raw: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilOperator31Trap(dsu_result: *UtilityResult, tramp_store_raw: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     const store: [*]const obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(tramp_store_raw)));
     const a1 = abi.stackPop();
     abi.stackPush(obj.default_object);
@@ -2055,7 +2055,7 @@ pub fn comutilOperator31Trap(dsu_result: *UtilityResult, tramp_store_raw: c_ulon
     returnToSchemeEntry(dsu_result, ccEntryAddress(store[0]));
 }
 
-pub fn comutilOperator32Trap(dsu_result: *UtilityResult, tramp_store_raw: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilOperator32Trap(dsu_result: *UtilityResult, tramp_store_raw: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     const store: [*]const obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(tramp_store_raw)));
     const a1 = abi.stackPop();
     const a2 = abi.stackPop();
@@ -2065,7 +2065,7 @@ pub fn comutilOperator32Trap(dsu_result: *UtilityResult, tramp_store_raw: c_ulon
     returnToSchemeEntry(dsu_result, ccEntryAddress(store[0]));
 }
 
-pub fn comutilOperator40Trap(dsu_result: *UtilityResult, tramp_store_raw: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilOperator40Trap(dsu_result: *UtilityResult, tramp_store_raw: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     const store: [*]const obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(tramp_store_raw)));
     abi.stackPush(obj.default_object);
     abi.stackPush(obj.default_object);
@@ -2074,7 +2074,7 @@ pub fn comutilOperator40Trap(dsu_result: *UtilityResult, tramp_store_raw: c_ulon
     returnToSchemeEntry(dsu_result, ccEntryAddress(store[0]));
 }
 
-pub fn comutilOperator41Trap(dsu_result: *UtilityResult, tramp_store_raw: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilOperator41Trap(dsu_result: *UtilityResult, tramp_store_raw: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     const store: [*]const obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(tramp_store_raw)));
     const a1 = abi.stackPop();
     abi.stackPush(obj.default_object);
@@ -2084,7 +2084,7 @@ pub fn comutilOperator41Trap(dsu_result: *UtilityResult, tramp_store_raw: c_ulon
     returnToSchemeEntry(dsu_result, ccEntryAddress(store[0]));
 }
 
-pub fn comutilOperator42Trap(dsu_result: *UtilityResult, tramp_store_raw: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilOperator42Trap(dsu_result: *UtilityResult, tramp_store_raw: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     const store: [*]const obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(tramp_store_raw)));
     const a1 = abi.stackPop();
     const a2 = abi.stackPop();
@@ -2095,7 +2095,7 @@ pub fn comutilOperator42Trap(dsu_result: *UtilityResult, tramp_store_raw: c_ulon
     returnToSchemeEntry(dsu_result, ccEntryAddress(store[0]));
 }
 
-pub fn comutilOperator43Trap(dsu_result: *UtilityResult, tramp_store_raw: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilOperator43Trap(dsu_result: *UtilityResult, tramp_store_raw: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     const store: [*]const obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(tramp_store_raw)));
     const a1 = abi.stackPop();
     const a2 = abi.stackPop();
@@ -2107,13 +2107,13 @@ pub fn comutilOperator43Trap(dsu_result: *UtilityResult, tramp_store_raw: c_ulon
     returnToSchemeEntry(dsu_result, ccEntryAddress(store[0]));
 }
 
-pub fn comutilOperatorLookupTrap(dsu_result: *UtilityResult, tramp_store_raw: c_ulong, _: c_ulong, _: c_ulong, _: c_ulong) callconv(.c) void {
+pub fn comutilOperatorLookupTrap(dsu_result: *UtilityResult, tramp_store_raw: usize, _: usize, _: usize, _: usize) callconv(.c) void {
     const store: [*]const obj.SchemeObject = @ptrFromInt(@as(usize, @intCast(tramp_store_raw)));
     const cache = store[0];
     const block = store[1];
     const offset = store[2];
     const cache_addr = obj.memoryLoc(block, @intCast(obj.objectDatum(offset)));
-    const frame_size: c_ulong = abi.read_uuo_frame_size(cache_addr);
+    const frame_size: usize = abi.read_uuo_frame_size(cache_addr);
     var procedure: obj.SchemeObject = 0;
     const code = abi.compiler_operator_reference_trap(cache, &procedure);
     if (code != abi.prim_done) {
@@ -2128,7 +2128,7 @@ pub fn comutilOperatorLookupTrap(dsu_result: *UtilityResult, tramp_store_raw: c_
     comutilApply(dsu_result, @intCast(procedure), frame_size, 0, 0);
 }
 
-pub fn compOpLookupTrapRestart() callconv(.c) c_long {
+pub fn compOpLookupTrapRestart() callconv(.c) isize {
     restoreLastReturnCode();
     abi.stack_pointer = abi.stackLoc(3);
     const store = trampolineStorage(ccEntryToBlockAddress(abi.stackPop()));
@@ -2141,10 +2141,10 @@ pub fn makeUuoLink(
     proc_in: obj.SchemeObject,
     cache: obj.SchemeObject,
     block: obj.SchemeObject,
-    offset: c_ulong,
-) callconv(.c) c_long {
+    offset: usize,
+) callconv(.c) isize {
     const cache_address = obj.memoryLoc(block, @intCast(offset));
-    var frame_size: c_ulong = abi.read_uuo_frame_size(cache_address);
+    var frame_size: usize = abi.read_uuo_frame_size(cache_address);
     if (obj.referenceTrapP(proc_in)) {
         return makeFakeUuoLink(cache, block, offset);
     }
@@ -2160,8 +2160,8 @@ pub fn makeUuoLink(
                 if (abi.read_cc_entry_type(&cet, entry) or cet.marker != .procedure) {
                     return abi.err_compiled_code_error;
                 }
-                const nmin: c_ulong = cet.args.for_procedure.n_required;
-                const nmax: c_ulong = nmin + cet.args.for_procedure.n_optional;
+                const nmin: usize = cet.args.for_procedure.n_required;
+                const nmax: usize = nmin + cet.args.for_procedure.n_optional;
                 if (cet.args.for_procedure.rest_p) {
                     kind = abi.trampoline_k_apply;
                 } else if (nargs == nmax) {
@@ -2191,7 +2191,7 @@ pub fn makeUuoLink(
             },
             obj.tc_primitive => {
                 const arity = primitiveArity(procedure);
-                if (arity == @as(c_long, @intCast(frame_size - 1))) {
+                if (arity == @as(isize, @intCast(frame_size - 1))) {
                     kind = abi.trampoline_k_primitive;
                     frame_size = 0;
                 } else if (arity == abi.lexpr_primitive_arity) {
@@ -2219,7 +2219,7 @@ pub fn makeUuoLink(
     return result;
 }
 
-fn makeFakeUuoLink(cache: obj.SchemeObject, block: obj.SchemeObject, offset: c_ulong) c_long {
+fn makeFakeUuoLink(cache: obj.SchemeObject, block: obj.SchemeObject, offset: usize) isize {
     var cet: abi.CcEntryType = undefined;
     var trampoline: obj.SchemeObject = 0;
     makeCcEntryType(&cet, .trampoline);
@@ -2233,7 +2233,7 @@ fn makeFakeUuoLink(cache: obj.SchemeObject, block: obj.SchemeObject, offset: c_u
     return abi.prim_done;
 }
 
-pub fn coerceToCompiled(procedure: obj.SchemeObject, arity: c_uint, location: *obj.SchemeObject) callconv(.c) c_long {
+pub fn coerceToCompiled(procedure: obj.SchemeObject, arity: c_uint, location: *obj.SchemeObject) callconv(.c) isize {
     var cet: abi.CcEntryType = undefined;
     if (ccEntryP(procedure)) {
         if (abi.read_cc_entry_type(&cet, ccEntryAddress(procedure))) {
@@ -2247,7 +2247,7 @@ pub fn coerceToCompiled(procedure: obj.SchemeObject, arity: c_uint, location: *o
     makeCompiledProcedureType(&cet, arity, 0, false);
     return makeTrampoline(location, &cet, abi.trampoline_k_apply, &.{
         procedure,
-        obj.ulongToFixnum(@as(c_ulong, arity) + 1),
+        obj.ulongToFixnum(@as(usize, arity) + 1),
     });
 }
 
@@ -2256,10 +2256,10 @@ fn makeTrampoline(
     cet: *abi.CcEntryType,
     kind: u8,
     values: []const obj.SchemeObject,
-) c_long {
+) isize {
     if (comptime have_trampoline_to_interface) {
         const tti = trampoline_to_interface orelse return abi.err_compiled_code_error;
-        const n_words: c_ulong = 5 + @as(c_ulong, @intCast(values.len));
+        const n_words: usize = 5 + @as(usize, @intCast(values.len));
         if (abi.gcNeededP(n_words)) {
             abi.requestGc(n_words);
             return abi.prim_interrupt;
@@ -2295,7 +2295,7 @@ fn makeTrampoline(
     } else {
         var h1: obj.SchemeObject = 0;
         var h2: obj.SchemeObject = 0;
-        var n_words: c_ulong = 0;
+        var n_words: usize = 0;
         makeTrampolineHeaders(1, @intCast(values.len), &h1, &h2, &n_words);
         if (abi.gcNeededP(n_words)) {
             abi.requestGc(n_words);
@@ -2318,11 +2318,11 @@ fn makeTrampoline(
 }
 
 fn makeTrampolineHeaders(
-    n_entries: c_ulong,
-    n_store: c_ulong,
+    n_entries: usize,
+    n_store: usize,
     h1_r: *obj.SchemeObject,
     h2_r: *obj.SchemeObject,
-    n_words_r: *c_ulong,
+    n_words_r: *usize,
 ) void {
     const n1 = abi.trampoline_entry_size(n_entries);
     const n2 = 1 + n1 + n_store;
@@ -2333,7 +2333,7 @@ fn makeTrampolineHeaders(
 
 fn fillTrampoline(
     block: [*]obj.SchemeObject,
-    index: c_ulong,
+    index: usize,
     cet: *abi.CcEntryType,
     kind: u8,
 ) bool {
@@ -2358,13 +2358,13 @@ pub fn trampolineStorage(block: [*]obj.SchemeObject) callconv(.c) [*]obj.SchemeO
     return block + 2 + @as(usize, @intCast(obj.objectDatum(block[1])));
 }
 
-fn makeRedirectionTrampoline(slot: *obj.SchemeObject, kind: u8, procedure: obj.SchemeObject) c_long {
+fn makeRedirectionTrampoline(slot: *obj.SchemeObject, kind: u8, procedure: obj.SchemeObject) isize {
     var cet: abi.CcEntryType = undefined;
     makeCcEntryType(&cet, .trampoline);
     return makeTrampoline(slot, &cet, kind, &.{procedure});
 }
 
-fn makeApplyTrampoline(slot: *obj.SchemeObject, kind: u8, procedure: obj.SchemeObject, frame_size: c_ulong) c_long {
+fn makeApplyTrampoline(slot: *obj.SchemeObject, kind: u8, procedure: obj.SchemeObject, frame_size: usize) isize {
     var cet: abi.CcEntryType = undefined;
     makeCcEntryType(&cet, .trampoline);
     return makeTrampoline(slot, &cet, kind, &.{ procedure, obj.ulongToFixnum(frame_size) });
@@ -2390,16 +2390,16 @@ pub fn bkptProceed(_: ?*anyopaque, _: obj.SchemeObject, _: obj.SchemeObject) cal
     abi.error_external_return();
 }
 
-pub fn doBkptProceed(_: *?*anyopaque) callconv(.c) c_long {
+pub fn doBkptProceed(_: *?*anyopaque) callconv(.c) isize {
     return abi.err_external_return;
 }
 
 pub fn comutilCompiledCodeBkpt(
     dsu_result: *UtilityResult,
-    entry_addr_raw: c_ulong,
-    state_raw: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
+    entry_addr_raw: usize,
+    state_raw: usize,
+    _: usize,
+    _: usize,
 ) callconv(.c) void {
     const entry_addr: *anyopaque = @ptrFromInt(@as(usize, @intCast(entry_addr_raw)));
     const entry = makeCcEntry(entry_addr);
@@ -2426,10 +2426,10 @@ pub fn comutilCompiledCodeBkpt(
 
 pub fn comutilCompiledClosureBkpt(
     dsu_result: *UtilityResult,
-    entry_addr_raw: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
-    _: c_ulong,
+    entry_addr_raw: usize,
+    _: usize,
+    _: usize,
+    _: usize,
 ) callconv(.c) void {
     const entry_addr: *anyopaque = @ptrFromInt(@as(usize, @intCast(entry_addr_raw)));
     const entry = makeCcEntry(entry_addr);
@@ -2445,21 +2445,21 @@ pub fn utilityIndexToName(_: c_uint) callconv(.c) ?[*:0]const u8 {
     return null;
 }
 
-pub fn pcToUtilityIndex(_: c_ulong) callconv(.c) c_int {
+pub fn pcToUtilityIndex(_: usize) callconv(.c) c_int {
     return -1;
 }
 
-pub fn declareBuiltin(builtin_addr: c_ulong, name: [*:0]const u8) callconv(.c) void {
+pub fn declareBuiltin(builtin_addr: usize, name: [*:0]const u8) callconv(.c) void {
     if (n_builtins == s_builtins) {
         if (s_builtins == 0) {
             s_builtins = 30;
-            const b_ptr = std.c.malloc(@as(usize, s_builtins) * @sizeOf(c_ulong));
+            const b_ptr = std.c.malloc(@as(usize, s_builtins) * @sizeOf(usize));
             const n_ptr = std.c.malloc(@as(usize, s_builtins) * @sizeOf([*:0]const u8));
             builtins = if (b_ptr) |p| @ptrCast(@alignCast(p)) else null;
             builtin_names = if (n_ptr) |p| @ptrCast(@alignCast(p)) else null;
         } else {
             s_builtins += s_builtins;
-            const b_ptr = std.c.realloc(@ptrCast(builtins), @as(usize, s_builtins) * @sizeOf(c_ulong));
+            const b_ptr = std.c.realloc(@ptrCast(builtins), @as(usize, s_builtins) * @sizeOf(usize));
             const n_ptr = std.c.realloc(@ptrCast(builtin_names), @as(usize, s_builtins) * @sizeOf([*:0]const u8));
             builtins = if (b_ptr) |p| @ptrCast(@alignCast(p)) else null;
             builtin_names = if (n_ptr) |p| @ptrCast(@alignCast(p)) else null;
@@ -2504,7 +2504,7 @@ pub fn builtinIndexToName(index: c_uint) callconv(.c) ?[*:0]const u8 {
     return if (index < n_builtins) builtin_names.?[index] else null;
 }
 
-pub fn pcToBuiltinIndex(pc: c_ulong) callconv(.c) c_int {
+pub fn pcToBuiltinIndex(pc: usize) callconv(.c) c_int {
     const bs = builtins orelse return -1;
     if (!(n_builtins > 0 and pc >= bs[0] and pc < bs[n_builtins - 1])) return -1;
     var low: c_uint = 0;
@@ -2685,7 +2685,7 @@ test "cmpint format word encode/decode and entry groups" {
     try std.testing.expect(!encodeOldStyleFormatWord(&cet, &fw));
     try std.testing.expect(!decodeOldStyleFormatWord(&got, fw));
     try std.testing.expectEqual(abi.CcEntryTypeMarker.continuation, got.marker);
-    try std.testing.expectEqual(@as(c_ulong, 0x1234), got.args.for_continuation.offset);
+    try std.testing.expectEqual(@as(usize, 0x1234), got.args.for_continuation.offset);
     try std.testing.expectEqual(abi.CcEntryTypeGroup.continuation, ccEntryTypeMarkerGroup(got.marker));
 
     // All 6 special markers
@@ -2723,7 +2723,7 @@ test "cmpint linkage markers, reflect frame types, and cpoint offsets" {
     for (types) |t| {
         const m = makeLinkageSectionMarker(t, 7);
         try std.testing.expectEqual(@intFromEnum(t), linkageSectionType(m));
-        try std.testing.expectEqual(@as(c_ulong, 7), linkageSectionCount(m));
+        try std.testing.expectEqual(@as(usize, 7), linkageSectionCount(m));
     }
 
     var frame: [3]obj.SchemeObject = .{
@@ -2741,11 +2741,11 @@ test "cmpint linkage markers, reflect frame types, and cpoint offsets" {
     cpoint_words[0] = obj.makeVectorHeader(11);
     const cpoint = obj.makePointerObject(obj.tc_control_point, &cpoint_words);
     obj.vectorSet(cpoint, 0, obj.makeReturnCode(abi.rc_reenter_compiled_code));
-    try std.testing.expectEqual(@as(c_ulong, abi.cont_size), cpointCompiledCodeNext(cpoint, 0));
+    try std.testing.expectEqual(@as(usize, abi.cont_size), cpointCompiledCodeNext(cpoint, 0));
     obj.vectorSet(cpoint, 1, obj.makeReturnCode(abi.rc_comp_link_caches_restart));
-    try std.testing.expectEqual(@as(c_ulong, 1 + abi.cont_size + 7), cpointCompiledCodeNext(cpoint, 1));
+    try std.testing.expectEqual(@as(usize, 1 + abi.cont_size + 7), cpointCompiledCodeNext(cpoint, 1));
     obj.vectorSet(cpoint, 2, obj.makeReturnCode(abi.rc_comp_assignment_trap_restart));
-    try std.testing.expectEqual(@as(c_ulong, 2 + abi.cont_size + 3), cpointCompiledCodeNext(cpoint, 2));
+    try std.testing.expectEqual(@as(usize, 2 + abi.cont_size + 3), cpointCompiledCodeNext(cpoint, 2));
 }
 
 test "cmpint stack gaps, lexpr setup, trampoline storage, utilities, and builtins" {

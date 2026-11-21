@@ -6,7 +6,7 @@ const std = @import("std");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
 
-fn indirect(slot: usize, arity: c_ulong) noreturn {
+fn indirect(slot: usize, arity: usize) noreturn {
     abi.canonicalize_primitive_context();
     abi.stackCheck(2);
     abi.stackPush(obj.vectorRef(abi.fixed_objects, slot));

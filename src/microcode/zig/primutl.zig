@@ -10,9 +10,9 @@ const transact = @import("transact.zig");
 const wind = @import("wind.zig");
 
 pub const PrimRenumber = extern struct {
-    internal: [*]c_ulong,
-    external: [*]c_ulong,
-    next_code: c_ulong,
+    internal: [*]usize,
+    external: [*]usize,
+    next_code: usize,
 };
 
 const PrimitiveAlias = struct {
@@ -41,14 +41,14 @@ const primitive_aliases = [_]PrimitiveAlias{
     .{ .alias = "DUMP-BAND", .name = "DUMP-BAND*" },
 };
 
-extern var MAX_STATIC_PRIMITIVE: c_long;
+extern var MAX_STATIC_PRIMITIVE: isize;
 extern var Static_Primitive_Procedure_Table: [1]abi.PrimitiveProcedure;
 extern var Static_Primitive_Arity_Table: [1]c_int;
 extern var Static_Primitive_Count_Table: [1]c_int;
 extern var Static_Primitive_Name_Table: [1]?[*:0]const u8;
 extern var Static_Primitive_Documentation_Table: [1]?[*:0]const u8;
 
-pub export var MAX_PRIMITIVE: c_ulong = 0;
+pub export var MAX_PRIMITIVE: usize = 0;
 pub export var Primitive_Procedure_Table: ?[*]abi.PrimitiveProcedure = null;
 pub export var Primitive_Arity_Table: ?[*]c_int = null;
 pub export var Primitive_Count_Table: ?[*]c_int = null;
@@ -56,7 +56,7 @@ pub export var Primitive_Name_Table: ?[*]?[*:0]const u8 = null;
 pub export var Primitive_Documentation_Table: ?[*]?[*:0]const u8 = null;
 pub export var load_renumber_table: ?[*]obj.SchemeObject = null;
 
-var prim_table_size: c_ulong = 0;
+var prim_table_size: usize = 0;
 var prim_procedure_tree: ?*avltree.TreeNode = null;
 
 pub export fn strcmp_ci(s1: [*:0]const u8, s2: [*:0]const u8) callconv(.c) c_int {
@@ -115,7 +115,7 @@ fn growPrimitiveTables() void {
 }
 
 pub export fn initialize_primitives() callconv(.c) void {
-    MAX_PRIMITIVE = @as(c_ulong, @intCast(MAX_STATIC_PRIMITIVE)) + 1;
+    MAX_PRIMITIVE = @as(usize, @intCast(MAX_STATIC_PRIMITIVE)) + 1;
     growPrimitiveTables();
 
     avltree.tree_error_message = null;
@@ -126,7 +126,7 @@ pub export fn initialize_primitives() callconv(.c) void {
     }
 
     for (primitive_aliases) |entry| {
-        var index: c_ulong = undefined;
+        var index: usize = undefined;
         if (avltree.tree_lookup(prim_procedure_tree, entry.name)) |orig| {
             index = orig.value;
         } else {
@@ -290,11 +290,11 @@ fn freePrimRenumber(vpr: ?*anyopaque) callconv(.c) void {
 pub export fn make_prim_renumber() callconv(.c) *PrimRenumber {
     const n_entries: usize = @intCast(MAX_PRIMITIVE);
     const pr: *PrimRenumber = @ptrCast(@alignCast(abi.OS_malloc(@sizeOf(PrimRenumber)).?));
-    const arr_bytes = @max(n_entries, 1) * @sizeOf(c_ulong);
+    const arr_bytes = @max(n_entries, 1) * @sizeOf(usize);
     pr.internal = @ptrCast(@alignCast(abi.OS_malloc(arr_bytes).?));
     pr.external = @ptrCast(@alignCast(abi.OS_malloc(arr_bytes).?));
     pr.next_code = 0;
-    const empty_val = std.math.maxInt(c_ulong);
+    const empty_val = std.math.maxInt(usize);
     @memset(pr.internal[0..n_entries], empty_val);
     @memset(pr.external[0..n_entries], empty_val);
     transact.transaction_record_action(.tat_always, &freePrimRenumber, @ptrCast(pr));
@@ -305,7 +305,7 @@ pub export fn renumber_primitive(primitive: obj.SchemeObject, pr: *PrimRenumber)
     const old = obj.objectDatum(primitive);
     const old_idx: usize = @intCast(old);
     var new_code = pr.internal[old_idx];
-    if (new_code == std.math.maxInt(c_ulong)) {
+    if (new_code == std.math.maxInt(usize)) {
         new_code = pr.next_code;
         pr.next_code += 1;
         pr.internal[old_idx] = new_code;
@@ -314,13 +314,13 @@ pub export fn renumber_primitive(primitive: obj.SchemeObject, pr: *PrimRenumber)
     return obj.objectNewDatum(primitive, new_code);
 }
 
-fn tableEntryLength(code: c_ulong) c_ulong {
+fn tableEntryLength(code: usize) usize {
     const source = Primitive_Name_Table.?[@intCast(code)];
-    const n_chars: c_ulong = if (source) |s| @intCast(std.mem.len(s)) else 0;
+    const n_chars: usize = if (source) |s| @intCast(std.mem.len(s)) else 0;
     return obj.bytevectorLengthToGcLength(n_chars) + 2;
 }
 
-fn makeTableEntry(code: c_ulong, start_in: [*]obj.SchemeObject) [*]obj.SchemeObject {
+fn makeTableEntry(code: usize, start_in: [*]obj.SchemeObject) [*]obj.SchemeObject {
     const idx: usize = @intCast(code);
     const source: [*:0]const u8 = Primitive_Name_Table.?[idx] orelse "";
     const n_chars: usize = std.mem.len(source);
@@ -337,8 +337,8 @@ fn makeTableEntry(code: c_ulong, start_in: [*]obj.SchemeObject) [*]obj.SchemeObj
     return start + n_words_u;
 }
 
-pub export fn renumbered_primitives_export_length(pr: *PrimRenumber) callconv(.c) c_ulong {
-    var result: c_ulong = 0;
+pub export fn renumbered_primitives_export_length(pr: *PrimRenumber) callconv(.c) usize {
+    var result: usize = 0;
     for (0..@as(usize, @intCast(pr.next_code))) |i| {
         result += tableEntryLength(pr.external[i]);
     }
@@ -352,8 +352,8 @@ pub export fn export_renumbered_primitives(start_in: [*]obj.SchemeObject, pr: *P
     }
 }
 
-pub export fn primitive_table_export_length() callconv(.c) c_ulong {
-    var result: c_ulong = 0;
+pub export fn primitive_table_export_length() callconv(.c) usize {
+    var result: usize = 0;
     for (0..@as(usize, @intCast(MAX_PRIMITIVE))) |i| {
         result += tableEntryLength(@intCast(i));
     }
@@ -369,7 +369,7 @@ pub export fn export_primitive_table(start_in: [*]obj.SchemeObject) callconv(.c)
 
 pub export fn import_primitive_table(
     entries_in: [*]obj.SchemeObject,
-    n_entries: c_ulong,
+    n_entries: usize,
     primitives: [*]obj.SchemeObject,
 ) callconv(.c) void {
     var entries = entries_in;
@@ -419,7 +419,7 @@ test "primutl initialize, aliases, declare/install, find, and fasl renumber expo
 
     initialize_primitives();
     // 2 static primitives ("CAR", "CDR") + 17 distinct targets across 18 aliases
-    try std.testing.expectEqual(@as(c_ulong, 19), MAX_PRIMITIVE);
+    try std.testing.expectEqual(@as(usize, 19), MAX_PRIMITIVE);
 
     // Lookup existing static primitive & alias
     const p_car = find_primitive_cname("car", false, false, 1);
@@ -458,9 +458,9 @@ test "primutl initialize, aliases, declare/install, find, and fasl renumber expo
     const pr = make_prim_renumber();
     const r0 = renumber_primitive(dyn, pr);
     const r1 = renumber_primitive(p_car, pr);
-    try std.testing.expectEqual(@as(c_ulong, 0), obj.objectDatum(r0));
-    try std.testing.expectEqual(@as(c_ulong, 1), obj.objectDatum(r1));
-    try std.testing.expectEqual(@as(c_ulong, 2), pr.next_code);
+    try std.testing.expectEqual(@as(usize, 0), obj.objectDatum(r0));
+    try std.testing.expectEqual(@as(usize, 1), obj.objectDatum(r1));
+    try std.testing.expectEqual(@as(usize, 2), pr.next_code);
 
     const export_len: usize = @intCast(renumbered_primitives_export_length(pr));
     var export_buf: [64]obj.SchemeObject = @splat(0);

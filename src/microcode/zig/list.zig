@@ -120,7 +120,7 @@ pub export fn Prim_sys_pair() callconv(.c) obj.SchemeObject {
 }
 
 pub export fn system_pair_cons(
-    pair_type: c_long,
+    pair_type: isize,
     car_val: obj.SchemeObject,
     cdr_val: obj.SchemeObject,
 ) callconv(.c) obj.SchemeObject {

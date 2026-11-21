@@ -9,19 +9,19 @@ pub inline fn groupP(o: obj.SchemeObject) bool {
     return obj.vectorP(o);
 }
 
-pub inline fn groupText(group: obj.SchemeObject, len_r: ?*c_ulong) [*]u8 {
+pub inline fn groupText(group: obj.SchemeObject, len_r: ?*usize) [*]u8 {
     return str.string_to_char_pointer(obj.vectorRef(group, 1), len_r);
 }
 
-pub inline fn groupGapStart(group: obj.SchemeObject) c_ulong {
+pub inline fn groupGapStart(group: obj.SchemeObject) usize {
     return obj.fixnumToUlong(obj.vectorRef(group, 2));
 }
 
-pub inline fn groupGapLength(group: obj.SchemeObject) c_ulong {
+pub inline fn groupGapLength(group: obj.SchemeObject) usize {
     return obj.fixnumToUlong(obj.vectorRef(group, 3));
 }
 
-pub inline fn groupGapEnd(group: obj.SchemeObject) c_ulong {
+pub inline fn groupGapEnd(group: obj.SchemeObject) usize {
     return obj.fixnumToUlong(obj.vectorRef(group, 4));
 }
 
@@ -37,6 +37,6 @@ pub inline fn markP(o: obj.SchemeObject) bool {
     return obj.recordP(o);
 }
 
-pub inline fn markIndex(mark: obj.SchemeObject) c_long {
+pub inline fn markIndex(mark: obj.SchemeObject) isize {
     return obj.unsignedFixnumToLong(obj.vectorRef(mark, 2));
 }

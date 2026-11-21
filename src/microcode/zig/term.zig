@@ -17,13 +17,13 @@ const fasload = @import("fasload.zig");
 const debug = @import("debug.zig");
 const interp = @import("interp.zig");
 
-const min_heap_delta: c_ulong = 50;
+const min_heap_delta: usize = 50;
 
 extern "c" fn outf_console([*:0]const u8, ...) void;
 extern "c" fn outf_flush_console() void;
 extern "c" fn outf_flush_fatal() void;
 
-inline fn bytesToBlocks(n: c_ulong) c_ulong {
+inline fn bytesToBlocks(n: usize) usize {
     return (n + 1023) / 1024;
 }
 
@@ -41,7 +41,7 @@ fn attemptTerminationBackout(code: c_int) void {
     const term_vector = obj.vectorRef(abi.fixed_objects, abi.fixobj_termination_proc_vector);
     if (!(obj.vectorP(term_vector) and
         code >= 0 and
-        @as(c_ulong, @intCast(code)) < obj.vectorLength(term_vector)))
+        @as(usize, @intCast(code)) < obj.vectorLength(term_vector)))
     {
         return;
     }
@@ -50,7 +50,7 @@ fn attemptTerminationBackout(code: c_int) void {
         return;
     }
 
-    const frame_size: c_ulong = if (code == abi.term_no_error_handler) 5 else 4;
+    const frame_size: usize = if (code == abi.term_no_error_handler) 5 else 4;
     abi.stackCheck(2 + @as(usize, @intCast(frame_size)) + 1);
     abi.pushCont(abi.rc_halt, obj.longToUnsignedFixnum(code));
     if (code == abi.term_no_error_handler) {
@@ -137,12 +137,12 @@ pub fn terminationTrap() callconv(.c) noreturn {
 pub fn terminationNoErrorHandler() callconv(.c) noreturn {
     terminationPrefix(abi.term_no_error_handler);
     if (utils.death_blow == abi.err_fasl_file_too_big) {
-        var heap_size: c_ulong = 0;
-        var const_size: c_ulong = 0;
+        var heap_size: usize = 0;
+        var const_size: usize = 0;
         fasload.get_band_parameters(&heap_size, &const_size);
         abi.outf_fatal("Try again with values at least as large as\n");
-        abi.outf_fatal("  --heap %lu\n", min_heap_delta + bytesToBlocks(heap_size));
-        abi.outf_fatal("  --constant %lu\n", bytesToBlocks(const_size));
+        abi.outf_fatal("  --heap %zu\n", min_heap_delta + bytesToBlocks(heap_size));
+        abi.outf_fatal("  --constant %zu\n", bytesToBlocks(const_size));
     }
     terminationSuffix(1);
 }
@@ -151,12 +151,12 @@ pub fn terminationGcOutOfSpace() callconv(.c) noreturn {
     terminationPrefix(abi.term_gc_out_of_space);
     abi.outf_fatal("You are out of space at the end of a garbage collection!\n");
     abi.outf_fatal(
-        "Free = %#lx; heap_alloc_limit = %#lx; heap_end = %#lx\n",
-        @as(c_ulong, @intCast(@intFromPtr(abi.Free))),
-        @as(c_ulong, @intCast(@intFromPtr(abi.heap_alloc_limit))),
-        @as(c_ulong, @intCast(@intFromPtr(abi.heap_end))),
+        "Free = %#zx; heap_alloc_limit = %#zx; heap_end = %#zx\n",
+        @as(usize, @intCast(@intFromPtr(abi.Free))),
+        @as(usize, @intCast(@intFromPtr(abi.heap_alloc_limit))),
+        @as(usize, @intCast(@intFromPtr(abi.heap_end))),
     );
-    abi.outf_fatal("# words needed = %lu; # words available = %lu\n", abi.gc_space_needed, abi.heapAvailable());
+    abi.outf_fatal("# words needed = %zu; # words available = %zu\n", abi.gc_space_needed, abi.heapAvailable());
     terminationSuffixTrace();
 }
 
@@ -213,7 +213,7 @@ fn edwinAutoSave() void {
         {
             const group = obj.pairCar(entry);
             const namestring: [*:0]const u8 = @ptrCast(obj.legacyStringData(obj.pairCdr(entry)));
-            var length: c_ulong = 0;
+            var length: usize = 0;
             const start = edwin.groupText(group, &length);
             const end_ptr = start + @as(usize, @intCast(length));
             const gap_start = start + @as(usize, @intCast(edwin.groupGapStart(group)));

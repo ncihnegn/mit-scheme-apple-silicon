@@ -13,7 +13,7 @@ comptime {
 
 pub const SchemeObject = scheme_obj.SchemeObject;
 
-const code_arena_min_overflow_words: c_ulong = 262144;
+const code_arena_min_overflow_words: usize = 262144;
 const code_mark_stack_initial_cap: usize = 4096;
 
 extern "c" fn malloc(size: usize) ?*anyopaque;
@@ -30,7 +30,7 @@ const CodeArenaChunk = struct {
     alloc_next: ?[*]SchemeObject = null,
     end: ?[*]SchemeObject = null,
     byte_size: usize = 0,
-    total_words: c_ulong = 0,
+    total_words: usize = 0,
     mark_bits: ?[*]u64 = null,
     next: ?*CodeArenaChunk = null,
 };
@@ -80,7 +80,7 @@ fn findChunkForAddr(addr: ?*const anyopaque) ?*CodeArenaChunk {
     return null;
 }
 
-fn initChunk(c: *CodeArenaChunk, requested_words: c_ulong) void {
+fn initChunk(c: *CodeArenaChunk, requested_words: usize) void {
     const page_size = jit.jit_page_size();
     const words: usize = if (requested_words == 0) 2048 else @intCast(requested_words);
 
@@ -142,7 +142,7 @@ fn freeOverflowChunks() void {
     code_overflow_chunks = null;
 }
 
-pub export fn code_arena_setup(initial_words: c_ulong) callconv(.c) void {
+pub export fn code_arena_setup(initial_words: usize) callconv(.c) void {
     if (primary_initialized_p) {
         code_arena_teardown();
     }
@@ -169,7 +169,7 @@ pub export fn code_arena_setup(initial_words: c_ulong) callconv(.c) void {
     primary_initialized_p = true;
 }
 
-pub export fn code_arena_reset(required_words: c_ulong) callconv(.c) void {
+pub export fn code_arena_reset(required_words: usize) callconv(.c) void {
     freeOverflowChunks();
     code_free_list = null;
     mark_stack_top = 0;
@@ -269,8 +269,8 @@ pub export fn code_arena_find_block(addr: ?*const anyopaque) callconv(.c) ?[*]Sc
     return null;
 }
 
-pub export fn code_arena_chunk_count() callconv(.c) c_ulong {
-    var count: c_ulong = 0;
+pub export fn code_arena_chunk_count() callconv(.c) usize {
+    var count: usize = 0;
     var cur = firstChunk();
     while (cur) |c| : (cur = nextChunk(c)) {
         count += 1;
@@ -278,8 +278,8 @@ pub export fn code_arena_chunk_count() callconv(.c) c_ulong {
     return count;
 }
 
-pub export fn code_arena_nonempty_chunk_count() callconv(.c) c_ulong {
-    var count: c_ulong = 0;
+pub export fn code_arena_nonempty_chunk_count() callconv(.c) usize {
+    var count: usize = 0;
     var cur = firstChunk();
     while (cur) |c| : (cur = nextChunk(c)) {
         if (@intFromPtr(c.alloc_next) > @intFromPtr(c.start)) {
@@ -300,7 +300,7 @@ pub export fn code_arena_max_end() callconv(.c) ?[*]SchemeObject {
     return best;
 }
 
-pub export fn code_arena_mark_hole(start: ?[*]SchemeObject, n_words: c_ulong) callconv(.c) void {
+pub export fn code_arena_mark_hole(start: ?[*]SchemeObject, n_words: usize) callconv(.c) void {
     const s = start orelse return;
     if (n_words == 0) return;
     jit.jit_write_begin();
@@ -311,8 +311,8 @@ pub export fn code_arena_mark_hole(start: ?[*]SchemeObject, n_words: c_ulong) ca
     jit.jit_write_end();
 }
 
-pub export fn code_arena_live_words() callconv(.c) c_ulong {
-    var live: c_ulong = 0;
+pub export fn code_arena_live_words() callconv(.c) usize {
+    var live: usize = 0;
     var cur = firstChunk();
     while (cur) |c| : (cur = nextChunk(c)) {
         var scan = c.start.?;
@@ -329,7 +329,7 @@ pub export fn code_arena_live_words() callconv(.c) c_ulong {
     return live;
 }
 
-pub const LiveBlockCallback = *const fn ([*]SchemeObject, c_ulong, ?*anyopaque) callconv(.c) void;
+pub const LiveBlockCallback = *const fn ([*]SchemeObject, usize, ?*anyopaque) callconv(.c) void;
 
 pub export fn code_arena_for_each_live_block(
     callback: LiveBlockCallback,
@@ -350,7 +350,7 @@ pub export fn code_arena_for_each_live_block(
                 len_usize == 0 or
                 len_usize > wordDiff(end, scan))
             {
-                outf_fatal("code_arena_for_each_live_block: corrupt header %#lx at %p\n", hdr, @as(?*const anyopaque, @ptrCast(scan)));
+                outf_fatal("code_arena_for_each_live_block: corrupt header %#zx at %p\n", hdr, @as(?*const anyopaque, @ptrCast(scan)));
                 outf_flush_fatal();
                 abort();
             }
@@ -364,7 +364,7 @@ pub export fn code_arena_for_each_live_block(
     }
 }
 
-fn bumpAllocInChunk(c: *CodeArenaChunk, alloc_words: c_ulong) ?[*]SchemeObject {
+fn bumpAllocInChunk(c: *CodeArenaChunk, alloc_words: usize) ?[*]SchemeObject {
     const next_ptr = c.alloc_next.?;
     const end_ptr = c.end.?;
     const pad: usize = if (!scheme_obj.floatingAlignedP(next_ptr) and @intFromPtr(next_ptr) < @intFromPtr(end_ptr))
@@ -390,7 +390,7 @@ fn bumpAllocInChunk(c: *CodeArenaChunk, alloc_words: c_ulong) ?[*]SchemeObject {
     return result;
 }
 
-pub export fn code_arena_alloc(n_words: c_ulong) callconv(.c) ?[*]SchemeObject {
+pub export fn code_arena_alloc(n_words: usize) callconv(.c) ?[*]SchemeObject {
     if (n_words == 0) return null;
     if (!primary_initialized_p) {
         outf_fatal("code_arena_alloc: code arena not initialized.\n");
@@ -398,7 +398,7 @@ pub export fn code_arena_alloc(n_words: c_ulong) callconv(.c) ?[*]SchemeObject {
         abort();
     }
 
-    const alloc_words: c_ulong = if (n_words < 2) 2 else n_words;
+    const alloc_words: usize = if (n_words < 2) 2 else n_words;
     var prev_hole: ?[*]SchemeObject = null;
     var curr = code_free_list;
     while (curr) |hole| {
@@ -560,7 +560,7 @@ fn codeArenaCoalescePass(check_marks_p: bool) void {
                 words > wordDiff(end, scan))
             {
                 jit.jit_write_end();
-                outf_fatal("code_arena sweep: corrupt header %#lx at %p\n", hdr, @as(?*const anyopaque, @ptrCast(scan)));
+                outf_fatal("code_arena sweep: corrupt header %#zx at %p\n", hdr, @as(?*const anyopaque, @ptrCast(scan)));
                 outf_flush_fatal();
                 abort();
             }
@@ -570,7 +570,7 @@ fn codeArenaCoalescePass(check_marks_p: bool) void {
 
             if (live_p) {
                 if (hole_start) |hs| {
-                    const hole_words: c_ulong = @intCast(wordDiff(scan, hs));
+                    const hole_words: usize = @intCast(wordDiff(scan, hs));
                     hs[0] = scheme_obj.makeNmvHeader(hole_words - 1);
                     if (hole_words >= 2) {
                         hs[1] = 0;
@@ -648,8 +648,8 @@ test "code_arena alloc, mark/sweep, coalescing, 1-word remainder split, and rese
     code_arena_setup(256);
     defer code_arena_teardown();
 
-    try std.testing.expectEqual(@as(c_ulong, 1), code_arena_chunk_count());
-    try std.testing.expectEqual(@as(c_ulong, 0), code_arena_nonempty_chunk_count());
+    try std.testing.expectEqual(@as(usize, 1), code_arena_chunk_count());
+    try std.testing.expectEqual(@as(usize, 0), code_arena_nonempty_chunk_count());
     try std.testing.expect(code_start != null);
     try std.testing.expectEqual(code_start, code_alloc_next);
 
@@ -665,8 +665,8 @@ test "code_arena alloc, mark/sweep, coalescing, 1-word remainder split, and rese
     d[0] = scheme_obj.makeVectorHeader(5);
     code_arena_write_end();
 
-    try std.testing.expectEqual(@as(c_ulong, 1), code_arena_nonempty_chunk_count());
-    try std.testing.expectEqual(@as(c_ulong, 19), code_arena_live_words());
+    try std.testing.expectEqual(@as(usize, 1), code_arena_nonempty_chunk_count());
+    try std.testing.expectEqual(@as(usize, 19), code_arena_live_words());
     try std.testing.expect(code_address_p(@ptrCast(b + 2)));
     try std.testing.expect(code_range_valid_p(a, d + 6));
     try std.testing.expectEqual(@as(?[*]SchemeObject, b), code_arena_find_block(@ptrCast(b + 2)));
@@ -675,7 +675,7 @@ test "code_arena alloc, mark/sweep, coalescing, 1-word remainder split, and rese
     const Ctx = struct { count: usize = 0 };
     var ctx = Ctx{};
     const cb = struct {
-        fn visit(_: [*]SchemeObject, _: c_ulong, raw: ?*anyopaque) callconv(.c) void {
+        fn visit(_: [*]SchemeObject, _: usize, raw: ?*anyopaque) callconv(.c) void {
             const p: *Ctx = @ptrCast(@alignCast(raw.?));
             p.count += 1;
         }
@@ -697,7 +697,7 @@ test "code_arena alloc, mark/sweep, coalescing, 1-word remainder split, and rese
     try std.testing.expect(code_arena_mark_stack_empty_p());
 
     code_arena_sweep();
-    try std.testing.expectEqual(@as(c_ulong, 9), code_arena_live_words());
+    try std.testing.expectEqual(@as(usize, 9), code_arena_live_words());
     try std.testing.expectEqual(@as(?[*]SchemeObject, d), code_alloc_next);
 
     // 3-word alloc from 4-word hole leaves a 1-word NMV pad at b[3].
@@ -708,5 +708,5 @@ test "code_arena alloc, mark/sweep, coalescing, 1-word remainder split, and rese
     // Convert reused and c to live vectors, then verify reset clears arena.
     code_arena_reset(256);
     try std.testing.expectEqual(code_start, code_alloc_next);
-    try std.testing.expectEqual(@as(c_ulong, 0), code_arena_nonempty_chunk_count());
+    try std.testing.expectEqual(@as(usize, 0), code_arena_nonempty_chunk_count());
 }

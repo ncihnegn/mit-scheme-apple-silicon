@@ -40,7 +40,7 @@ var mock_unused_argv = [_]?[*:0]const u8{ "--extra", null };
 var mock_library_path = [_]?[*:0]const u8{ "/mock/lib1", "/mock/lib2", null };
 pub export var compiler_utilities: obj.SchemeObject = obj.sharp_f;
 pub var mock_icache_flush_calls: usize = 0;
-pub var mock_resize_tospace_arg: c_ulong = 0;
+pub var mock_resize_tospace_arg: usize = 0;
 pub export var OS_channel_table_size: abi.Tchannel = 16;
 pub export var OS_have_select_p: c_int = 1;
 pub var mock_channel_buf: [256]u8 = @splat(0);
@@ -74,7 +74,7 @@ pub export var OS_process_table_size: abi.Tprocess = 4;
 var mock_proc_valid: [4]bool = @splat(false);
 pub var mock_last_proc_sig: c_int = 0;
 pub var mock_sock_accept_none: bool = false;
-pub var mock_last_sock_shutdown: c_ulong = 0;
+pub var mock_last_sock_shutdown: usize = 0;
 pub var mock_sock_listen_calls: usize = 0;
 var mock_host_addr_1: [4]u8 = .{ 127, 0, 0, 1 };
 var mock_host_addr_2: [4]u8 = .{ 10, 0, 0, 2 };
@@ -96,13 +96,13 @@ pub var mock_sig_tstp_handler: c_uint = 4;
 pub var mock_write_var_cache_calls: usize = 0;
 pub var mock_make_uuo_link_calls: usize = 0;
 pub var mock_apply_compiled_calls: usize = 0;
-pub var mock_last_compiled_nargs: c_ulong = 0;
+pub var mock_last_compiled_nargs: usize = 0;
 pub var mock_last_compiled_proc: obj.SchemeObject = obj.sharp_f;
 pub var mock_stack_marker_calls: usize = 0;
 pub var mock_last_marker_thunk: obj.SchemeObject = obj.sharp_f;
 pub var mock_int_mask_calls: usize = 0;
-pub var mock_last_compiled_mask: c_ulong = 0;
-pub var mock_last_compiled_new_mask: c_ulong = 0;
+pub var mock_last_compiled_mask: usize = 0;
+pub var mock_last_compiled_new_mask: usize = 0;
 pub export var ERROR_OUTPUT: abi.OutfChannel = .{ .type = 1, .cookie = null };
 pub export var FATAL_OUTPUT: abi.OutfChannel = .{ .type = 2, .cookie = null };
 pub var mock_cc_entry_bad: bool = false;
@@ -110,7 +110,7 @@ pub var mock_cc_entry_type: abi.CcEntryType = .{
     .marker = .procedure,
     .args = .{ .for_procedure = .{ .n_required = 0, .n_optional = 0, .rest_p = false } },
 };
-pub export var MAX_STATIC_PRIMITIVE: c_long = 1;
+pub export var MAX_STATIC_PRIMITIVE: isize = 1;
 pub export var Static_Primitive_Procedure_Table = [_]abi.PrimitiveProcedure{ &mockDummyPrim, &mockDummyPrim };
 pub export var Static_Primitive_Arity_Table = [_]c_int{ 1, 2 };
 pub export var Static_Primitive_Count_Table = [_]c_int{ @sizeOf(obj.SchemeObject), 2 * @sizeOf(obj.SchemeObject) };
@@ -345,7 +345,7 @@ pub export fn OS_get_entropy(buf: *[32]u8) callconv(.c) void {
     }
 }
 
-pub export fn abort_to_interpreter(_: c_long) callconv(.c) noreturn {
+pub export fn abort_to_interpreter(_: isize) callconv(.c) noreturn {
     @panic("mock abort_to_interpreter");
 }
 
@@ -410,15 +410,15 @@ fn mockReflectToInterfaceFrameType(frame: [*]obj.SchemeObject) callconv(.c) c_in
     };
 }
 
-fn mockCpointCompiledCodeNext(_: obj.SchemeObject, idx: c_ulong) callconv(.c) c_ulong {
+fn mockCpointCompiledCodeNext(_: obj.SchemeObject, idx: usize) callconv(.c) usize {
     return idx + 3;
 }
 
-fn mockCpointCompiledAddressNext(_: obj.SchemeObject, idx: c_ulong) callconv(.c) c_ulong {
+fn mockCpointCompiledAddressNext(_: obj.SchemeObject, idx: usize) callconv(.c) usize {
     return idx + 4;
 }
 
-fn mockCpointReflectToInterfaceNext(_: obj.SchemeObject, idx: c_ulong) callconv(.c) c_ulong {
+fn mockCpointReflectToInterfaceNext(_: obj.SchemeObject, idx: usize) callconv(.c) usize {
     return idx + 5;
 }
 
@@ -443,12 +443,12 @@ pub export fn OS_tty_y_size() callconv(.c) c_uint {
     return 24;
 }
 
-pub export fn OS_syscall_names(len_out: *c_ulong, names_out: *[*]?[*:0]const u8) callconv(.c) void {
+pub export fn OS_syscall_names(len_out: *usize, names_out: *[*]?[*:0]const u8) callconv(.c) void {
     len_out.* = mock_syscall_names_arr.len;
     names_out.* = &mock_syscall_names_arr;
 }
 
-pub export fn OS_syserr_names(len_out: *c_ulong, names_out: *[*]?[*:0]const u8) callconv(.c) void {
+pub export fn OS_syserr_names(len_out: *usize, names_out: *[*]?[*:0]const u8) callconv(.c) void {
     len_out.* = mock_syserr_names_arr.len;
     names_out.* = &mock_syserr_names_arr;
 }
@@ -461,7 +461,7 @@ comptime {
     }
 }
 
-fn mockApplyCompiledFromPrimitive(nargs: c_ulong, proc: obj.SchemeObject) callconv(.c) void {
+fn mockApplyCompiledFromPrimitive(nargs: usize, proc: obj.SchemeObject) callconv(.c) void {
     mock_apply_compiled_calls += 1;
     mock_last_compiled_nargs = nargs;
     mock_last_compiled_proc = proc;
@@ -472,13 +472,13 @@ fn mockCompiledWithStackMarker(thunk: obj.SchemeObject) callconv(.c) void {
     mock_last_marker_thunk = thunk;
 }
 
-fn mockCompiledWithInterruptMask(old_mask: c_ulong, _: obj.SchemeObject, new_mask: c_ulong) callconv(.c) void {
+fn mockCompiledWithInterruptMask(old_mask: usize, _: obj.SchemeObject, new_mask: usize) callconv(.c) void {
     mock_int_mask_calls += 1;
     mock_last_compiled_mask = old_mask;
     mock_last_compiled_new_mask = new_mask;
 }
 
-fn mockTospaceAllocator(n_words: c_ulong, start_out: *?[*]obj.SchemeObject, end_out: *?[*]obj.SchemeObject) callconv(.c) void {
+fn mockTospaceAllocator(n_words: usize, start_out: *?[*]obj.SchemeObject, end_out: *?[*]obj.SchemeObject) callconv(.c) void {
     mock_resize_tospace_arg = n_words;
     if (n_words == 0) {
         start_out.* = null;
@@ -615,11 +615,11 @@ fn mockCcBlockEnvironment(block: obj.SchemeObject) callconv(.c) obj.SchemeObject
     return if (len >= 1) obj.vectorRef(block, @intCast(len - 1)) else obj.the_global_env;
 }
 
-fn mockWriteVariableCache(_: obj.SchemeObject, _: obj.SchemeObject, _: c_ulong) callconv(.c) void {
+fn mockWriteVariableCache(_: obj.SchemeObject, _: obj.SchemeObject, _: usize) callconv(.c) void {
     mock_write_var_cache_calls += 1;
 }
 
-fn mockMakeUuoLink(_: obj.SchemeObject, _: obj.SchemeObject, _: obj.SchemeObject, _: c_ulong) callconv(.c) c_long {
+fn mockMakeUuoLink(_: obj.SchemeObject, _: obj.SchemeObject, _: obj.SchemeObject, _: usize) callconv(.c) isize {
     mock_make_uuo_link_calls += 1;
     return abi.prim_done;
 }
@@ -628,11 +628,11 @@ fn mockCcReturnToBlock(ret: obj.SchemeObject) callconv(.c) obj.SchemeObject {
     return ret;
 }
 
-fn mockCcEntryToBlockOffset(_: obj.SchemeObject) callconv(.c) c_ulong {
+fn mockCcEntryToBlockOffset(_: obj.SchemeObject) callconv(.c) usize {
     return 0;
 }
 
-fn mockCcReturnToBlockOffset(_: obj.SchemeObject) callconv(.c) c_ulong {
+fn mockCcReturnToBlockOffset(_: obj.SchemeObject) callconv(.c) usize {
     return 0;
 }
 
@@ -648,7 +648,7 @@ fn mockCcReturnAddressToEntryAddress(addr: ?*anyopaque) callconv(.c) ?*anyopaque
     return addr;
 }
 
-fn mockCoerceToCompiled(proc: obj.SchemeObject, _: c_uint, out: *obj.SchemeObject) callconv(.c) c_long {
+fn mockCoerceToCompiled(proc: obj.SchemeObject, _: c_uint, out: *obj.SchemeObject) callconv(.c) isize {
     out.* = proc;
     return abi.prim_done;
 }
@@ -718,7 +718,7 @@ fn mockLinkageSectionType(marker: obj.SchemeObject) callconv(.c) c_uint {
     return @intCast(obj.objectDatum(marker) >> 16);
 }
 
-fn mockLinkageSectionCount(marker: obj.SchemeObject) callconv(.c) c_ulong {
+fn mockLinkageSectionCount(marker: obj.SchemeObject) callconv(.c) usize {
     return obj.objectDatum(marker) & 0xFFFF;
 }
 
@@ -736,7 +736,7 @@ fn mockCompiledClosureStart(ptr: [*]obj.SchemeObject) callconv(.c) ?*anyopaque {
     return @ptrCast(ptr);
 }
 
-fn mockCompiledClosureCount(_: [*]obj.SchemeObject) callconv(.c) c_ulong {
+fn mockCompiledClosureCount(_: [*]obj.SchemeObject) callconv(.c) usize {
     return 0;
 }
 
@@ -756,19 +756,19 @@ fn mockSkipCompiledClosurePadding(ptr: ?*anyopaque) callconv(.c) [*]obj.SchemeOb
 fn mockPlausibleCcBlockP(_: [*]obj.SchemeObject) callconv(.c) c_int {
     return 1;
 }
-fn mockPcToBuiltinIndex(_: c_ulong) callconv(.c) c_int {
+fn mockPcToBuiltinIndex(_: usize) callconv(.c) c_int {
     return -1;
 }
-fn mockPcToUtilityIndex(_: c_ulong) callconv(.c) c_int {
+fn mockPcToUtilityIndex(_: usize) callconv(.c) c_int {
     return -1;
 }
-fn mockSvmExportIp(pc: c_ulong) callconv(.c) c_ulong {
+fn mockSvmExportIp(pc: usize) callconv(.c) usize {
     return pc;
 }
 
 pub var mock_declare_builtin_calls: usize = 0;
 
-pub export fn declare_builtin(_: c_ulong, _: [*:0]const u8) callconv(.c) void {
+pub export fn declare_builtin(_: usize, _: [*:0]const u8) callconv(.c) void {
     mock_declare_builtin_calls += 1;
 }
 
@@ -788,7 +788,7 @@ pub export fn make_compiled_procedure_type(
 
 pub export fn make_compiled_continuation_type(
     cet: *abi.CcEntryType,
-    offset: c_ulong,
+    offset: usize,
 ) callconv(.c) void {
     cet.marker = .continuation;
     cet.args = .{ .for_continuation = .{ .offset = offset } };
@@ -820,7 +820,7 @@ pub export fn decode_old_style_format_word(cet: *abi.CcEntryType, fw: u16) callc
     }
     if (low < 0x80) return true;
     if (low < 0xE0) {
-        make_compiled_continuation_type(cet, @as(c_ulong, ((low & 0x7F) << 7) | (high & 0x7F)));
+        make_compiled_continuation_type(cet, @as(usize, ((low & 0x7F) << 7) | (high & 0x7F)));
         return false;
     }
     if (high != 0xFF) return true;
@@ -884,7 +884,7 @@ pub export fn encode_old_style_format_word(cet: *abi.CcEntryType, fw_r: *u16) ca
     return false;
 }
 
-pub export var prim_apply_error_code: c_long = 0;
+pub export var prim_apply_error_code: isize = 0;
 
 pub export fn apply_primitive_external(_: obj.SchemeObject) callconv(.c) void {}
 
@@ -909,13 +909,13 @@ fn mockReadUuoFrameSize(_: [*]obj.SchemeObject) callconv(.c) c_uint {
 fn mockReadUuoTargetNoReloc(saddr: [*]obj.SchemeObject) callconv(.c) ?*anyopaque {
     return @ptrFromInt(@as(usize, @intCast(saddr[0])));
 }
-fn mockTrampolineEntrySize(n_entries: c_ulong) callconv(.c) c_ulong {
+fn mockTrampolineEntrySize(n_entries: usize) callconv(.c) usize {
     return n_entries * 4;
 }
-fn mockTrampolineEntryAddr(block: [*]obj.SchemeObject, index: c_ulong) callconv(.c) ?*anyopaque {
+fn mockTrampolineEntryAddr(block: [*]obj.SchemeObject, index: usize) callconv(.c) ?*anyopaque {
     return @ptrCast(block + 2 + @as(usize, @intCast(index)) * 4 + 2);
 }
-fn mockTrampolineReturnAddr(block: [*]obj.SchemeObject, index: c_ulong) callconv(.c) ?*anyopaque {
+fn mockTrampolineReturnAddr(block: [*]obj.SchemeObject, index: usize) callconv(.c) ?*anyopaque {
     return mockTrampolineEntryAddr(block, index);
 }
 fn mockStoreTrampolineInsns(_: ?*anyopaque, _: u8) callconv(.c) bool {
@@ -925,13 +925,13 @@ fn mockStoreTrampolineToInterfaceInsns(_: ?*anyopaque) callconv(.c) bool {
     return false;
 }
 fn mockInitializeSvm1() callconv(.c) void {}
-fn mockCtoInterfaceSvm(_: ?*anyopaque) callconv(.c) c_long {
+fn mockCtoInterfaceSvm(_: ?*anyopaque) callconv(.c) isize {
     return abi.prim_done;
 }
 fn mockInterfaceToC() callconv(.c) void {}
 fn mockInterfaceToScheme() callconv(.c) void {}
 fn mockInterfaceToSchemeReturn() callconv(.c) void {}
-fn mockCtoInterfaceNative(_: ?*anyopaque, _: ?*anyopaque) callconv(.c) c_long {
+fn mockCtoInterfaceNative(_: ?*anyopaque, _: ?*anyopaque) callconv(.c) isize {
     return abi.prim_done;
 }
 fn mockAarch64ResetHook() callconv(.c) void {}
@@ -975,14 +975,14 @@ pub export fn OS_channel_type(ch: abi.Tchannel) callconv(.c) c_uint {
     return if (ch < mock_channels_type.len) mock_channels_type[ch] else 0;
 }
 
-pub export fn OS_channel_read(_: abi.Tchannel, buf: ?*anyopaque, nbytes: usize) callconv(.c) c_long {
+pub export fn OS_channel_read(_: abi.Tchannel, buf: ?*anyopaque, nbytes: usize) callconv(.c) isize {
     const n = @min(nbytes, mock_channel_len);
     const dst: [*]u8 = @ptrCast(buf.?);
     @memcpy(dst[0..n], mock_channel_buf[0..n]);
     return @intCast(n);
 }
 
-pub export fn OS_channel_write(_: abi.Tchannel, buf: ?*const anyopaque, nbytes: usize) callconv(.c) c_long {
+pub export fn OS_channel_write(_: abi.Tchannel, buf: ?*const anyopaque, nbytes: usize) callconv(.c) isize {
     const n = @min(nbytes, mock_channel_buf.len);
     const src: [*]const u8 = @ptrCast(buf.?);
     @memcpy(mock_channel_buf[0..n], src[0..n]);
@@ -1400,7 +1400,7 @@ pub export fn OS_open_tcp_stream_socket(_: ?*anyopaque, _: c_uint) callconv(.c) 
     setMockChannel(ch, @intFromEnum(abi.ChannelType.tcp_stream_socket), false);
     return ch;
 }
-pub export fn OS_shutdown_socket(_: abi.Tchannel, action: c_ulong) callconv(.c) void {
+pub export fn OS_shutdown_socket(_: abi.Tchannel, action: usize) callconv(.c) void {
     mock_last_sock_shutdown = action;
 }
 pub export fn OS_get_service_by_name(service: [*:0]const u8, _: [*:0]const u8) callconv(.c) c_int {
@@ -1408,7 +1408,7 @@ pub export fn OS_get_service_by_name(service: [*:0]const u8, _: [*:0]const u8) c
     if (std.mem.eql(u8, name, "http")) return 80 << 8;
     return -1;
 }
-pub export fn OS_get_service_by_number(port: c_ulong) callconv(.c) c_ulong {
+pub export fn OS_get_service_by_number(port: usize) callconv(.c) usize {
     return ((port & 0xff) << 8) | ((port >> 8) & 0xff);
 }
 pub export fn OS_host_address_length() callconv(.c) c_uint {
@@ -1623,7 +1623,7 @@ pub export fn OS_current_user_name() callconv(.c) [*:0]const u8 {
 pub export fn OS_current_user_home_directory() callconv(.c) [*:0]const u8 {
     return "/home/mock-user";
 }
-pub export fn find_ccblock(pc: c_ulong) callconv(.c) obj.SchemeObject {
+pub export fn find_ccblock(pc: usize) callconv(.c) obj.SchemeObject {
     return obj.ulongToFixnum(pc & 0xFFFF);
 }
 pub export fn UX_read_fd_status(_: c_int, s: *abi.Stat) callconv(.c) void {

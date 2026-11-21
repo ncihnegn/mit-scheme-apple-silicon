@@ -7,15 +7,15 @@ const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
 const artutl = @import("artutl.zig");
 
-inline fn argType(arg: c_int) c_ulong {
-    return abi.arg_ulong_index_integer(arg, @as(c_ulong, 1) << obj.type_code_length);
+inline fn argType(arg: c_int) usize {
+    return abi.arg_ulong_index_integer(arg, @as(usize, 1) << obj.type_code_length);
 }
 
-inline fn argDatum(arg: c_int) c_ulong {
-    return abi.arg_ulong_index_integer(arg, @as(c_ulong, 1) << obj.datum_length);
+inline fn argDatum(arg: c_int) usize {
+    return abi.arg_ulong_index_integer(arg, @as(usize, 1) << obj.datum_length);
 }
 
-fn safeObjectNewTypeP(object: obj.SchemeObject, type_code: c_ulong) bool {
+fn safeObjectNewTypeP(object: obj.SchemeObject, type_code: usize) bool {
     const gc_type_old = abi.gcType(object);
     const gc_type_new = abi.gc_type_code(@intCast(type_code));
     if (gc_type_old == @intFromEnum(abi.GcType.undefined) or gc_type_new == @intFromEnum(abi.GcType.undefined)) {
@@ -406,7 +406,7 @@ pub export fn Prim_primitive_memory_hash() callconv(.c) obj.SchemeObject {
     const start = abi.arg_ulong_integer(2);
     const end = abi.arg_ulong_integer(3);
 
-    const word_bytes: c_ulong = @sizeOf(obj.SchemeObject);
+    const word_bytes: usize = @sizeOf(obj.SchemeObject);
     const min_index = word_bytes;
     const max_index = min_index + (nwords * word_bytes);
 
@@ -456,7 +456,7 @@ test "prim object inspection, safe_object_new_type_p, cells, byte/u16, and memor
     stubs.setArgs(&.{ bv, obj.ulongToFixnum(9) });
     try std.testing.expectEqual(obj.ulongToFixnum(0xBEEF), Prim_prim_u16_ref());
 
-    const start_off: c_ulong = @sizeOf(obj.SchemeObject) * 2;
+    const start_off: usize = @sizeOf(obj.SchemeObject) * 2;
     stubs.setArgs(&.{ bv, obj.ulongToFixnum(start_off), obj.ulongToFixnum(start_off + 8) });
     const h = Prim_primitive_memory_hash();
     try std.testing.expect(obj.fixnumP(h));

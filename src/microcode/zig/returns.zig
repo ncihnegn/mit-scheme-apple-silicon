@@ -228,7 +228,7 @@ const return_frame_types_table = [abi.max_return_code + 1]RFT{
     .compiled_code_subproblem, // 0x5e
 };
 
-pub export var MAX_RETURN: c_ulong = abi.max_return_code;
+pub export var MAX_RETURN: usize = abi.max_return_code;
 
 pub export fn make_return_code_names_table() callconv(.c) obj.SchemeObject {
     const table = abi.allocate_vector(abi.max_return_code + 1, true);
@@ -459,7 +459,7 @@ pub export fn make_frame_code_info_table() callconv(.c) obj.SchemeObject {
     return table;
 }
 
-pub export fn cpoint_next_frame(cpoint: obj.SchemeObject, index: c_ulong) callconv(.c) c_ulong {
+pub export fn cpoint_next_frame(cpoint: obj.SchemeObject, index: usize) callconv(.c) usize {
     const frame = obj.vectorLoc(cpoint, @intCast(index));
     const rft = return_frame_type(frame);
     switch (rft) {
@@ -501,7 +501,7 @@ pub export fn cpoint_next_frame(cpoint: obj.SchemeObject, index: c_ulong) callco
         },
         else => {},
     }
-    return std.math.maxInt(c_ulong);
+    return std.math.maxInt(usize);
 }
 
 test "returns tables, frame types, and cpoint_next_frame" {
@@ -514,7 +514,7 @@ test "returns tables, frame types, and cpoint_next_frame" {
     obj.vectorSet(fixobjs, abi.fixobj_obarray, obarray);
     abi.fixed_objects = fixobjs;
 
-    try std.testing.expectEqual(@as(c_ulong, 0x5E), MAX_RETURN);
+    try std.testing.expectEqual(@as(usize, 0x5E), MAX_RETURN);
 
     // return_code_name & return_code_frame_type
     const rc_eval_err = obj.makeObject(obj.tc_return_code, 0x41);
@@ -525,14 +525,14 @@ test "returns tables, frame types, and cpoint_next_frame" {
 
     // make_return_code_names_table
     const rc_names = make_return_code_names_table();
-    try std.testing.expectEqual(@as(c_ulong, 95), obj.vectorLength(rc_names));
+    try std.testing.expectEqual(@as(usize, 95), obj.vectorLength(rc_names));
     try std.testing.expect(obj.internedSymbolP(obj.vectorRef(rc_names, 0x00)));
     try std.testing.expectEqual(obj.sharp_f, obj.vectorRef(rc_names, 0x02));
     try std.testing.expectEqual(intern.char_pointer_to_symbol("compiler-error-restart"), obj.vectorRef(rc_names, 0x5E));
 
     // make_frame_type_info_table (preserving upstream "cc-bpkt" spelling)
     const fti = make_frame_type_info_table();
-    try std.testing.expectEqual(@as(c_ulong, @intFromEnum(RFT.limit)), obj.vectorLength(fti));
+    try std.testing.expectEqual(@as(usize, @intFromEnum(RFT.limit)), obj.vectorLength(fti));
     try std.testing.expectEqual(obj.sharp_f, obj.vectorRef(fti, 0));
     const cc_bkpt_entry = obj.vectorRef(fti, @intFromEnum(RFT.cc_bkpt));
     try std.testing.expectEqual(intern.char_pointer_to_symbol("cc-bpkt"), obj.vectorRef(cc_bkpt_entry, 0));
@@ -541,7 +541,7 @@ test "returns tables, frame types, and cpoint_next_frame" {
 
     // make_frame_code_info_table shares entries as in C
     const fci = make_frame_code_info_table();
-    try std.testing.expectEqual(@as(c_ulong, 95), obj.vectorLength(fci));
+    try std.testing.expectEqual(@as(usize, 95), obj.vectorLength(fci));
     try std.testing.expectEqual(obj.sharp_f, obj.vectorRef(fci, 0x00));
     const e1 = obj.vectorRef(fci, abi.rc_comp_lookup_trap_restart);
     try std.testing.expectEqual(e1, obj.vectorRef(fci, abi.rc_comp_safe_ref_trap_restart));
@@ -556,41 +556,41 @@ test "returns tables, frame types, and cpoint_next_frame" {
     const cpoint = abi.allocate_vector(40, true);
     // 0: WITH_ARG (0x20) -> 0 + 2 = 2
     obj.vectorSet(cpoint, 0, obj.makeObject(obj.tc_return_code, 0x20));
-    try std.testing.expectEqual(@as(c_ulong, 2), cpoint_next_frame(cpoint, 0));
+    try std.testing.expectEqual(@as(usize, 2), cpoint_next_frame(cpoint, 0));
     // 2: EXP_ENV (0x08) -> 2 + 3 = 5
     obj.vectorSet(cpoint, 2, obj.makeObject(obj.tc_return_code, 0x08));
-    try std.testing.expectEqual(@as(c_ulong, 5), cpoint_next_frame(cpoint, 2));
+    try std.testing.expectEqual(@as(usize, 5), cpoint_next_frame(cpoint, 2));
     // 5: HISTORY (0x05) -> 5 + 4 = 9
     obj.vectorSet(cpoint, 5, obj.makeObject(obj.tc_return_code, 0x05));
-    try std.testing.expectEqual(@as(c_ulong, 9), cpoint_next_frame(cpoint, 5));
+    try std.testing.expectEqual(@as(usize, 9), cpoint_next_frame(cpoint, 5));
     // 9: STACK_MARKER (0x42) -> 9 + 3 = 12
     obj.vectorSet(cpoint, 9, obj.makeObject(obj.tc_return_code, 0x42));
-    try std.testing.expectEqual(@as(c_ulong, 12), cpoint_next_frame(cpoint, 9));
+    try std.testing.expectEqual(@as(usize, 12), cpoint_next_frame(cpoint, 9));
     // 12: HARDWARE_TRAP (0x5C) -> 12 + 9 = 21
     obj.vectorSet(cpoint, 12, obj.makeObject(obj.tc_return_code, abi.rc_hardware_trap));
-    try std.testing.expectEqual(@as(c_ulong, 21), cpoint_next_frame(cpoint, 12));
+    try std.testing.expectEqual(@as(usize, 21), cpoint_next_frame(cpoint, 12));
     // 21: APPLY (0x03) with AF header size 3 -> 21 + 2 + 1 + 3 = 27
     obj.vectorSet(cpoint, 21, obj.makeObject(obj.tc_return_code, 0x03));
     obj.vectorSet(cpoint, 23, obj.makeObject(obj.tc_manifest_vector, 3));
-    try std.testing.expectEqual(@as(c_ulong, 27), cpoint_next_frame(cpoint, 21));
+    try std.testing.expectEqual(@as(usize, 27), cpoint_next_frame(cpoint, 21));
     // 27: COMBINATION_SAVE (0x15) with comb length 4 -> 27 + 3 + 4 = 34
     obj.vectorSet(cpoint, 27, obj.makeObject(obj.tc_return_code, 0x15));
     obj.vectorSet(cpoint, 28, comb);
-    try std.testing.expectEqual(@as(c_ulong, 34), cpoint_next_frame(cpoint, 27));
+    try std.testing.expectEqual(@as(usize, 34), cpoint_next_frame(cpoint, 27));
 
     try std.testing.expect(return_address_p(obj.makeObject(obj.tc_return_code, 0x00)));
     if (build_options.cc_support) {
         obj.vectorSet(cpoint, 34, abi.return_to_interpreter);
         try std.testing.expectEqual(@intFromEnum(RFT.return_to_interpreter), return_frame_type(obj.vectorLoc(cpoint, 34)));
-        try std.testing.expectEqual(@as(c_ulong, 35), cpoint_next_frame(cpoint, 34));
+        try std.testing.expectEqual(@as(usize, 35), cpoint_next_frame(cpoint, 34));
 
         obj.vectorSet(cpoint, 35, abi.reflect_to_interface);
         obj.vectorSet(cpoint, 36, obj.ulongToFixnum(2));
         try std.testing.expectEqual(@intFromEnum(RFT.cc_stack_marker), return_frame_type(obj.vectorLoc(cpoint, 35)));
-        try std.testing.expectEqual(@as(c_ulong, 40), cpoint_next_frame(cpoint, 35));
+        try std.testing.expectEqual(@as(usize, 40), cpoint_next_frame(cpoint, 35));
 
         obj.vectorSet(cpoint, 37, obj.makeObject(obj.tc_compiled_entry, 0x10));
         try std.testing.expectEqual(@intFromEnum(RFT.compiled_address), return_frame_type(obj.vectorLoc(cpoint, 37)));
-        try std.testing.expectEqual(@as(c_ulong, 41), cpoint_next_frame(cpoint, 37));
+        try std.testing.expectEqual(@as(usize, 41), cpoint_next_frame(cpoint, 37));
     }
 }

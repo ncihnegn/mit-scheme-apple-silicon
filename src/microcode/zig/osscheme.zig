@@ -56,11 +56,11 @@ pub export fn deliver_pending_interrupts() callconv(.c) void {
     }
 }
 
-pub export fn get_interrupt_mask() callconv(.c) c_ulong {
+pub export fn get_interrupt_mask() callconv(.c) usize {
     return abi.Registers[abi.regblock_int_mask];
 }
 
-pub export fn set_interrupt_mask(mask: c_ulong) callconv(.c) void {
+pub export fn set_interrupt_mask(mask: usize) callconv(.c) void {
     abi.setInterruptMask(mask & abi.int_mask);
 }
 
@@ -71,7 +71,7 @@ pub export fn debug_back_trace(stream: abi.OutfChannel) callconv(.c) void {
     abi.outf_flush(stream);
 }
 
-pub export fn debug_examine_memory(address: c_long, label: [*:0]const u8) callconv(.c) void {
+pub export fn debug_examine_memory(address: isize, label: [*:0]const u8) callconv(.c) void {
     const ptr: *const obj.SchemeObject = @ptrFromInt(@as(usize, @bitCast(address)));
     abi.debug_print_expr(ptr.*, label);
 }
@@ -84,7 +84,7 @@ test "osscheme interrupt mask, request flags, pending check, and primitive statu
     abi.Registers[abi.regblock_primitive] = obj.makePrimitiveObject(0);
     try std.testing.expectEqual(@as(c_int, 1), executing_scheme_primitive_p());
 
-    set_interrupt_mask(abi.int_timer | (@as(c_ulong, 1) << 20));
+    set_interrupt_mask(abi.int_timer | (@as(usize, 1) << 20));
     try std.testing.expectEqual(abi.int_timer, get_interrupt_mask());
     try std.testing.expectEqual(@as(c_int, 0), pending_interrupts_p());
 

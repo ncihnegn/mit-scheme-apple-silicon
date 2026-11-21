@@ -26,20 +26,20 @@ pub export var last_return_code: ?[*]obj.SchemeObject = null;
 pub export var fixed_objects: obj.SchemeObject = 0;
 
 pub export var ephemeron_array: obj.SchemeObject = obj.sharp_f;
-pub export var ephemeron_count: c_ulong = 0;
+pub export var ephemeron_count: usize = 0;
 
 pub export var trapping: bool = false;
 
-pub export var n_heap_blocks: c_ulong = 0;
-pub export var n_constant_blocks: c_ulong = 0;
-pub export var n_stack_blocks: c_ulong = 0;
+pub export var n_heap_blocks: usize = 0;
+pub export var n_constant_blocks: usize = 0;
+pub export var n_stack_blocks: usize = 0;
 pub export var memory_block_start: ?[*]obj.SchemeObject = null;
 pub export var memory_block_end: ?[*]obj.SchemeObject = null;
 
-pub export var heap_reserved: c_ulong = 0;
-pub export var gc_space_needed: c_ulong = 0;
+pub export var heap_reserved: usize = 0;
+pub export var gc_space_needed: usize = 0;
 
-pub export var n_ephemerons_requested: c_ulong = 0;
+pub export var n_ephemerons_requested: usize = 0;
 pub export var ephemeron_request_hard_p: bool = false;
 
 var registers_storage: [14]obj.SchemeObject = @splat(0);
@@ -404,7 +404,7 @@ test "storage exports runtime globals and name tables" {
     try std.testing.expectEqual(@as(?[*]obj.SchemeObject, null), memory_block_end);
     try std.testing.expectEqual(@as(?[*]obj.SchemeObject, null), last_return_code);
     try std.testing.expectEqual(obj.sharp_f, ephemeron_array);
-    try std.testing.expectEqual(@as(c_ulong, 0), ephemeron_count);
+    try std.testing.expectEqual(@as(usize, 0), ephemeron_count);
     try std.testing.expectEqual(false, trapping);
 
     try std.testing.expectEqualStrings("false", std.mem.span(type_names[0x00].?));

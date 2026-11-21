@@ -11,14 +11,14 @@ const bignum = @import("bignum.zig");
 const storage = @import("storage.zig");
 
 pub export var history_register: ?[*]obj.SchemeObject = null;
-pub export var prev_restore_history_offset: c_ulong = 0;
-pub export var death_blow: c_long = 0;
+pub export var prev_restore_history_offset: usize = 0;
+pub export var death_blow: isize = 0;
 
 var error_argument: obj.SchemeObject = 0;
 
-fn computeInterruptNumber(masked_interrupts: c_ulong) c_ulong {
-    var interrupt_number: c_ulong = 0;
-    var bit_mask: c_ulong = 1;
+fn computeInterruptNumber(masked_interrupts: usize) usize {
+    var interrupt_number: usize = 0;
+    var bit_mask: usize = 1;
     while (interrupt_number <= abi.max_interrupt_number and (masked_interrupts & bit_mask) == 0) {
         interrupt_number += 1;
         bit_mask <<= 1;
@@ -26,26 +26,26 @@ fn computeInterruptNumber(masked_interrupts: c_ulong) c_ulong {
     return interrupt_number;
 }
 
-fn computeInterruptHandlerMask(interrupt_masks: obj.SchemeObject, interrupt_number: c_ulong) c_ulong {
+fn computeInterruptHandlerMask(interrupt_masks: obj.SchemeObject, interrupt_number: usize) usize {
     if (obj.vectorP(interrupt_masks) and interrupt_number < obj.vectorLength(interrupt_masks)) {
         const mask = obj.vectorRef(interrupt_masks, @intCast(interrupt_number));
         if (obj.integerP(mask) and artutl.integer_to_ulong_p(mask)) {
-            const bit: c_ulong = if (interrupt_number < @bitSizeOf(c_ulong))
-                (@as(c_ulong, 1) << @intCast(interrupt_number))
+            const bit: usize = if (interrupt_number < @bitSizeOf(usize))
+                (@as(usize, 1) << @intCast(interrupt_number))
             else
                 0;
             return artutl.integer_to_ulong(mask) & ~bit;
         }
     }
     if (interrupt_number <= abi.max_interrupt_number) {
-        return (@as(c_ulong, 1) << @intCast(interrupt_number)) - 1;
+        return (@as(usize, 1) << @intCast(interrupt_number)) - 1;
     }
     return abi.Registers[abi.regblock_int_mask];
 }
 
-fn terminateNoInterruptHandler(masked_interrupts: c_ulong) noreturn {
+fn terminateNoInterruptHandler(masked_interrupts: usize) noreturn {
     abi.outf_fatal(
-        "\nInterrupts = %#08lx, Mask = %#08lx, Masked = %#08lx\n",
+        "\nInterrupts = %#08zx, Mask = %#08zx, Masked = %#08zx\n",
         abi.Registers[abi.regblock_int_code],
         abi.Registers[abi.regblock_int_mask],
         masked_interrupts,
@@ -59,18 +59,18 @@ pub export fn initialize_interrupt_handler_vector() callconv(.c) obj.SchemeObjec
 
 pub export fn initialize_interrupt_mask_vector() callconv(.c) obj.SchemeObject {
     const v = abi.make_vector(abi.max_interrupt_number + 2, obj.sharp_f, false);
-    var interrupt_number: c_ulong = 0;
+    var interrupt_number: usize = 0;
     while (interrupt_number <= abi.max_interrupt_number) : (interrupt_number += 1) {
         obj.vectorSet(
             v,
             @intCast(interrupt_number),
-            artutl.ulong_to_integer((@as(c_ulong, 1) << @intCast(interrupt_number)) - 1),
+            artutl.ulong_to_integer((@as(usize, 1) << @intCast(interrupt_number)) - 1),
         );
     }
     return v;
 }
 
-pub export fn setup_interrupt(masked_interrupts: c_ulong) callconv(.c) void {
+pub export fn setup_interrupt(masked_interrupts: usize) callconv(.c) void {
     const interrupt_number = computeInterruptNumber(masked_interrupts);
 
     if (!obj.vectorP(abi.fixed_objects)) {
@@ -97,19 +97,19 @@ pub export fn setup_interrupt(masked_interrupts: c_ulong) callconv(.c) void {
     abi.setInterruptMask(interrupt_mask);
 }
 
-pub export fn err_print(error_code: c_long, where: abi.OutfChannel) callconv(.c) void {
+pub export fn err_print(error_code: isize, where: abi.OutfChannel) callconv(.c) void {
     const message: ?[*:0]const u8 = if (error_code >= 0 and error_code <= abi.err_process_terminated)
         storage.Error_Names[@intCast(error_code)]
     else
         null;
     if (message) |msg| {
-        abi.outf(where, "Error code %#lx (%s).\n", error_code, msg);
+        abi.outf(where, "Error code %#zx (%s).\n", error_code, msg);
     } else {
-        abi.outf(where, "Unknown error code %#lx.\n", error_code);
+        abi.outf(where, "Unknown error code %#zx.\n", error_code);
     }
 }
 
-fn errorDeath(code: c_long, message: [*:0]const u8) noreturn {
+fn errorDeath(code: isize, message: [*:0]const u8) noreturn {
     death_blow = code;
     abi.outf_fatal("Microcode Error: %s.\n", message);
     err_print(code, abi.FATAL_OUTPUT);
@@ -153,7 +153,7 @@ pub export fn back_out_of_primitive() callconv(.c) void {
     abi.Registers[abi.regblock_val] = obj.sharp_f;
 }
 
-pub export fn signal_error_from_primitive(error_code: c_long) callconv(.c) noreturn {
+pub export fn signal_error_from_primitive(error_code: isize) callconv(.c) noreturn {
     abi.abort_to_interpreter(error_code);
 }
 
@@ -162,7 +162,7 @@ pub export fn signal_interrupt_from_primitive() callconv(.c) noreturn {
 }
 
 pub export fn error_wrong_type_arg(n: c_int) callconv(.c) noreturn {
-    const error_code: c_long = switch (n) {
+    const error_code: isize = switch (n) {
         1 => abi.err_arg_1_wrong_type,
         2 => abi.err_arg_2_wrong_type,
         3 => abi.err_arg_3_wrong_type,
@@ -179,7 +179,7 @@ pub export fn error_wrong_type_arg(n: c_int) callconv(.c) noreturn {
 }
 
 pub export fn error_bad_range_arg(n: c_int) callconv(.c) noreturn {
-    const error_code: c_long = switch (n) {
+    const error_code: isize = switch (n) {
         1 => abi.err_arg_1_bad_range,
         2 => abi.err_arg_2_bad_range,
         3 => abi.err_arg_3_bad_range,
@@ -203,13 +203,13 @@ pub export fn error_with_argument(argument: obj.SchemeObject) callconv(.c) noret
     error_argument = argument;
     const is_syscall = obj.vectorP(argument) and
         obj.vectorLength(argument) > 0 and
-        obj.vectorRef(argument, 0) == obj.ulongToFixnum(@as(c_ulong, @bitCast(abi.err_in_system_call)));
+        obj.vectorRef(argument, 0) == obj.ulongToFixnum(@as(usize, @bitCast(abi.err_in_system_call)));
     signal_error_from_primitive(if (is_syscall) abi.err_in_system_call else abi.err_with_argument);
 }
 
 pub export fn error_in_system_call(err: c_int, name: c_int) callconv(.c) noreturn {
     const v = abi.allocate_vector(3, false);
-    obj.vectorSet(v, 0, obj.ulongToFixnum(@as(c_ulong, @bitCast(abi.err_in_system_call))));
+    obj.vectorSet(v, 0, obj.ulongToFixnum(@as(usize, @bitCast(abi.err_in_system_call))));
     obj.vectorSet(v, 1, obj.ulongToFixnum(@as(c_uint, @bitCast(err))));
     obj.vectorSet(v, 2, obj.ulongToFixnum(@as(c_uint, @bitCast(name))));
     error_argument = v;
@@ -220,7 +220,7 @@ pub export fn error_system_call(code: c_int, name: c_int) callconv(.c) noreturn 
     error_in_system_call(abi.OS_error_code_to_syserr(code), name);
 }
 
-pub export fn arg_integer(arg_number: c_int) callconv(.c) c_long {
+pub export fn arg_integer(arg_number: c_int) callconv(.c) isize {
     const object = abi.argRef(@intCast(arg_number));
     if (!obj.integerP(object)) error_wrong_type_arg(arg_number);
     if (!artutl.integer_to_long_p(object)) error_bad_range_arg(arg_number);
@@ -234,13 +234,13 @@ pub export fn arg_integer_to_intmax(arg_number: c_int) callconv(.c) i64 {
     return artutl.integer_to_intmax(object);
 }
 
-pub export fn arg_nonnegative_integer(arg_number: c_int) callconv(.c) c_long {
+pub export fn arg_nonnegative_integer(arg_number: c_int) callconv(.c) isize {
     const result = arg_integer(arg_number);
     if (result < 0) error_bad_range_arg(arg_number);
     return result;
 }
 
-pub export fn arg_index_integer(arg_number: c_int, upper_limit: c_long) callconv(.c) c_long {
+pub export fn arg_index_integer(arg_number: c_int, upper_limit: isize) callconv(.c) isize {
     const result = arg_integer(arg_number);
     if (result < 0 or result >= upper_limit) error_bad_range_arg(arg_number);
     return result;
@@ -252,26 +252,26 @@ pub export fn arg_index_integer_to_intmax(arg_number: c_int, upper_limit: i64) c
     return result;
 }
 
-pub export fn arg_integer_in_range(arg_number: c_int, lower_limit: c_long, upper_limit: c_long) callconv(.c) c_long {
+pub export fn arg_integer_in_range(arg_number: c_int, lower_limit: isize, upper_limit: isize) callconv(.c) isize {
     const result = arg_integer(arg_number);
     if (result < lower_limit or result >= upper_limit) error_bad_range_arg(arg_number);
     return result;
 }
 
-pub export fn arg_ulong_integer(arg_number: c_int) callconv(.c) c_ulong {
+pub export fn arg_ulong_integer(arg_number: c_int) callconv(.c) usize {
     const object = abi.argRef(@intCast(arg_number));
     if (!obj.integerP(object)) error_wrong_type_arg(arg_number);
     if (!artutl.integer_to_ulong_p(object)) error_bad_range_arg(arg_number);
     return artutl.integer_to_ulong(object);
 }
 
-pub export fn arg_ulong_index_integer(arg_number: c_int, upper_limit: c_ulong) callconv(.c) c_ulong {
+pub export fn arg_ulong_index_integer(arg_number: c_int, upper_limit: usize) callconv(.c) usize {
     const result = arg_ulong_integer(arg_number);
     if (result >= upper_limit) error_bad_range_arg(arg_number);
     return result;
 }
 
-pub export fn arg_ulong_integer_in_range(arg_number: c_int, lower_limit: c_ulong, upper_limit: c_ulong) callconv(.c) c_ulong {
+pub export fn arg_ulong_integer_in_range(arg_number: c_int, lower_limit: usize, upper_limit: usize) callconv(.c) usize {
     const result = arg_ulong_integer(arg_number);
     if (!(result >= lower_limit and result < upper_limit)) error_bad_range_arg(arg_number);
     return result;
@@ -303,7 +303,7 @@ pub export fn arg_real_in_range(arg_number: c_int, lower_limit: f64, upper_limit
 }
 
 // The 32-bit FNV-1a hash.
-pub export fn memory_hash(length: c_ulong, vp: ?*const anyopaque) callconv(.c) u32 {
+pub export fn memory_hash(length: usize, vp: ?*const anyopaque) callconv(.c) u32 {
     var result: u32 = 2166136261;
     if (length == 0) return result;
     const scan: [*]const u8 = @ptrCast(vp.?);
@@ -343,8 +343,8 @@ pub export fn hash_object(object: obj.SchemeObject) callconv(.c) u32 {
             return memory_hash(obj.bytevectorLength(name), obj.bytevectorData(name));
         },
         obj.tc_big_fixnum => {
-            const n_digits: c_ulong = @intCast(bignum.bignumLength(object));
-            return memory_hash(n_digits * @sizeOf(c_long), bignum.bignumStartPtr(object));
+            const n_digits: usize = @intCast(bignum.bignumLength(object));
+            return memory_hash(n_digits * @sizeOf(isize), bignum.bignumStartPtr(object));
         },
         obj.tc_big_flonum => {
             return memory_hash(obj.floatingVectorLength(object) * @sizeOf(f64), obj.floatingVectorLoc(object, 0));
@@ -419,7 +419,7 @@ pub export fn interpreter_applicable_p(object_arg: obj.SchemeObject) callconv(.c
     }
 }
 
-pub export fn Do_Micro_Error(error_code: c_long, from_pop_return_p: bool) callconv(.c) void {
+pub export fn Do_Micro_Error(error_code: isize, from_pop_return_p: bool) callconv(.c) void {
     var handler: obj.SchemeObject = obj.sharp_f;
 
     if (build_options.debugging) {
@@ -482,9 +482,9 @@ pub export fn Do_Micro_Error(error_code: c_long, from_pop_return_p: bool) callco
         errorDeath(error_code, "No error handlers");
     }
     const err_len = obj.vectorLength(error_vector);
-    if (error_code >= 0 and @as(c_ulong, @intCast(error_code)) < err_len) {
+    if (error_code >= 0 and @as(usize, @intCast(error_code)) < err_len) {
         handler = obj.vectorRef(error_vector, @intCast(error_code));
-    } else if (abi.err_bad_error_code < @as(c_long, @intCast(err_len))) {
+    } else if (abi.err_bad_error_code < @as(isize, @intCast(err_len))) {
         handler = obj.vectorRef(error_vector, @intCast(abi.err_bad_error_code));
     } else {
         errorDeath(error_code, "No error handlers");
@@ -531,7 +531,7 @@ pub export fn make_dummy_history() callconv(.c) [*]obj.SchemeObject {
     return history;
 }
 
-pub export fn save_history(rc: c_ulong) callconv(.c) void {
+pub export fn save_history(rc: usize) callconv(.c) void {
     abi.stackCheck(abi.history_cont_size);
     abi.stackPush(obj.sharp_f);
     abi.stackPush(obj.ulongToFixnum(prev_restore_history_offset));
@@ -691,9 +691,9 @@ test "utils interrupt vectors, arg validation, hashing, applicability, and histo
     // Interrupt vectors & setup_interrupt
     const handlers = initialize_interrupt_handler_vector();
     const masks = initialize_interrupt_mask_vector();
-    try std.testing.expectEqual(@as(c_ulong, 17), obj.vectorLength(handlers));
-    try std.testing.expectEqual(@as(c_ulong, 17), obj.vectorLength(masks));
-    try std.testing.expectEqual(@as(c_ulong, 0x0F), artutl.integer_to_ulong(obj.vectorRef(masks, 4)));
+    try std.testing.expectEqual(@as(usize, 17), obj.vectorLength(handlers));
+    try std.testing.expectEqual(@as(usize, 17), obj.vectorLength(masks));
+    try std.testing.expectEqual(@as(usize, 0x0F), artutl.integer_to_ulong(obj.vectorRef(masks, 4)));
 
     const fov = abi.make_vector(0x28, obj.sharp_f, false);
     const dummy_hist = obj.makePointerObject(obj.tc_history_unmarked, make_dummy_history());
@@ -709,7 +709,7 @@ test "utils interrupt vectors, arg validation, hashing, applicability, and histo
     abi.Registers[abi.regblock_int_mask] = 0xFFFF;
     abi.Registers[abi.regblock_int_code] = 0x04;
     setup_interrupt(0x04);
-    try std.testing.expectEqual(@as(c_ulong, 0x03), abi.Registers[abi.regblock_int_mask]);
+    try std.testing.expectEqual(@as(usize, 0x03), abi.Registers[abi.regblock_int_mask]);
     // Stack has apply frame(3): [header, handler_proc, int_code, prev_mask], RC_RESTORE_INT_MASK frame, RC_RESTORE_DONT_COPY_HISTORY frame
     try std.testing.expectEqual(abi.makeApplyFrameHeader(3), abi.stackPop());
     try std.testing.expectEqual(handler_proc, abi.stackPop());
@@ -720,12 +720,12 @@ test "utils interrupt vectors, arg validation, hashing, applicability, and histo
 
     // Arg helpers & real_number_to_double*
     stubs.setArgs(&.{ obj.longToFixnum(-5), artutl.ulong_to_integer(300), abi.double_to_flonum(2.5) });
-    try std.testing.expectEqual(@as(c_long, -5), arg_integer(-1 + 2)); // arg 1
-    try std.testing.expectEqual(@as(c_long, -5), arg_integer_in_range(1, -10, 0));
+    try std.testing.expectEqual(@as(isize, -5), arg_integer(-1 + 2)); // arg 1
+    try std.testing.expectEqual(@as(isize, -5), arg_integer_in_range(1, -10, 0));
     try std.testing.expectEqual(@as(i64, -5), arg_integer_to_intmax(1));
-    try std.testing.expectEqual(@as(c_ulong, 300), arg_ulong_integer(2));
-    try std.testing.expectEqual(@as(c_ulong, 300), arg_ulong_index_integer(2, 500));
-    try std.testing.expectEqual(@as(c_ulong, 300), arg_ulong_integer_in_range(2, 100, 400));
+    try std.testing.expectEqual(@as(usize, 300), arg_ulong_integer(2));
+    try std.testing.expectEqual(@as(usize, 300), arg_ulong_index_integer(2, 500));
+    try std.testing.expectEqual(@as(usize, 300), arg_ulong_integer_in_range(2, 100, 400));
     try std.testing.expectEqual(@as(f64, 2.5), arg_real_number(3));
     try std.testing.expectEqual(@as(f64, 2.5), arg_real_in_range(3, 1.0, 3.0));
     try std.testing.expect(real_number_to_double_p(abi.argRef(3)));

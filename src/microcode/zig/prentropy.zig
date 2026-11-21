@@ -11,7 +11,7 @@ const abi = @import("prim_abi.zig");
 // Randomize the 32-byte vector BYTEVECTOR from the system entropy pool.")
 pub export fn Prim_get_entropy() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    var nbytes: c_ulong = 0;
+    var nbytes: usize = 0;
     const buf = abi.arg_bytevector(1, &nbytes);
     if (nbytes != 32) abi.error_bad_range_arg(1);
     abi.OS_get_entropy(@ptrCast(buf));

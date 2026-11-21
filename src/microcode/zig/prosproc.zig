@@ -375,7 +375,7 @@ test "prosproc environment, process table, status, signals, and make-subprocess"
     // Query table & status primitives
     stubs.setArgs(&.{});
     const ptbl = Prim_process_table();
-    try std.testing.expectEqual(@as(c_ulong, 1), obj.vectorLength(ptbl));
+    try std.testing.expectEqual(@as(usize, 1), obj.vectorLength(ptbl));
     try std.testing.expectEqual(pidx, obj.vectorRef(ptbl, 0));
 
     stubs.setArgs(&.{pidx});

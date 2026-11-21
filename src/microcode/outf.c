@@ -41,6 +41,12 @@ USA.
    Use outf where you would normally think of using fprintf and
    outf_flush where you would normally use fflush.  */
 
+#ifdef __MINGW32__
+#  ifndef __USE_MINGW_ANSI_STDIO
+#    define __USE_MINGW_ANSI_STDIO 1
+#  endif
+#endif
+
 #include <stdarg.h>
 #include <stdio.h>
 

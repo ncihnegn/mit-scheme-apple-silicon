@@ -13,7 +13,7 @@ pub export fn string_p(object: obj.SchemeObject) callconv(.c) bool {
         (obj.unicodeStringP(object) and obj.ustringBytesPerCp(object) == 1);
 }
 
-pub export fn allocate_string(nbytes: c_ulong) callconv(.c) obj.SchemeObject {
+pub export fn allocate_string(nbytes: usize) callconv(.c) obj.SchemeObject {
     const result = abi.allocate_non_marked_vector(
         @intCast(obj.tc_character_string),
         obj.bytevectorLengthToGcLength(nbytes),
@@ -23,7 +23,7 @@ pub export fn allocate_string(nbytes: c_ulong) callconv(.c) obj.SchemeObject {
     return result;
 }
 
-pub export fn allocate_string_no_gc(nbytes: c_ulong) callconv(.c) obj.SchemeObject {
+pub export fn allocate_string_no_gc(nbytes: usize) callconv(.c) obj.SchemeObject {
     const result = abi.allocate_non_marked_vector(
         @intCast(obj.tc_character_string),
         obj.bytevectorLengthToGcLength(nbytes),
@@ -33,7 +33,7 @@ pub export fn allocate_string_no_gc(nbytes: c_ulong) callconv(.c) obj.SchemeObje
     return result;
 }
 
-pub export fn memory_to_string(n_bytes: c_ulong, vp: ?*const anyopaque) callconv(.c) obj.SchemeObject {
+pub export fn memory_to_string(n_bytes: usize, vp: ?*const anyopaque) callconv(.c) obj.SchemeObject {
     const result = allocate_string(n_bytes);
     if (n_bytes > 0) {
         const src: [*]const u8 = @ptrCast(vp.?);
@@ -42,7 +42,7 @@ pub export fn memory_to_string(n_bytes: c_ulong, vp: ?*const anyopaque) callconv
     return result;
 }
 
-pub export fn memory_to_string_no_gc(n_bytes: c_ulong, vp: ?*const anyopaque) callconv(.c) obj.SchemeObject {
+pub export fn memory_to_string_no_gc(n_bytes: usize, vp: ?*const anyopaque) callconv(.c) obj.SchemeObject {
     const result = allocate_string_no_gc(n_bytes);
     if (n_bytes > 0) {
         const src: [*]const u8 = @ptrCast(vp.?);
@@ -52,16 +52,16 @@ pub export fn memory_to_string_no_gc(n_bytes: c_ulong, vp: ?*const anyopaque) ca
 }
 
 pub export fn char_pointer_to_string(cp: ?[*:0]const u8) callconv(.c) obj.SchemeObject {
-    const len: c_ulong = if (cp) |p| @intCast(std.mem.len(p)) else 0;
+    const len: usize = if (cp) |p| @intCast(std.mem.len(p)) else 0;
     return memory_to_string(len, cp);
 }
 
 pub export fn char_pointer_to_string_no_gc(cp: ?[*:0]const u8) callconv(.c) obj.SchemeObject {
-    const len: c_ulong = if (cp) |p| @intCast(std.mem.len(p)) else 0;
+    const len: usize = if (cp) |p| @intCast(std.mem.len(p)) else 0;
     return memory_to_string_no_gc(len, cp);
 }
 
-pub export fn string_to_char_pointer(string: obj.SchemeObject, lp: ?*c_ulong) callconv(.c) [*]u8 {
+pub export fn string_to_char_pointer(string: obj.SchemeObject, lp: ?*usize) callconv(.c) [*]u8 {
     if (lp) |out| out.* = obj.legacyStringLength(string);
     return obj.legacyStringLoc(string, 0);
 }
@@ -97,7 +97,7 @@ pub export fn Prim_set_string_length() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     abi.checkArg(1, string_p);
     const str = abi.argRef(1);
-    const max_len: c_long = @intCast(obj.legacyStringMaxLength(str));
+    const max_len: isize = @intCast(obj.legacyStringMaxLength(str));
     obj.setLegacyStringLength(str, @intCast(abi.arg_index_integer(2, max_len + 1)));
     return obj.unspecific;
 }
@@ -107,8 +107,8 @@ pub export fn Prim_set_string_maximum_length() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     abi.checkArg(1, string_p);
     const str = abi.argRef(1);
-    const max_len: c_long = @intCast(obj.legacyStringMaxLength(str));
-    const length: c_ulong = @intCast(abi.arg_index_integer(2, max_len + 1));
+    const max_len: isize = @intCast(obj.legacyStringMaxLength(str));
+    const length: usize = @intCast(abi.arg_index_integer(2, max_len + 1));
     if (length < obj.legacyStringLength(str)) {
         obj.setLegacyStringLength(str, length);
     }
@@ -139,7 +139,7 @@ fn stringSetImpl(comptime getAsciiFn: anytype) obj.SchemeObject {
     abi.checkArg(1, string_p);
     const str = abi.argRef(1);
     const idx = abi.arg_index_integer(2, @intCast(obj.legacyStringLength(str)));
-    const ch: u8 = @truncate(@as(c_ulong, @bitCast(getAsciiFn(3))));
+    const ch: u8 = @truncate(@as(usize, @bitCast(getAsciiFn(3))));
     obj.legacyStringSet(str, @intCast(idx), ch);
     return obj.unspecific;
 }
@@ -166,8 +166,8 @@ const SubstringMoveArgs = struct {
 
 fn substringMovePrefix() SubstringMoveArgs {
     abi.primitiveHeader();
-    var len1: c_ulong = undefined;
-    var len2: c_ulong = undefined;
+    var len1: usize = undefined;
+    var len2: usize = undefined;
     const ptr1 = arg_extended_string(1, &len1);
     const end1 = abi.arg_ulong_index_integer(3, len1 + 1);
     const start1 = abi.arg_ulong_index_integer(2, end1 + 1);
@@ -212,14 +212,14 @@ fn substringModify(comptime charMap: anytype) obj.SchemeObject {
     abi.primitiveHeader();
     abi.checkArg(1, string_p);
     const str = abi.argRef(1);
-    const start: c_ulong = @intCast(abi.arg_nonnegative_integer(2));
-    const end: c_ulong = @intCast(abi.arg_nonnegative_integer(3));
+    const start: usize = @intCast(abi.arg_nonnegative_integer(2));
+    const end: usize = @intCast(abi.arg_nonnegative_integer(3));
     if (end > obj.legacyStringLength(str)) abi.error_bad_range_arg(3);
     if (start > end) abi.error_bad_range_arg(2);
     const scan = obj.legacyStringLoc(str, @intCast(start));
     const len: usize = @intCast(end - start);
     for (scan[0..len]) |*slot| {
-        slot.* = @truncate(@as(c_ulong, @bitCast(charMap(@as(c_long, slot.*)))));
+        slot.* = @truncate(@as(usize, @bitCast(charMap(@as(isize, slot.*)))));
     }
     return obj.unspecific;
 }
@@ -236,11 +236,11 @@ pub export fn Prim_substring_downcase() callconv(.c) obj.SchemeObject {
 
 fn vec8bSubstringPrefix() struct { ptr: [*]u8, start: usize, end: usize, ascii: u8 } {
     abi.primitiveHeader();
-    var length: c_ulong = undefined;
+    var length: usize = undefined;
     const ptr = arg_extended_string(1, &length);
-    const start: c_ulong = @intCast(abi.arg_nonnegative_integer(2));
-    const end: c_ulong = @intCast(abi.arg_nonnegative_integer(3));
-    const ascii: u8 = @truncate(@as(c_ulong, @bitCast(abi.arg_ascii_integer(4))));
+    const start: usize = @intCast(abi.arg_nonnegative_integer(2));
+    const end: usize = @intCast(abi.arg_nonnegative_integer(3));
+    const ascii: u8 = @truncate(@as(usize, @bitCast(abi.arg_ascii_integer(4))));
     if (end > length) abi.error_bad_range_arg(3);
     if (start > end) abi.error_bad_range_arg(2);
     return .{
@@ -280,7 +280,7 @@ pub export fn Prim_vec_8b_find_prev_char() callconv(.c) obj.SchemeObject {
 }
 
 inline fn asciiUpcaseByte(c: u8) u8 {
-    return @truncate(@as(c_ulong, @bitCast(abi.char_upcase(@as(c_long, c)))));
+    return @truncate(@as(usize, @bitCast(abi.char_upcase(@as(isize, c)))));
 }
 
 // DEFINE_PRIMITIVE ("VECTOR-8B-FIND-NEXT-CHAR-CI", Prim_vec_8b_find_next_char_ci, 4, 4, 0)
@@ -308,10 +308,10 @@ pub export fn Prim_vec_8b_find_prev_char_ci() callconv(.c) obj.SchemeObject {
 
 fn substrFindCharInSetPrefix() struct { ptr: [*]const u8, start: usize, end: usize, char_set: [*]const u8 } {
     abi.primitiveHeader();
-    var length: c_ulong = undefined;
+    var length: usize = undefined;
     const ptr = arg_extended_string(1, &length);
-    const start: c_ulong = @intCast(abi.arg_nonnegative_integer(2));
-    const end: c_ulong = @intCast(abi.arg_nonnegative_integer(3));
+    const start: usize = @intCast(abi.arg_nonnegative_integer(2));
+    const end: usize = @intCast(abi.arg_nonnegative_integer(3));
     abi.checkArg(4, string_p);
     const cs_obj = abi.argRef(4);
     const char_set = obj.legacyStringLoc(cs_obj, 0);
@@ -361,13 +361,13 @@ fn substringComparePrefix() SubstringCmpArgs {
     abi.checkArg(1, string_p);
     const obj1 = abi.argRef(1);
     const s1 = obj.legacyStringLoc(obj1, 0);
-    const start1: c_ulong = @intCast(abi.arg_nonnegative_integer(2));
-    const end1: c_ulong = @intCast(abi.arg_nonnegative_integer(3));
+    const start1: usize = @intCast(abi.arg_nonnegative_integer(2));
+    const end1: usize = @intCast(abi.arg_nonnegative_integer(3));
     abi.checkArg(4, string_p);
     const obj2 = abi.argRef(4);
     const s2 = obj.legacyStringLoc(obj2, 0);
-    const start2: c_ulong = @intCast(abi.arg_nonnegative_integer(5));
-    const end2: c_ulong = @intCast(abi.arg_nonnegative_integer(6));
+    const start2: usize = @intCast(abi.arg_nonnegative_integer(5));
+    const end2: usize = @intCast(abi.arg_nonnegative_integer(6));
     if (end1 > obj.legacyStringLength(obj1)) abi.error_bad_range_arg(3);
     if (start1 > end1) abi.error_bad_range_arg(2);
     if (end2 > obj.legacyStringLength(obj2)) abi.error_bad_range_arg(6);
@@ -471,27 +471,27 @@ pub export fn Prim_match_backward_ci() callconv(.c) obj.SchemeObject {
 
 const HtRecord = extern struct {
     next: ?*HtRecord,
-    n_bytes: c_ulong,
+    n_bytes: usize,
 };
 
 const HashTable = struct {
-    n_records: c_ulong,
-    n_buckets: c_ulong,
+    n_records: usize,
+    n_buckets: usize,
     buckets: [*]?*HtRecord,
 };
 
 const ht_min_expt: u5 = 4;
 const ht_max_expt: u5 = 24;
 
-inline fn exptToN(e: u5) c_ulong {
-    return (@as(c_ulong, 1) << e) - 1;
+inline fn exptToN(e: u5) usize {
+    return (@as(usize, 1) << e) - 1;
 }
 
 inline fn htRecordPtr(rec: *HtRecord) [*]u8 {
     return @ptrCast(@as([*]HtRecord, @ptrCast(rec)) + 1);
 }
 
-inline fn htRecordKey(rec: *HtRecord) c_ulong {
+inline fn htRecordKey(rec: *HtRecord) usize {
     return @intCast(@intFromPtr(htRecordPtr(rec)));
 }
 
@@ -534,7 +534,7 @@ fn htRecordsList(table: *HashTable) ?*HtRecord {
     return result;
 }
 
-fn htInsertRaw(table: *HashTable, rec: *HtRecord) c_ulong {
+fn htInsertRaw(table: *HashTable, rec: *HtRecord) usize {
     const key = htRecordKey(rec);
     const index: usize = @intCast(key % table.n_buckets);
     rec.next = null;
@@ -549,7 +549,7 @@ fn htInsertRaw(table: *HashTable, rec: *HtRecord) c_ulong {
     return key;
 }
 
-fn htResize(table: *HashTable, new_n_buckets: c_ulong) void {
+fn htResize(table: *HashTable, new_n_buckets: usize) void {
     const new_bytes: usize = @as(usize, @intCast(new_n_buckets)) * @sizeOf(?*HtRecord);
     const new_raw = std.c.malloc(new_bytes) orelse return;
     const new_buckets: [*]?*HtRecord = @ptrCast(@alignCast(new_raw));
@@ -567,7 +567,7 @@ fn htResize(table: *HashTable, new_n_buckets: c_ulong) void {
     std.c.free(@ptrCast(old_buckets));
 }
 
-fn htLookup(table: *HashTable, key: c_ulong) ?*HtRecord {
+fn htLookup(table: *HashTable, key: usize) ?*HtRecord {
     const index: usize = @intCast(key % table.n_buckets);
     var rec = table.buckets[index];
     while (rec) |r| {
@@ -577,7 +577,7 @@ fn htLookup(table: *HashTable, key: c_ulong) ?*HtRecord {
     return null;
 }
 
-fn htInsert(table: *HashTable, rec: *HtRecord) c_ulong {
+fn htInsert(table: *HashTable, rec: *HtRecord) usize {
     const key = htInsertRaw(table, rec);
     if (table.n_records >= table.n_buckets and table.n_buckets < exptToN(ht_max_expt)) {
         var e: u5 = ht_min_expt;
@@ -593,7 +593,7 @@ fn htInsert(table: *HashTable, rec: *HtRecord) c_ulong {
     return key;
 }
 
-fn htDelete(table: *HashTable, key: c_ulong) ?*HtRecord {
+fn htDelete(table: *HashTable, key: usize) ?*HtRecord {
     const index: usize = @intCast(key % table.n_buckets);
     var scan = table.buckets[index];
     var prev: ?*HtRecord = null;
@@ -665,19 +665,19 @@ pub export fn Prim_dealloc_external_string() callconv(.c) obj.SchemeObject {
 // DEFINE_PRIMITIVE ("EXTENDED-STRING-LENGTH", Prim_extended_string_length, 1, 1, 0)
 pub export fn Prim_extended_string_length() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    var len: c_ulong = undefined;
+    var len: usize = undefined;
     _ = arg_extended_string(1, &len);
     return artutl.ulong_to_integer(len);
 }
 
-pub export fn lookup_external_string(descriptor: obj.SchemeObject, lp: ?*c_ulong) callconv(.c) ?[*]u8 {
+pub export fn lookup_external_string(descriptor: obj.SchemeObject, lp: ?*usize) callconv(.c) ?[*]u8 {
     const tbl = ensureExternalStringsTable();
     const rec = htLookup(tbl, artutl.integer_to_ulong(descriptor)) orelse return null;
     if (lp) |out| out.* = rec.n_bytes;
     return htRecordPtr(rec);
 }
 
-pub export fn arg_extended_string(n: c_uint, lp: ?*c_ulong) callconv(.c) [*]u8 {
+pub export fn arg_extended_string(n: c_uint, lp: ?*usize) callconv(.c) [*]u8 {
     const object = abi.argRef(@intCast(n));
     if (string_p(object)) {
         if (lp) |out| out.* = obj.legacyStringLength(object);
@@ -696,11 +696,11 @@ test "string_p, allocation, overlapping moves, ci compare/search, and external s
     // string_p accepts legacy strings, bytevectors, and 1-byte unicode strings only
     const s = char_pointer_to_string("HeLLo");
     try std.testing.expect(string_p(s));
-    try std.testing.expectEqual(@as(c_ulong, 5), obj.legacyStringLength(s));
+    try std.testing.expectEqual(@as(usize, 5), obj.legacyStringLength(s));
     try std.testing.expectEqual(@as(u8, 0), obj.legacyStringRef(s, 5));
     const empty_s = char_pointer_to_string(null);
     try std.testing.expect(string_p(empty_s));
-    try std.testing.expectEqual(@as(c_ulong, 0), obj.legacyStringLength(empty_s));
+    try std.testing.expectEqual(@as(usize, 0), obj.legacyStringLength(empty_s));
 
     const bv = abi.allocate_bytevector(4);
     try std.testing.expect(string_p(bv));
@@ -746,9 +746,9 @@ test "string_p, allocation, overlapping moves, ci compare/search, and external s
         stubs.setArgs(&.{ext});
         try std.testing.expectEqual(obj.ulongToFixnum(@intCast(idx + 4)), Prim_extended_string_length());
     }
-    var ext_len: c_ulong = 0;
+    var ext_len: usize = 0;
     const ext_ptr = lookup_external_string(descs[0], &ext_len).?;
-    try std.testing.expectEqual(@as(c_ulong, 4), ext_len);
+    try std.testing.expectEqual(@as(usize, 4), ext_len);
     ext_ptr[0] = 'X';
     stubs.setArgs(&.{ descs[0], obj.ulongToFixnum(0), obj.ulongToFixnum(1), lower, obj.ulongToFixnum(1) });
     _ = Prim_substring_move_left();

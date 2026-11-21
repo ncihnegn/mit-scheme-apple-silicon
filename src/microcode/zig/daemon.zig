@@ -27,7 +27,7 @@ pub export fn Prim_close_lost_open_files() callconv(.c) obj.SchemeObject {
 }
 
 // Called inside GC daemon with space guaranteed from preceding GC.
-fn rehashPair(pair: obj.SchemeObject, hash_table: obj.SchemeObject, table_size: c_ulong) void {
+fn rehashPair(pair: obj.SchemeObject, hash_table: obj.SchemeObject, table_size: usize) void {
     const datum = obj.objectDatum(obj.pairCar(pair));
     const hash_address: usize = 2 + @as(usize, @intCast(datum % table_size));
     const new_pair = abi.Free;
@@ -37,7 +37,7 @@ fn rehashPair(pair: obj.SchemeObject, hash_table: obj.SchemeObject, table_size: 
     obj.memorySet(hash_table, hash_address, obj.makePointerObject(obj.tc_list, new_pair));
 }
 
-fn rehashBucket(start_bucket: [*]obj.SchemeObject, hash_table: obj.SchemeObject, table_size: c_ulong) void {
+fn rehashBucket(start_bucket: [*]obj.SchemeObject, hash_table: obj.SchemeObject, table_size: usize) void {
     var bucket = start_bucket;
     while (!obj.emptyListP(bucket[0])) {
         const weak_pair = obj.pairCar(bucket[0]);
@@ -48,7 +48,7 @@ fn rehashBucket(start_bucket: [*]obj.SchemeObject, hash_table: obj.SchemeObject,
     }
 }
 
-fn spliceAndRehashBucket(start_bucket: [*]obj.SchemeObject, hash_table: obj.SchemeObject, table_size: c_ulong) void {
+fn spliceAndRehashBucket(start_bucket: [*]obj.SchemeObject, hash_table: obj.SchemeObject, table_size: usize) void {
     var bucket = start_bucket;
     while (!obj.emptyListP(bucket[0])) {
         const weak_pair = obj.pairCar(bucket[0]);

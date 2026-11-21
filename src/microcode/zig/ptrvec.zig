@@ -4,8 +4,8 @@
 
 const std = @import("std");
 
-pub const PtrvecIndex = c_ulong;
-pub const PtrvecLength = c_ulong;
+pub const PtrvecIndex = usize;
+pub const PtrvecLength = usize;
 
 pub const Ptrvec = extern struct {
     length: PtrvecLength,

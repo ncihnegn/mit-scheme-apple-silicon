@@ -23,9 +23,9 @@ extern "c" fn strncpy([*]u8, [*]const u8, usize) [*]u8;
 
 const CChar = if (builtin.os.tag == .linux and builtin.cpu.arch == .aarch64) u8 else i8;
 
-const half_word_shift: std.math.Log2Int(c_ulong) = (@sizeOf(?*anyopaque) * 8) / 2;
-const half_word_mask: c_ulong = (@as(c_ulong, 1) << half_word_shift) - 1;
-const ustring_flags_all: c_ulong = 0x7;
+const half_word_shift: std.math.Log2Int(usize) = (@sizeOf(?*anyopaque) * 8) / 2;
+const half_word_mask: usize = (@as(usize, 1) << half_word_shift) - 1;
+const ustring_flags_all: usize = 0x7;
 
 pub export var cstack_depth: c_int = 0;
 var c_call_continue: SCM = obj.sharp_f;
@@ -39,7 +39,7 @@ fn argRecord(argument_number: c_int) SCM {
     return val;
 }
 
-fn unsignedFixnumArg(arg: c_int) c_ulong {
+fn unsignedFixnumArg(arg: c_int) usize {
     const val = abi.argRef(@intCast(arg));
     if (!obj.fixnumP(val)) {
         abi.error_wrong_type_arg(arg);
@@ -85,34 +85,34 @@ inline fn cPoker(comptime T: type, val: T) SCM {
 }
 
 fn peekCharConv(v: CChar) SCM {
-    return obj.longToFixnum(@as(c_long, v));
+    return obj.longToFixnum(@as(isize, v));
 }
 
 fn peekUCharConv(v: u8) SCM {
-    return obj.longToFixnum(@as(c_long, v));
+    return obj.longToFixnum(@as(isize, v));
 }
 
 fn peekShortConv(v: c_short) SCM {
-    return obj.longToFixnum(@as(c_long, v));
+    return obj.longToFixnum(@as(isize, v));
 }
 
 fn peekUShortConv(v: c_ushort) SCM {
-    return obj.longToFixnum(@as(c_long, v));
+    return obj.longToFixnum(@as(isize, v));
 }
 
 fn peekIntConv(v: c_int) SCM {
-    return abi.long_to_integer(@as(c_long, v));
+    return abi.long_to_integer(@as(isize, v));
 }
 
 fn peekUIntConv(v: c_uint) SCM {
-    return abi.ulong_to_integer(@as(c_ulong, v));
+    return abi.ulong_to_integer(@as(usize, v));
 }
 
-fn peekLongConv(v: c_long) SCM {
+fn peekLongConv(v: isize) SCM {
     return abi.long_to_integer(v);
 }
 
-fn peekULongConv(v: c_ulong) SCM {
+fn peekULongConv(v: usize) SCM {
     return abi.ulong_to_integer(v);
 }
 
@@ -144,7 +144,7 @@ pub export fn alien_address(alien: SCM) callconv(.c) ?*anyopaque {
 }
 
 pub export fn set_alien_address(alien: SCM, ptr: ?*const anyopaque) callconv(.c) void {
-    const addr: c_ulong = @intCast(@intFromPtr(ptr));
+    const addr: usize = @intCast(@intFromPtr(ptr));
     obj.vectorSet(alien, 1, obj.ulongToFixnum(addr >> half_word_shift));
     obj.vectorSet(alien, 2, obj.ulongToFixnum(addr & half_word_mask));
 }
@@ -199,12 +199,12 @@ pub export fn Prim_peek_uint() callconv(.c) SCM {
 
 // DEFINE_PRIMITIVE ("C-PEEK-LONG", Prim_peek_long, 2, 2, 0)
 pub export fn Prim_peek_long() callconv(.c) SCM {
-    return cPeeker(c_long, peekLongConv);
+    return cPeeker(isize, peekLongConv);
 }
 
 // DEFINE_PRIMITIVE ("C-PEEK-ULONG", Prim_peek_ulong, 2, 2, 0)
 pub export fn Prim_peek_ulong() callconv(.c) SCM {
-    return cPeeker(c_ulong, peekULongConv);
+    return cPeeker(usize, peekULongConv);
 }
 
 // DEFINE_PRIMITIVE ("C-PEEK-FLOAT", Prim_peek_float, 2, 2, 0)
@@ -226,7 +226,7 @@ pub export fn Prim_peek_pointer() callconv(.c) SCM {
 }
 
 pub export fn bytes_to_ustring(bytes: [*]u8, n_bytes: c_int) callconv(.c) SCM {
-    const n: c_ulong = @intCast(n_bytes);
+    const n: usize = @intCast(n_bytes);
     const result = abi.allocate_non_marked_vector(
         @intCast(obj.tc_unicode_string),
         obj.bytevectorLengthToGcLength(n),
@@ -331,12 +331,12 @@ pub export fn Prim_poke_uint() callconv(.c) SCM {
 
 // DEFINE_PRIMITIVE ("C-POKE-LONG", Prim_poke_long, 3, 3, 0)
 pub export fn Prim_poke_long() callconv(.c) SCM {
-    return cPoker(c_long, abi.arg_integer(3));
+    return cPoker(isize, abi.arg_integer(3));
 }
 
 // DEFINE_PRIMITIVE ("C-POKE-ULONG", Prim_poke_ulong, 3, 3, 0)
 pub export fn Prim_poke_ulong() callconv(.c) SCM {
-    return cPoker(c_ulong, abi.arg_ulong_integer(3));
+    return cPoker(usize, abi.arg_ulong_integer(3));
 }
 
 // DEFINE_PRIMITIVE ("C-POKE-FLOAT", Prim_poke_float, 3, 3, 0)
@@ -637,7 +637,7 @@ fn validCallbackHandler() SCM {
     return handler;
 }
 
-fn validCallbackId(id: c_long) SCM {
+fn validCallbackId(id: isize) SCM {
     if (id >= 0 and obj.ulongToFixnumP(@intCast(id))) {
         return obj.ulongToFixnum(@intCast(id));
     }
@@ -646,7 +646,7 @@ fn validCallbackId(id: c_long) SCM {
 
 pub export fn callback_run_handler(callback_id: c_long, arglist: SCM) callconv(.c) void {
     const handler = validCallbackHandler();
-    const fixnum_id = validCallbackId(callback_id);
+    const fixnum_id = validCallbackId(@as(isize, callback_id));
 
     abi.stackCheck(4 + abi.cont_size);
     abi.stackPush(arglist);
@@ -663,11 +663,19 @@ pub export fn callback_return(tos: [*]u8) callconv(.c) void {
 // Converters
 
 pub export fn arg_long(argn: c_int) callconv(.c) c_long {
-    return abi.arg_integer(argn);
+    const v = abi.arg_integer(argn);
+    if (v < std.math.minInt(c_long) or v > std.math.maxInt(c_long)) {
+        abi.error_bad_range_arg(argn);
+    }
+    return @intCast(v);
 }
 
 pub export fn arg_ulong(argn: c_int) callconv(.c) c_ulong {
-    return abi.arg_ulong_integer(argn);
+    const v = abi.arg_ulong_integer(argn);
+    if (v > std.math.maxInt(c_ulong)) {
+        abi.error_bad_range_arg(argn);
+    }
+    return @intCast(v);
 }
 
 pub export fn arg_double(argn: c_int) callconv(.c) f64 {
@@ -704,11 +712,11 @@ pub export fn arg_pointer(argn: c_int) callconv(.c) ?*anyopaque {
 }
 
 pub export fn long_to_scm(i: c_long) callconv(.c) SCM {
-    return abi.long_to_integer(i);
+    return abi.long_to_integer(@as(isize, i));
 }
 
 pub export fn ulong_to_scm(i: c_ulong) callconv(.c) SCM {
-    return abi.ulong_to_integer(i);
+    return abi.ulong_to_integer(@as(usize, i));
 }
 
 pub export fn double_to_scm(d: f64) callconv(.c) SCM {
@@ -769,13 +777,18 @@ pub export fn long_value() callconv(.c) c_long {
         abi.outf_error_line("\nWarning: Callback returned an integer larger than a C long!");
         return 0;
     }
-    return artutl.integer_to_long(value);
+    const v = artutl.integer_to_long(value);
+    if (v < std.math.minInt(c_long) or v > std.math.maxInt(c_long)) {
+        abi.outf_error_line("\nWarning: Callback returned an integer larger than a C long!");
+        return 0;
+    }
+    return @intCast(v);
 }
 
 pub export fn ulong_value() callconv(.c) c_ulong {
     const value = abi.Registers[abi.regblock_val];
     if (obj.characterP(value)) {
-        return obj.charToAscii(value);
+        return @intCast(obj.charToAscii(value));
     }
     if (!obj.integerP(value)) {
         abi.outf_error_line("\nWarning: Callback did not return an integer!");
@@ -785,7 +798,12 @@ pub export fn ulong_value() callconv(.c) c_ulong {
         abi.outf_error_line("\nWarning: Callback returned an integer larger than a C unsigned long!");
         return 0;
     }
-    return artutl.integer_to_ulong(value);
+    const v = artutl.integer_to_ulong(value);
+    if (v > std.math.maxInt(c_ulong)) {
+        abi.outf_error_line("\nWarning: Callback returned an integer larger than a C unsigned long!");
+        return 0;
+    }
+    return @intCast(v);
 }
 
 pub export fn double_value() callconv(.c) f64 {
@@ -816,7 +834,7 @@ pub export fn pointer_value() callconv(.c) ?*anyopaque {
 // Utilities
 
 pub export fn check_number_of_args(num: c_int) callconv(.c) void {
-    if (num < 0 or abi.getLexprActuals() < @as(c_ulong, @intCast(num))) {
+    if (num < 0 or abi.getLexprActuals() < @as(usize, @intCast(num))) {
         abi.signal_error_from_primitive(abi.err_wrong_number_of_arguments);
     }
 }
@@ -886,7 +904,7 @@ fn testCalloutPart2() callconv(.c) SCM {
     const val = cstackLpopVal(u32, &tos);
     callout_pop(tos);
     test_callout_stage += 1;
-    return abi.ulong_to_integer(@as(c_ulong, val) + 1);
+    return abi.ulong_to_integer(@as(usize, val) + 1);
 }
 
 fn testCalloutPart1() callconv(.c) SCM {
@@ -939,7 +957,7 @@ test "pruxffi alien peek/poke unaligned, cstack/callout seal-unseal, and convert
     set_alien_address(alien, &backing);
     stubs.setArgs(&.{ alien, obj.ulongToFixnum(16) });
     const ustr = Prim_peek_cstring();
-    try std.testing.expectEqual(@as(c_ulong, 3), obj.objectDatum(obj.nmVectorSubheader(ustr)));
+    try std.testing.expectEqual(@as(usize, 3), obj.objectDatum(obj.nmVectorSubheader(ustr)));
     try std.testing.expectEqualStrings("hi!", obj.bytevectorData(ustr)[0..3]);
 
     // 3. C-MALLOC / C-FREE
@@ -967,8 +985,8 @@ test "pruxffi alien peek/poke unaligned, cstack/callout seal-unseal, and convert
     try std.testing.expectEqual(@as(c_int, 1), flovec_length(fptr));
 
     abi.Registers[abi.regblock_val] = obj.makeObject(obj.tc_character, 'Z');
-    try std.testing.expectEqual(@as(c_long, 'Z'), long_value());
-    try std.testing.expectEqual(@as(c_ulong, 'Z'), ulong_value());
+    try std.testing.expectEqual(@as(isize, 'Z'), long_value());
+    try std.testing.expectEqual(@as(usize, 'Z'), ulong_value());
     abi.Registers[abi.regblock_val] = fval;
     try std.testing.expectEqual(@as(f64, 7.25), double_value());
     abi.Registers[abi.regblock_val] = obj.ulongToFixnum(0);

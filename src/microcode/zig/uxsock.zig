@@ -146,7 +146,7 @@ pub fn osOpenTcpStreamSocket(host: ?*anyopaque, port: c_uint) callconv(.c) abi.T
 }
 
 /// Shut down read, write, or both halves of a socket channel.
-pub fn osShutdownSocket(channel: abi.Tchannel, stype: c_ulong) callconv(.c) void {
+pub fn osShutdownSocket(channel: abi.Tchannel, stype: usize) callconv(.c) void {
     const how: c_int = switch (stype & 0x3) {
         0x1 => std.c.SHUT.RD,
         0x2 => std.c.SHUT.WR,
@@ -165,8 +165,8 @@ pub fn osGetServiceByName(service_name: [*:0]const u8, protocol_name: ?[*:0]cons
 }
 
 /// Convert a host-order port number to network byte order.
-pub fn osGetServiceByNumber(port_number: c_ulong) callconv(.c) c_ulong {
-    return @as(c_ulong, std.mem.nativeToBig(u16, @truncate(port_number)));
+pub fn osGetServiceByNumber(port_number: usize) callconv(.c) usize {
+    return @as(usize, std.mem.nativeToBig(u16, @truncate(port_number)));
 }
 
 /// Return byte length of an IPv4 host address (`sizeof(struct in_addr)`).
@@ -347,7 +347,7 @@ test "uxsock loopback TCP and Unix sockets plus host/service helpers" {
     osHostAddressLoopback(&loopback_buf);
     try std.testing.expectEqualSlices(u8, &.{ 127, 0, 0, 1 }, &loopback_buf);
 
-    try std.testing.expectEqual(@as(c_ulong, 0x5000), osGetServiceByNumber(80));
+    try std.testing.expectEqual(@as(usize, 0x5000), osGetServiceByNumber(80));
     const hname = osGetHostName();
     defer abi.OS_free(@ptrCast(@constCast(hname)));
     try std.testing.expect(std.mem.span(hname).len > 0);

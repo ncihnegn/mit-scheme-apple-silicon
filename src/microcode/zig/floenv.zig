@@ -8,15 +8,15 @@ const abi = @import("prim_abi.zig");
 const artutl = @import("artutl.zig");
 const fenv = @import("fenv_plat.zig");
 
-const frmode_nearest: c_ulong = 0;
-const frmode_toward_zero: c_ulong = 1;
-const frmode_downward: c_ulong = 2;
-const frmode_upward: c_ulong = 3;
+const frmode_nearest: usize = 0;
+const frmode_toward_zero: usize = 1;
+const frmode_downward: usize = 2;
+const frmode_upward: usize = 3;
 
 const non_trappable_exceptions: c_int = fenv.fe_inexact;
 
 comptime {
-    std.debug.assert(obj.ulongToFixnumP(@as(c_ulong, @intCast(fenv.fe_all_except))));
+    std.debug.assert(obj.ulongToFixnumP(@as(usize, @intCast(fenv.fe_all_except))));
 }
 
 var scheme_fenv_p: bool = false;
@@ -56,7 +56,7 @@ fn argStructBytes(comptime T: type, n: c_int) T {
     return out;
 }
 
-inline fn exceptionsMachineToScheme(except_machine: c_int) c_ulong {
+inline fn exceptionsMachineToScheme(except_machine: c_int) usize {
     return @intCast(except_machine);
 }
 
@@ -113,11 +113,11 @@ pub export fn Prim_update_float_environment() callconv(.c) obj.SchemeObject {
 // DEFINE_PRIMITIVE ("FLOAT-ROUNDING-MODES", Prim_float_rounding_modes, 0, 0, 0)
 pub export fn Prim_float_rounding_modes() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    const modes: c_ulong =
-        (@as(c_ulong, 1) << @intCast(frmode_nearest)) |
-        (@as(c_ulong, 1) << @intCast(frmode_toward_zero)) |
-        (@as(c_ulong, 1) << @intCast(frmode_downward)) |
-        (@as(c_ulong, 1) << @intCast(frmode_upward));
+    const modes: usize =
+        (@as(usize, 1) << @intCast(frmode_nearest)) |
+        (@as(usize, 1) << @intCast(frmode_toward_zero)) |
+        (@as(usize, 1) << @intCast(frmode_downward)) |
+        (@as(usize, 1) << @intCast(frmode_upward));
     return artutl.ulong_to_integer(modes);
 }
 
@@ -371,5 +371,5 @@ test "floenv primitives round mode, exception flags, and environment save/restor
 
     const trappable = Prim_trappable_float_exceptions();
     const inexact = Prim_float_inexact_result_exception();
-    try std.testing.expectEqual(@as(c_ulong, 0), obj.fixnumToUlong(trappable) & obj.fixnumToUlong(inexact));
+    try std.testing.expectEqual(@as(usize, 0), obj.fixnumToUlong(trappable) & obj.fixnumToUlong(inexact));
 }

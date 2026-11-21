@@ -123,7 +123,7 @@ fn printVector(stream: abi.OutfChannel, vector: obj.SchemeObject) void {
         printObject(stream, obj.vectorRef(vector, i));
     }
     if (end < length) {
-        abi.outf(stream, "...[%ld more]", @as(c_long, @intCast(length - end)));
+        abi.outf(stream, "...[%zd more]", @as(isize, @intCast(length - end)));
     }
     abi.outf(stream, ")");
 }
@@ -139,7 +139,7 @@ fn printBytevector(stream: abi.OutfChannel, bv: obj.SchemeObject) void {
         abi.outf(stream, "%d", @as(c_int, obj.bytevectorRef(bv, i)));
     }
     if (end < length) {
-        abi.outf(stream, "...[%ld more]", @as(c_long, @intCast(length - end)));
+        abi.outf(stream, "...[%zd more]", @as(isize, @intCast(length - end)));
     }
     abi.outf(stream, ")");
 }
@@ -151,7 +151,7 @@ fn printReturnName(stream: abi.OutfChannel, ret: obj.SchemeObject) void {
             return;
         }
     }
-    abi.outf(stream, "[0x%lx]", obj.objectDatum(ret));
+    abi.outf(stream, "[0x%zx]", obj.objectDatum(ret));
 }
 
 fn printSimple(stream: abi.OutfChannel, object: obj.SchemeObject) void {
@@ -165,7 +165,7 @@ fn printSimple(stream: abi.OutfChannel, object: obj.SchemeObject) void {
     } else {
         abi.outf(stream, "[%#02x", @as(c_uint, @intCast(tc)));
     }
-    abi.outf(stream, " %#lx]", obj.objectDatum(object));
+    abi.outf(stream, " %#zx]", obj.objectDatum(object));
 }
 
 fn printChar(stream: abi.OutfChannel, cp: c_uint) void {
@@ -194,7 +194,7 @@ fn printLegacyString(stream: abi.OutfChannel, str_obj: obj.SchemeObject) void {
         printChar(stream, next[i]);
     }
     if (length != long_enough) {
-        abi.outf(stream, "...[%ld total chars]", @as(c_long, @intCast(length)));
+        abi.outf(stream, "...[%zd total chars]", @as(isize, @intCast(length)));
     }
     abi.outf(stream, "\"");
 }
@@ -224,7 +224,7 @@ fn printUstring(stream: abi.OutfChannel, str_obj: obj.SchemeObject) void {
         printChar(stream, cp);
     }
     if (length != long_enough) {
-        abi.outf(stream, "...[%ld total chars]", @as(c_long, @intCast(length)));
+        abi.outf(stream, "...[%zd total chars]", @as(isize, @intCast(length)));
     }
     abi.outf(stream, "\"");
 }
@@ -304,13 +304,13 @@ fn printCompiledEntry(stream: abi.OutfChannel, entry_in: obj.SchemeObject) void 
 
     abi.outf(
         stream,
-        "[%s offset: %#lx entry: %#lx",
+        "[%s offset: %#zx entry: %#zx",
         type_string,
         abi.cc_entry_to_block_offset(entry),
         obj.objectDatum(entry),
     );
     if (closure_p) {
-        abi.outf(stream, " address: %#lx", obj.objectDatum(original_entry));
+        abi.outf(stream, " address: %#zx", obj.objectDatum(original_entry));
     }
 
     const filename = compiledEntryDebugFilename(entry);
@@ -320,7 +320,7 @@ fn printCompiledEntry(stream: abi.OutfChannel, entry_in: obj.SchemeObject) void 
     } else if (obj.pairP(filename)) {
         abi.outf(stream, " file: ");
         printFilename(stream, obj.pairCar(filename));
-        abi.outf(stream, " block: %ld", obj.fixnumToLong(obj.pairCdr(filename)));
+        abi.outf(stream, " block: %zd", obj.fixnumToLong(obj.pairCdr(filename)));
     }
     abi.outf(stream, "]");
 }
@@ -366,7 +366,7 @@ fn printLambda(stream: abi.OutfChannel, lambda: obj.SchemeObject) void {
         abi.outf(stream, " ");
         printSymbol(stream, scan[0]);
     }
-    abi.outf(stream, ") %#lx]", obj.objectDatum(lambda));
+    abi.outf(stream, ") %#zx]", obj.objectDatum(lambda));
 }
 
 fn printExtendedLambda(stream: abi.OutfChannel, lambda: obj.SchemeObject) void {
@@ -409,7 +409,7 @@ fn printExtendedLambda(stream: abi.OutfChannel, lambda: obj.SchemeObject) void {
         }
         abi.outf(stream, ")");
     }
-    abi.outf(stream, " %#lx]", obj.objectDatum(lambda));
+    abi.outf(stream, " %#zx]", obj.objectDatum(lambda));
 }
 
 fn printObject(stream: abi.OutfChannel, object: obj.SchemeObject) void {
@@ -430,22 +430,22 @@ fn printObject(stream: abi.OutfChannel, object: obj.SchemeObject) void {
         obj.tc_access => {
             abi.outf(stream, "[access ");
             printSymbol(stream, obj.accessName(object));
-            abi.outf(stream, " %#lx]", obj.objectDatum(object));
+            abi.outf(stream, " %#zx]", obj.objectDatum(object));
         },
         obj.tc_assignment => {
             abi.outf(stream, "[set! ");
             printSymbol(stream, obj.variableName(obj.assignmentName(object)));
-            abi.outf(stream, " %#lx]", obj.objectDatum(object));
+            abi.outf(stream, " %#zx]", obj.objectDatum(object));
         },
         obj.tc_definition => {
             abi.outf(stream, "[define ");
             printSymbol(stream, obj.definitionName(object));
-            abi.outf(stream, " %#lx]", obj.objectDatum(object));
+            abi.outf(stream, " %#zx]", obj.objectDatum(object));
         },
         obj.tc_character_string => printLegacyString(stream, object),
         obj.tc_bytevector => printBytevector(stream, object),
         obj.tc_unicode_string => printUstring(stream, object),
-        obj.tc_fixnum => abi.outf(stream, "%ld", obj.fixnumToLong(object)),
+        obj.tc_fixnum => abi.outf(stream, "%zd", obj.fixnumToLong(object)),
         obj.tc_big_flonum => abi.outf(stream, "%lf", obj.flonumToDouble(object)),
         obj.tc_weak_cons, obj.tc_list => printList(stream, object),
         obj.tc_vector => printVector(stream, object),
@@ -453,7 +453,7 @@ fn printObject(stream: abi.OutfChannel, object: obj.SchemeObject) void {
         obj.tc_uninterned_symbol => {
             abi.outf(stream, "[uninterned ");
             printSymbol(stream, object);
-            abi.outf(stream, " %#lx]", obj.objectDatum(object));
+            abi.outf(stream, " %#zx]", obj.objectDatum(object));
         },
         obj.tc_interned_symbol => printSymbol(stream, object),
         obj.tc_variable => {
@@ -462,24 +462,24 @@ fn printObject(stream: abi.OutfChannel, object: obj.SchemeObject) void {
             if (obj.variableSafeP(object)) {
                 abi.outf(stream, " (safe)");
             }
-            abi.outf(stream, " %#lx]", obj.objectDatum(object));
+            abi.outf(stream, " %#zx]", obj.objectDatum(object));
         },
         obj.tc_combination => {
             abi.outf(stream, "[combination ");
             printObject(stream, obj.combinationExpr(object, 0));
-            abi.outf(stream, " ... (%ld args)", @as(c_long, @intCast(obj.combinationSize(object) - 1)));
-            abi.outf(stream, " %#lx]", obj.objectDatum(object));
+            abi.outf(stream, " ... (%zd args)", @as(isize, @intCast(obj.combinationSize(object) - 1)));
+            abi.outf(stream, " %#zx]", obj.objectDatum(object));
         },
         obj.tc_environment => {
             abi.outf(stream, "[environment from ");
             printObject(stream, if (obj.extendedFrameP(object)) obj.extendedFrameProc(object) else obj.envProc(object));
-            abi.outf(stream, " %#lx]", obj.objectDatum(object));
+            abi.outf(stream, " %#zx]", obj.objectDatum(object));
         },
         obj.tc_extended_lambda => printExtendedLambda(stream, object),
         obj.tc_extended_procedure => {
             abi.outf(stream, "[extended-procedure ");
             printObject(stream, obj.procLambda(object));
-            abi.outf(stream, " %#lx]", obj.objectDatum(object));
+            abi.outf(stream, " %#zx]", obj.objectDatum(object));
         },
         obj.tc_lambda => printLambda(stream, object),
         obj.tc_primitive => {
@@ -490,7 +490,7 @@ fn printObject(stream: abi.OutfChannel, object: obj.SchemeObject) void {
         obj.tc_procedure => {
             abi.outf(stream, "[procedure ");
             printObject(stream, obj.procLambda(object));
-            abi.outf(stream, " %#lx]", obj.objectDatum(object));
+            abi.outf(stream, " %#zx]", obj.objectDatum(object));
         },
         obj.tc_reference_trap => {
             if (obj.objectDatum(object) <= obj.trap_max_immediate) {
@@ -499,7 +499,7 @@ fn printObject(stream: abi.OutfChannel, object: obj.SchemeObject) void {
                 abi.outf(stream, "[reference-trap");
                 printExpression(stream, obj.ptrRefTrapTag(object), " tag");
                 printExpression(stream, obj.ptrRefTrapCache(object), " cache");
-                abi.outf(stream, " %#lx]", obj.objectDatum(object));
+                abi.outf(stream, " %#zx]", obj.objectDatum(object));
             }
         },
         obj.tc_return_code => {
@@ -527,7 +527,7 @@ fn printObject(stream: abi.OutfChannel, object: obj.SchemeObject) void {
             } else if (code > 0x20 and code < 0x7F) {
                 abi.outf(stream, "#\\%c", @as(c_int, @intCast(code)));
             } else {
-                abi.outf(stream, "#\\x%lx", code);
+                abi.outf(stream, "#\\x%zx", code);
             }
         },
         obj.tc_compiled_entry => {
@@ -592,7 +592,7 @@ fn dumpStack(stream: abi.OutfChannel, sp_in: [*]obj.SchemeObject, limit_in: [*]o
     var limit = limit_in;
     var done: c_int = 0;
     while ((count == 0 or done < count) and @intFromPtr(sp) < @intFromPtr(limit)) {
-        abi.outf(stream, "%#lx: ", @as(c_ulong, @intCast(@intFromPtr(sp))));
+        abi.outf(stream, "%#zx: ", @as(usize, @intCast(@intFromPtr(sp))));
         const item = sp[0];
         sp += 1;
         printObject(stream, item);
@@ -616,7 +616,7 @@ pub export fn Stack(count: c_int) callconv(.c) void {
 pub export fn debug_stack_trace(stream: abi.OutfChannel) callconv(.c) void {
     var scan = abi.stack_pointer;
     while (true) {
-        abi.outf(stream, "{%#lx}", @as(c_ulong, @intCast(@intFromPtr(scan))));
+        abi.outf(stream, "{%#zx}", @as(usize, @intCast(@intFromPtr(scan))));
         const object = scan[0];
         scan += 1;
         if (obj.returnCodeP(object)) {
@@ -639,7 +639,7 @@ pub export fn debug_print_stack() callconv(.c) void {
     debug_stack_trace(abi.ERROR_OUTPUT);
 }
 
-fn primitiveNumber(primitive: obj.SchemeObject) c_ulong {
+fn primitiveNumber(primitive: obj.SchemeObject) usize {
     return obj.objectDatum(primitive);
 }
 
@@ -662,7 +662,7 @@ fn printPrimitiveName(stream: abi.OutfChannel, primitive: obj.SchemeObject) bool
         abi.outf(stream, "%s", name);
         return true;
     }
-    abi.outf(stream, "Unknown primitive %#08lx", primitiveNumber(primitive));
+    abi.outf(stream, "Unknown primitive %#08zx", primitiveNumber(primitive));
     return false;
 }
 
@@ -711,7 +711,7 @@ inline fn validAddressP(address: [*]const obj.SchemeObject) bool {
 
 fn dumpWord(addr: [*]const obj.SchemeObject) void {
     const bytes: [*]const u8 = @ptrCast(addr);
-    abi.outf_error("%#lx: ", @as(c_ulong, @intCast(@intFromPtr(addr))));
+    abi.outf_error("%#zx: ", @as(usize, @intCast(@intFromPtr(addr))));
     for (0..@sizeOf(obj.SchemeObject)) |i| {
         const b = bytes[i];
         if (b > 0x20 and b < 0x7F) {
@@ -764,7 +764,7 @@ fn nextAddr(addr: [*]obj.SchemeObject) [*]obj.SchemeObject {
 fn dumpObject(addr_in: [*]obj.SchemeObject) void {
     var addr = addr_in;
     const object = addr[0];
-    abi.outf_error("%#lx: ", @as(c_ulong, @intCast(@intFromPtr(addr))));
+    abi.outf_error("%#zx: ", @as(usize, @intCast(@intFromPtr(addr))));
     printObject(abi.ERROR_OUTPUT, object);
     abi.outf_error("\n");
 
@@ -778,7 +778,7 @@ fn dumpObject(addr_in: [*]obj.SchemeObject) void {
         dumpWord(addr);
     }
     if (@intFromPtr(addr) == free_addr) {
-        abi.outf_error("%#lx: Free\n", @as(c_ulong, @intCast(@intFromPtr(addr))));
+        abi.outf_error("%#zx: Free\n", @as(usize, @intCast(@intFromPtr(addr))));
     }
 }
 
@@ -818,20 +818,20 @@ fn dumpHeapAt(addr: ?[*]obj.SchemeObject) callconv(.c) void {
     const a = ptrAddr(addr);
     if (ptrAddr(storage.constant_start) <= a and a < ptrAddr(storage.constant_alloc_next)) {
         abi.outf_error(
-            "Scanning constant area (%#lx - %#lx):\n",
-            @as(c_ulong, @intCast(ptrAddr(storage.constant_start))),
-            @as(c_ulong, @intCast(ptrAddr(storage.constant_alloc_next))),
+            "Scanning constant area (%#zx - %#zx):\n",
+            @as(usize, @intCast(ptrAddr(storage.constant_start))),
+            @as(usize, @intCast(ptrAddr(storage.constant_alloc_next))),
         );
         dumpHeapAreaAt(addr.?, storage.constant_start.?, storage.constant_alloc_next.?);
     } else if (ptrAddr(storage.heap_start) <= a and a < ptrAddr(storage.Free)) {
         abi.outf_error(
-            "Scanning heap area (%#lx - %#lx):\n",
-            @as(c_ulong, @intCast(ptrAddr(storage.heap_start))),
-            @as(c_ulong, @intCast(ptrAddr(storage.Free))),
+            "Scanning heap area (%#zx - %#zx):\n",
+            @as(usize, @intCast(ptrAddr(storage.heap_start))),
+            @as(usize, @intCast(ptrAddr(storage.Free))),
         );
         dumpHeapAreaAt(addr.?, storage.heap_start.?, storage.Free.?);
     } else {
-        abi.outf_error("%#lx: not a heap address\n", @as(c_ulong, @intCast(a)));
+        abi.outf_error("%#zx: not a heap address\n", @as(usize, @intCast(a)));
     }
     abi.outf_flush_error();
 }
@@ -840,79 +840,79 @@ fn verifyObject(object: obj.SchemeObject) bool {
     return abi.gc_type_code(@intCast(obj.objectType(object))) != @intFromEnum(abi.GcType.undefined);
 }
 
-fn verifyTuple(object: obj.SchemeObject, size: usize, name: [*:0]const u8, address: c_ulong) bool {
+fn verifyTuple(object: obj.SchemeObject, size: usize, name: [*:0]const u8, address: usize) bool {
     const location = obj.objectAddress(object);
     if (!validAddressP(location)) {
-        abi.outf_error("%#lx: Invalid %s\n", address, name);
+        abi.outf_error("%#zx: Invalid %s\n", address, name);
         return false;
     }
     for (0..size) |i| {
         const slot = obj.memoryLoc(object, i);
         if (!(validAddressP(slot) and verifyObject(slot[0]))) {
-            abi.outf_error("%#lx: Invalid %s (word %d)\n", address, name, @as(c_int, @intCast(i)));
+            abi.outf_error("%#zx: Invalid %s (word %d)\n", address, name, @as(c_int, @intCast(i)));
             return false;
         }
     }
     return true;
 }
 
-fn verifyVector(object: obj.SchemeObject, address: c_ulong) bool {
+fn verifyVector(object: obj.SchemeObject, address: usize) bool {
     const location = obj.objectAddress(object);
     if (!validAddressP(location)) {
-        abi.outf_error("%#lx: Invalid vector\n", address);
+        abi.outf_error("%#zx: Invalid vector\n", address);
         return false;
     }
     const header = obj.memoryRef(object, 0);
     const length = obj.objectDatum(header);
     const header_type = obj.objectType(header);
     if (header_type != obj.tc_manifest_vector and header_type != obj.tc_manifest_nm_vector) {
-        abi.outf_error("%#lx: Invalid vector header\n", address);
+        abi.outf_error("%#zx: Invalid vector header\n", address);
         return false;
     }
     if (!validAddressP(location + @as(usize, @intCast(length)))) {
-        abi.outf_error("%#lx: Invalid vector length\n", address);
+        abi.outf_error("%#zx: Invalid vector length\n", address);
         return false;
     }
     if (length > 1000000) {
-        abi.outf_error("%#lx: Extraordinary vector size: %ld\n", address, @as(c_long, @intCast(length)));
+        abi.outf_error("%#zx: Extraordinary vector size: %zd\n", address, @as(isize, @intCast(length)));
     }
     return true;
 }
 
-fn verifyCompiled(object: obj.SchemeObject, address: c_ulong) bool {
+fn verifyCompiled(object: obj.SchemeObject, address: usize) bool {
     const entry_raw_addr = @intFromPtr(obj.objectRawAddress(object));
     if (!validAddrUsize(entry_raw_addr)) {
-        abi.outf_error("%#lx: Invalid entry\n", address);
+        abi.outf_error("%#zx: Invalid entry\n", address);
         return false;
     }
     var block_addr = entry_raw_addr;
     while (true) {
         var ceo: abi.CcEntryOffset = undefined;
         if (abi.read_cc_entry_offset(&ceo, @ptrFromInt(block_addr))) {
-            abi.outf_error("%#lx: Invalid entry format\n", address);
+            abi.outf_error("%#zx: Invalid entry format\n", address);
             return false;
         }
         std.debug.assert(ceo.offset > 0);
         block_addr -%= @as(usize, @intCast(ceo.offset)) * @sizeOf(fasl.Insn);
         if (!validAddrUsize(block_addr)) {
-            abi.outf_error("%#lx: Invalid entry offset\n", address);
+            abi.outf_error("%#zx: Invalid entry offset\n", address);
             return false;
         }
         if (!ceo.continued_p) {
             if (block_addr % @sizeOf(obj.SchemeObject) != 0) {
-                abi.outf_error("%#lx: Invalid block alignment\n", address);
+                abi.outf_error("%#zx: Invalid block alignment\n", address);
                 return false;
             }
             const block_ptr: [*]const obj.SchemeObject = @ptrFromInt(block_addr);
             const block_header = block_ptr[0];
             const block_end_addr = block_addr + @as(usize, @intCast(1 + obj.objectDatum(block_header))) * @sizeOf(obj.SchemeObject);
             if (block_end_addr < entry_raw_addr) {
-                abi.outf_error("%#lx: Invalid block size\n", address);
+                abi.outf_error("%#zx: Invalid block size\n", address);
                 return false;
             }
             const header_type = obj.objectType(block_header);
             if (!(header_type == obj.tc_manifest_vector or header_type == obj.tc_manifest_closure)) {
-                abi.outf_error("%#lx: Invalid block header\n", address);
+                abi.outf_error("%#zx: Invalid block header\n", address);
                 return false;
             }
             break;
@@ -929,10 +929,10 @@ fn verifyHeapArea(area_in: [*]obj.SchemeObject, end: [*]obj.SchemeObject) bool {
         const object = area[0];
         const tc = obj.objectType(object);
         const code = abi.gc_type_code(@intCast(tc));
-        const area_addr: c_ulong = @intCast(@intFromPtr(area));
+        const area_addr: usize = @intCast(@intFromPtr(area));
         switch (code) {
             @intFromEnum(abi.GcType.undefined) => {
-                abi.outf_error("%#lx: Invalid object type: %#x\n", area_addr, @as(c_uint, @intCast(tc)));
+                abi.outf_error("%#zx: Invalid object type: %#x\n", area_addr, @as(c_uint, @intCast(tc)));
                 return false;
             },
             @intFromEnum(abi.GcType.non_pointer) => {
@@ -966,7 +966,7 @@ fn verifyHeapArea(area_in: [*]obj.SchemeObject, end: [*]obj.SchemeObject) bool {
                     obj.tc_reference_trap => {
                         if (obj.objectDatum(object) > obj.trap_max_immediate) {
                             if (!(verifyObject(obj.memoryRef(object, 0)) and verifyObject(obj.memoryRef(object, 1)))) {
-                                abi.outf_error("%#lx: Invalid reference trap\n", area_addr);
+                                abi.outf_error("%#zx: Invalid reference trap\n", area_addr);
                                 complaints += 1;
                             }
                         }
@@ -981,10 +981,10 @@ fn verifyHeapArea(area_in: [*]obj.SchemeObject, end: [*]obj.SchemeObject) bool {
                                 const n_words: usize = @intCast(obj.objectDatum(object) & 0xFFFF);
                                 const next = area + (1 + n_words);
                                 if (@intFromPtr(next) > @intFromPtr(end)) {
-                                    abi.outf_error("%#lx: Invalid linkage section size: %ld\n", area_addr, @as(c_long, @intCast(n_words)));
+                                    abi.outf_error("%#zx: Invalid linkage section size: %zd\n", area_addr, @as(isize, @intCast(n_words)));
                                     return false;
                                 } else if (n_words > 1000) {
-                                    abi.outf_error("%#lx: Extraordinary linkage section size: %ld\n", area_addr, @as(c_long, @intCast(n_words)));
+                                    abi.outf_error("%#zx: Extraordinary linkage section size: %zd\n", area_addr, @as(isize, @intCast(n_words)));
                                 }
                                 area = next;
                             },
@@ -994,7 +994,7 @@ fn verifyHeapArea(area_in: [*]obj.SchemeObject, end: [*]obj.SchemeObject) bool {
                                 area += 1;
                             },
                             else => {
-                                abi.outf_error("%#lx: Invalid linkage section type: %#x\n", area_addr, section_type);
+                                abi.outf_error("%#zx: Invalid linkage section type: %#x\n", area_addr, section_type);
                                 complaints += 1;
                                 area += 1;
                             },
@@ -1004,7 +1004,7 @@ fn verifyHeapArea(area_in: [*]obj.SchemeObject, end: [*]obj.SchemeObject) bool {
                         if (build_options.cc_support) {
                             area = abi.compiled_closure_objects(area + 1);
                         } else {
-                            abi.outf_error("%#lx: Invalid special\n", area_addr);
+                            abi.outf_error("%#zx: Invalid special\n", area_addr);
                             complaints += 1;
                             area += 1;
                         }
@@ -1013,15 +1013,15 @@ fn verifyHeapArea(area_in: [*]obj.SchemeObject, end: [*]obj.SchemeObject) bool {
                         const n_words: usize = @intCast(obj.objectDatum(object));
                         const next = area + (1 + n_words);
                         if (@intFromPtr(next) > @intFromPtr(end)) {
-                            abi.outf_error("%#lx: Invalid nm-vector size: %ld\n", area_addr, @as(c_long, @intCast(n_words)));
+                            abi.outf_error("%#zx: Invalid nm-vector size: %zd\n", area_addr, @as(isize, @intCast(n_words)));
                             return false;
                         } else if (n_words > 1000000) {
-                            abi.outf_error("%#lx: Extraordinary nm-vector size: %ld\n", area_addr, @as(c_long, @intCast(n_words)));
+                            abi.outf_error("%#zx: Extraordinary nm-vector size: %zd\n", area_addr, @as(isize, @intCast(n_words)));
                         }
                         area = next;
                     },
                     else => {
-                        abi.outf_error("%#lx: Invalid special\n", area_addr);
+                        abi.outf_error("%#zx: Invalid special\n", area_addr);
                         complaints += 1;
                         area += 1;
                     },
@@ -1032,22 +1032,22 @@ fn verifyHeapArea(area_in: [*]obj.SchemeObject, end: [*]obj.SchemeObject) bool {
                     if (!verifyCompiled(object, area_addr)) complaints += 1;
                     area += 1;
                 } else {
-                    abi.outf_error("%#lx: unknown gc type code: %#x\n", area_addr, @as(c_uint, @intCast(code)));
+                    abi.outf_error("%#zx: unknown gc type code: %#x\n", area_addr, @as(c_uint, @intCast(code)));
                     complaints += 1;
                     area += 1;
                 }
             },
             @intFromEnum(abi.GcType.compiled_return) => {
                 if (build_options.cc_support) {
-                    abi.outf_error("%#lx: XXX not implemented", area_addr);
+                    abi.outf_error("%#zx: XXX not implemented", area_addr);
                 } else {
-                    abi.outf_error("%#lx: unknown gc type code: %#x\n", area_addr, @as(c_uint, @intCast(code)));
+                    abi.outf_error("%#zx: unknown gc type code: %#x\n", area_addr, @as(c_uint, @intCast(code)));
                 }
                 complaints += 1;
                 area += 1;
             },
             else => {
-                abi.outf_error("%#lx: unknown gc type code: %#x\n", area_addr, @as(c_uint, @intCast(code)));
+                abi.outf_error("%#zx: unknown gc type code: %#x\n", area_addr, @as(c_uint, @intCast(code)));
                 complaints += 1;
                 area += 1;
             },
@@ -1055,7 +1055,7 @@ fn verifyHeapArea(area_in: [*]obj.SchemeObject, end: [*]obj.SchemeObject) bool {
     }
 
     if (@intFromPtr(area) != @intFromPtr(end)) {
-        abi.outf_error("%#lx: Invalid end address\n", @as(c_ulong, @intCast(@intFromPtr(area))));
+        abi.outf_error("%#zx: Invalid end address\n", @as(usize, @intCast(@intFromPtr(area))));
         return false;
     }
     return complaints == 0;
@@ -1071,14 +1071,14 @@ fn verifyStack(sp_in: [*]obj.SchemeObject, bottom: [*]obj.SchemeObject) callconv
         if (tc == obj.tc_manifest_nm_vector) {
             const n_words = obj.objectDatum(object);
             if (n_words > 1000) {
-                abi.outf_error("%#lx: Extraordinary finger size: %ld\n", @as(c_ulong, @intCast(@intFromPtr(sp))), @as(c_long, @intCast(n_words)));
+                abi.outf_error("%#zx: Extraordinary finger size: %zd\n", @as(usize, @intCast(@intFromPtr(sp))), @as(isize, @intCast(n_words)));
             }
             sp += @as(usize, @intCast(n_words));
         } else if (tc == obj.tc_manifest_closure or
             tc == obj.tc_broken_heart or
             abi.gc_type_code(@intCast(tc)) == @intFromEnum(abi.GcType.undefined))
         {
-            abi.outf_error("%#lx: Invalid stack slot: ", @as(c_ulong, @intCast(@intFromPtr(sp))));
+            abi.outf_error("%#zx: Invalid stack slot: ", @as(usize, @intCast(@intFromPtr(sp))));
             printObject(abi.ERROR_OUTPUT, object);
             abi.outf_error("\n");
             complaints += 1;
@@ -1140,7 +1140,7 @@ const debug_flags = [_]DebugFlag{
     .{ .name = "Print_Errors", .ptr = &storage.print_errors },
 };
 
-fn findFlag(flag_number: c_long) ?*bool {
+fn findFlag(flag_number: isize) ?*bool {
     if (flag_number < 0 or @as(usize, @intCast(flag_number)) >= debug_flags.len) {
         return null;
     }
@@ -1162,7 +1162,7 @@ fn showFlags(show_all: bool) void {
     abi.outf_flush_error();
 }
 
-fn setFlag(flag_number: c_long, value: bool) void {
+fn setFlag(flag_number: isize, value: bool) void {
     if (!build_options.debugging) {
         abi.outf_error("Not a debugging version.  No flags to set.\n");
         abi.outf_flush_error();
@@ -1175,7 +1175,7 @@ fn setFlag(flag_number: c_long, value: bool) void {
     }
 }
 
-fn debugGetDec(line: []const u8) c_long {
+fn debugGetDec(line: []const u8) isize {
     var idx: usize = 0;
     while (idx < line.len and (line[idx] == ' ' or line[idx] == '\t')) {
         idx += 1;
@@ -1186,9 +1186,9 @@ fn debugGetDec(line: []const u8) c_long {
         idx += 1;
     }
     var digits: usize = 0;
-    var val: c_long = 0;
+    var val: isize = 0;
     while (idx < line.len and line[idx] >= '0' and line[idx] <= '9') : (idx += 1) {
-        val = val * 10 + @as(c_long, line[idx] - '0');
+        val = val * 10 + @as(isize, line[idx] - '0');
         digits += 1;
     }
     if (digits == 0) return -1;
@@ -1366,8 +1366,8 @@ test "debug constantString, printer, stack trace, verify_heap, and debug flags" 
     }
 
     // 5. Prim_set_debug_flags & debugGetDec
-    try std.testing.expectEqual(@as(c_long, 9), debugGetDec("  9\n"));
-    try std.testing.expectEqual(@as(c_long, -1), debugGetDec("\n"));
+    try std.testing.expectEqual(@as(isize, 9), debugGetDec("  9\n"));
+    try std.testing.expectEqual(@as(isize, -1), debugGetDec("\n"));
     const prev_gc_debug = storage.gc_debug;
     defer storage.gc_debug = prev_gc_debug;
     stubs.setArgs(&.{ obj.ulongToFixnum(9), obj.sharp_t });

@@ -46,7 +46,7 @@ pub fn addAPopReturnBreakpoint(sp: [*]obj.SchemeObject) callconv(.c) bool {
 
 pub fn handlePopReturnBreak() callconv(.c) void {
     const old_stack = abi.stack_pointer;
-    abi.outf_error("Pop Return Break: SP = %#lx\n", @as(c_ulong, @intCast(@intFromPtr(abi.stack_pointer))));
+    abi.outf_error("Pop Return Break: SP = %#zx\n", @as(usize, @intCast(@intFromPtr(abi.stack_pointer))));
     _ = Print_One_Continuation_Frame(abi.Registers[abi.regblock_return]);
     abi.stack_pointer = old_stack;
 }

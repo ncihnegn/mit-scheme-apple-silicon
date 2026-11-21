@@ -6,7 +6,7 @@ const std = @import("std");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
 
-fn stdLookup(result: c_long) void {
+fn stdLookup(result: isize) void {
     if (result != abi.prim_done) {
         if (result == abi.prim_interrupt) {
             abi.signal_interrupt_from_primitive();

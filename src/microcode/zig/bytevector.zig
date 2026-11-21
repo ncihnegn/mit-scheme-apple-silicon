@@ -6,7 +6,7 @@ const std = @import("std");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
 
-pub export fn arg_bytevector(n: c_int, len_r: *c_ulong) callconv(.c) [*]u8 {
+pub export fn arg_bytevector(n: c_int, len_r: *usize) callconv(.c) [*]u8 {
     abi.checkArg(n, obj.bytevectorP);
     const bv = abi.argRef(@intCast(n));
     len_r.* = obj.bytevectorLength(bv);
@@ -22,7 +22,7 @@ fn argByte(n: c_int) u8 {
     return @intCast(value);
 }
 
-pub export fn allocate_bytevector(nbytes: c_ulong) callconv(.c) obj.SchemeObject {
+pub export fn allocate_bytevector(nbytes: usize) callconv(.c) obj.SchemeObject {
     const result = abi.allocate_non_marked_vector(
         @intCast(obj.tc_bytevector),
         obj.bytevectorLengthToGcLength(nbytes),
@@ -33,7 +33,7 @@ pub export fn allocate_bytevector(nbytes: c_ulong) callconv(.c) obj.SchemeObject
     return result;
 }
 
-pub export fn memory_to_bytevector(n_bytes: c_ulong, vp: ?*const anyopaque) callconv(.c) obj.SchemeObject {
+pub export fn memory_to_bytevector(n_bytes: usize, vp: ?*const anyopaque) callconv(.c) obj.SchemeObject {
     const result = allocate_bytevector(n_bytes);
     if (n_bytes > 0) {
         const src: [*]const u8 = @ptrCast(vp.?);
@@ -64,7 +64,7 @@ pub export fn Prim_bytevector_length() callconv(.c) obj.SchemeObject {
 // DEFINE_PRIMITIVE ("bytevector-u8-ref", Prim_bytevector_u8_ref, 2, 2, 0)
 pub export fn Prim_bytevector_u8_ref() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    var length: c_ulong = 0;
+    var length: usize = 0;
     const v = arg_bytevector(1, &length);
     const index: usize = @intCast(abi.arg_ulong_index_integer(2, length));
     return abi.ulong_to_integer(v[index]);
@@ -73,7 +73,7 @@ pub export fn Prim_bytevector_u8_ref() callconv(.c) obj.SchemeObject {
 // DEFINE_PRIMITIVE ("bytevector-u8-set!", Prim_bytevector_u8_set, 3, 3, 0)
 pub export fn Prim_bytevector_u8_set() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    var length: c_ulong = 0;
+    var length: usize = 0;
     const v = arg_bytevector(1, &length);
     const index: usize = @intCast(abi.arg_ulong_index_integer(2, length));
     v[index] = argByte(3);
@@ -83,11 +83,11 @@ pub export fn Prim_bytevector_u8_set() callconv(.c) obj.SchemeObject {
 // DEFINE_PRIMITIVE ("bytevector-fill!", Prim_bytevector_fill, 4, 4, 0)
 pub export fn Prim_bytevector_fill() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    var length: c_ulong = 0;
+    var length: usize = 0;
     const v = arg_bytevector(1, &length);
     const value = argByte(2);
     const end: usize = @intCast(abi.arg_ulong_index_integer(4, length + 1));
-    const start: usize = @intCast(abi.arg_ulong_index_integer(3, @as(c_ulong, @intCast(end)) + 1));
+    const start: usize = @intCast(abi.arg_ulong_index_integer(3, @as(usize, @intCast(end)) + 1));
     @memset(v[start..end], value);
     return obj.unspecific;
 }
@@ -95,20 +95,20 @@ pub export fn Prim_bytevector_fill() callconv(.c) obj.SchemeObject {
 // DEFINE_PRIMITIVE ("bytevector-copy", Prim_bytevector_copy, 3, 3, 0)
 pub export fn Prim_bytevector_copy() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    var length: c_ulong = 0;
+    var length: usize = 0;
     const v = arg_bytevector(1, &length);
     const end: usize = @intCast(abi.arg_ulong_index_integer(3, length + 1));
-    const start: usize = @intCast(abi.arg_ulong_index_integer(2, @as(c_ulong, @intCast(end)) + 1));
+    const start: usize = @intCast(abi.arg_ulong_index_integer(2, @as(usize, @intCast(end)) + 1));
     return memory_to_bytevector(@intCast(end - start), v + start);
 }
 
 // DEFINE_PRIMITIVE ("bytevector-copy!", Prim_bytevector_copyx, 5, 5, 0)
 pub export fn Prim_bytevector_copyx() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    var to_length: c_ulong = 0;
+    var to_length: usize = 0;
     const to_v = arg_bytevector(1, &to_length);
     const to_start = abi.arg_ulong_index_integer(2, to_length + 1);
-    var from_length: c_ulong = 0;
+    var from_length: usize = 0;
     const from_v = arg_bytevector(3, &from_length);
     const from_end = abi.arg_ulong_index_integer(5, from_length + 1);
     const from_start = abi.arg_ulong_index_integer(4, from_end + 1);
@@ -148,7 +148,7 @@ test "bytevector primitives allocate, fill, copy, and memmove overlaps" {
     const src = memory_to_bytevector(6, "abcdef");
     stubs.setArgs(&.{ src, obj.ulongToFixnum(1), obj.ulongToFixnum(4) });
     const slice_copy = Prim_bytevector_copy();
-    try std.testing.expectEqual(@as(c_ulong, 3), obj.bytevectorLength(slice_copy));
+    try std.testing.expectEqual(@as(usize, 3), obj.bytevectorLength(slice_copy));
     try std.testing.expectEqualSlices(u8, "bcd", obj.bytevectorData(slice_copy)[0..3]);
 
     // Overlapping forward shift: "abcdef" -> "aabcef" via copy!(src, 1, src, 0, 3) => "aabcdf"? Wait: [0..3]="abc" to [1..4] => "aabcdf"?! No, idx 4..5 stay 'e','f' => "aabcef"

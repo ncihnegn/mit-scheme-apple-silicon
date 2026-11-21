@@ -172,7 +172,7 @@ pub export fn Prim_instruction_address_to_compiled_code_block() callconv(.c) obj
     abi.primitiveHeader();
     if (build_options.cc_support) {
         const object = abi.argRef(1);
-        const pc: c_ulong = if (obj.integerP(object)) blk: {
+        const pc: usize = if (obj.integerP(object)) blk: {
             if (!artutl.integer_to_ulong_p(object)) abi.error_bad_range_arg(1);
             break :blk artutl.integer_to_ulong(object);
         } else blk: {
@@ -191,7 +191,7 @@ pub export fn Prim_macosx_main_bundle_dir() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     if (builtin.os.tag.isDarwin()) {
         const path = abi.macosx_main_bundle_dir() orelse return obj.sharp_f;
-        const n_words: c_ulong = 1 + obj.bytevectorLengthToGcLength(@intCast(std.mem.len(path)));
+        const n_words: usize = 1 + obj.bytevectorLengthToGcLength(@intCast(std.mem.len(path)));
         if (abi.gcNeededP(n_words)) {
             std.c.free(@constCast(@ptrCast(path)));
             abi.primitiveGc(n_words);
@@ -244,12 +244,12 @@ test "pruxenv pid, uid, gid, time string, env, hostname, uname, and ccblock look
     try std.testing.expect(obj.legacyStringLength(hn) > 0);
 
     const uvec = Prim_uname();
-    try std.testing.expectEqual(@as(c_ulong, 5), obj.vectorLength(uvec));
+    try std.testing.expectEqual(@as(usize, 5), obj.vectorLength(uvec));
     try std.testing.expect(obj.legacyStringLength(obj.vectorRef(uvec, 0)) > 0);
 
     stubs.setArgs(&.{obj.ulongToFixnum(0)});
     const fts = Prim_file_time_to_string();
-    try std.testing.expectEqual(@as(c_ulong, 24), obj.legacyStringLength(fts));
+    try std.testing.expectEqual(@as(usize, 24), obj.legacyStringLength(fts));
 
     stubs.setArgs(&.{string.char_pointer_to_string("PATH")});
     const path_env = Prim_get_environment_variable();

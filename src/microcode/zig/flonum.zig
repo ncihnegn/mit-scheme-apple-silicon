@@ -400,8 +400,8 @@ pub export fn Prim_flonum_signed_lgamma() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     var sign: c_int = undefined;
     const result = lgamma_r(arg_flonum(1), &sign);
-    std.debug.assert(obj.longToFixnumP(@as(c_long, sign)));
-    return abi.cons(double_to_flonum(result), obj.longToFixnum(@as(c_long, sign)));
+    std.debug.assert(obj.longToFixnumP(@as(isize, sign)));
+    return abi.cons(double_to_flonum(result), obj.longToFixnum(@as(isize, sign)));
 }
 
 // DEFINE_PRIMITIVE ("FLONUM-GAMMA", Prim_flonum_gamma, 1, 1, 0)

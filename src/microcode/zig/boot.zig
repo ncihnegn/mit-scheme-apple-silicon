@@ -58,7 +58,7 @@ pub export fn obstack_chunk_alloc(size: usize) callconv(.c) ?*anyopaque {
     };
 }
 
-inline fn blocksToWords(n: c_ulong) c_ulong {
+inline fn blocksToWords(n: usize) usize {
     return n * 1024;
 }
 
@@ -175,7 +175,7 @@ pub export fn Prim_microcode_identify() callconv(.c) obj.SchemeObject {
 pub export fn Prim_microcode_library_path() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     const scan = abi.option_library_path;
-    var count: c_ulong = 0;
+    var count: usize = 0;
     while (scan[count] != null) {
         count += 1;
     }
@@ -187,7 +187,7 @@ pub export fn Prim_microcode_library_path() callconv(.c) obj.SchemeObject {
 }
 
 fn argvToObject(argc: c_int, argv: [*]?[*:0]const u8) obj.SchemeObject {
-    const count: c_ulong = if (argc > 0) @intCast(argc) else 0;
+    const count: usize = if (argc > 0) @intCast(argc) else 0;
     const result = abi.allocate_vector(count, true);
     for (0..@as(usize, @intCast(count))) |idx| {
         obj.vectorSet(result, idx, string.char_pointer_to_string(argv[idx]));
@@ -277,20 +277,20 @@ test "boot utility primitives, obstack_chunk_alloc, and reload save/retrieve" {
     // MICROCODE-LIBRARY-PATH
     const lib_path = Prim_microcode_library_path();
     try std.testing.expect(obj.vectorP(lib_path));
-    try std.testing.expectEqual(@as(c_ulong, 2), obj.vectorLength(lib_path));
+    try std.testing.expectEqual(@as(usize, 2), obj.vectorLength(lib_path));
     try std.testing.expectEqualStrings("/mock/lib1", obj.legacyStringData(obj.vectorRef(lib_path, 0))[0..obj.legacyStringLength(obj.vectorRef(lib_path, 0))]);
     try std.testing.expectEqualStrings("/mock/lib2", obj.legacyStringData(obj.vectorRef(lib_path, 1))[0..obj.legacyStringLength(obj.vectorRef(lib_path, 1))]);
 
     // GET-COMMAND-LINE
     const cmdline = Prim_get_command_line();
-    try std.testing.expectEqual(@as(c_ulong, 2), obj.vectorLength(cmdline));
+    try std.testing.expectEqual(@as(usize, 2), obj.vectorLength(cmdline));
     try std.testing.expectEqualStrings("scheme", obj.legacyStringData(obj.vectorRef(cmdline, 0))[0..obj.legacyStringLength(obj.vectorRef(cmdline, 0))]);
     try std.testing.expectEqualStrings("--batch-mode", obj.legacyStringData(obj.vectorRef(cmdline, 1))[0..obj.legacyStringLength(obj.vectorRef(cmdline, 1))]);
 
     // GET-UNUSED-COMMAND-LINE clears option_unused_argv on first call
     const unused1 = Prim_get_unused_command_line();
     try std.testing.expect(obj.vectorP(unused1));
-    try std.testing.expectEqual(@as(c_ulong, 1), obj.vectorLength(unused1));
+    try std.testing.expectEqual(@as(usize, 1), obj.vectorLength(unused1));
     try std.testing.expectEqualStrings("--extra", obj.legacyStringData(obj.vectorRef(unused1, 0))[0..obj.legacyStringLength(obj.vectorRef(unused1, 0))]);
     try std.testing.expectEqual(obj.sharp_f, Prim_get_unused_command_line());
 

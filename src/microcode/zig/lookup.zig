@@ -8,12 +8,12 @@ const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
 const intern = @import("intern.zig");
 
-const space_per_uuo_link: c_ulong = 10;
-const space_per_reference: c_ulong = 8;
-const ptr_ref_trap_size: c_ulong = 2;
-const cache_size: c_ulong = 3;
-const cache_refs_size: c_ulong = 3;
-const frame_extension_min_size: c_ulong = 4;
+const space_per_uuo_link: usize = 10;
+const space_per_reference: usize = 8;
+const ptr_ref_trap_size: usize = 2;
+const cache_size: usize = 3;
+const cache_refs_size: usize = 3;
+const frame_extension_min_size: usize = 4;
 
 inline fn externalUnassignedObject() obj.SchemeObject {
     return obj.vectorRef(abi.fixed_objects, abi.fixobj_non_object);
@@ -27,7 +27,7 @@ inline fn mapFromUnassigned(value: obj.SchemeObject) obj.SchemeObject {
     return if (value == obj.unassigned_object) externalUnassignedObject() else value;
 }
 
-inline fn dieIfError(result: c_long) void {
+inline fn dieIfError(result: isize) void {
     if (result != abi.prim_done) {
         abi.outf_fatal("\nRan out of guaranteed space!\n");
         abi.Microcode_Termination(abi.term_exit);
@@ -43,7 +43,7 @@ fn cacheKindRefs(cache: obj.SchemeObject, kind: abi.CacheRefKind) *obj.SchemeObj
     return @ptrCast(loc);
 }
 
-fn makePtrRefTrap(tag: c_ulong, cache: obj.SchemeObject) obj.SchemeObject {
+fn makePtrRefTrap(tag: usize, cache: obj.SchemeObject) obj.SchemeObject {
     const free = abi.Free;
     const trap = obj.makePointerObject(obj.tc_reference_trap, free);
     free[0] = obj.ulongToFixnum(tag);
@@ -105,7 +105,7 @@ fn walkReferences(
     return null;
 }
 
-pub export fn get_trap_kind(object: obj.SchemeObject) callconv(.c) c_ulong {
+pub export fn get_trap_kind(object: obj.SchemeObject) callconv(.c) usize {
     if (!obj.referenceTrapP(object)) return obj.non_trap_kind;
     const datum = obj.objectDatum(object);
     return if (datum <= obj.trap_max_immediate)
@@ -118,7 +118,7 @@ pub export fn lookup_variable(
     environment: obj.SchemeObject,
     symbol: obj.SchemeObject,
     value_ret: *obj.SchemeObject,
-) callconv(.c) c_long {
+) callconv(.c) isize {
     if (!(obj.environmentP(environment) and obj.symbolP(symbol))) {
         return abi.err_bad_frame;
     }
@@ -140,7 +140,7 @@ pub export fn lookup_variable(
     };
 }
 
-fn lookupVariableCache(cache: obj.SchemeObject, value_ret: *obj.SchemeObject) c_long {
+fn lookupVariableCache(cache: obj.SchemeObject, value_ret: *obj.SchemeObject) isize {
     const value = obj.cacheValue(cache);
     return switch (get_trap_kind(value)) {
         obj.non_trap_kind => blk: {
@@ -161,7 +161,7 @@ pub export fn safe_lookup_variable(
     environment: obj.SchemeObject,
     symbol: obj.SchemeObject,
     value_ret: *obj.SchemeObject,
-) callconv(.c) c_long {
+) callconv(.c) isize {
     const result = lookup_variable(environment, symbol, value_ret);
     if (result == abi.err_unassigned_variable) {
         value_ret.* = externalUnassignedObject();
@@ -174,7 +174,7 @@ pub export fn variable_unassigned_p(
     environment: obj.SchemeObject,
     symbol: obj.SchemeObject,
     value_ret: *obj.SchemeObject,
-) callconv(.c) c_long {
+) callconv(.c) isize {
     var dummy: obj.SchemeObject = undefined;
     const result = lookup_variable(environment, symbol, &dummy);
     switch (result) {
@@ -194,7 +194,7 @@ pub export fn variable_unbound_p(
     environment: obj.SchemeObject,
     symbol: obj.SchemeObject,
     value_ret: *obj.SchemeObject,
-) callconv(.c) c_long {
+) callconv(.c) isize {
     var dummy: obj.SchemeObject = undefined;
     const result = lookup_variable(environment, symbol, &dummy);
     switch (result) {
@@ -214,7 +214,7 @@ pub export fn variable_unreferenceable_p(
     environment: obj.SchemeObject,
     symbol: obj.SchemeObject,
     value_ret: *obj.SchemeObject,
-) callconv(.c) c_long {
+) callconv(.c) isize {
     var dummy: obj.SchemeObject = undefined;
     const result = lookup_variable(environment, symbol, &dummy);
     switch (result) {
@@ -235,7 +235,7 @@ pub export fn assign_variable(
     symbol: obj.SchemeObject,
     value: obj.SchemeObject,
     value_ret: *obj.SchemeObject,
-) callconv(.c) c_long {
+) callconv(.c) isize {
     if (!(obj.environmentP(environment) and obj.symbolP(symbol))) {
         return abi.err_bad_frame;
     }
@@ -248,7 +248,7 @@ fn assignVariableEnd(
     value: obj.SchemeObject,
     value_ret: *obj.SchemeObject,
     force_p: bool,
-) c_long {
+) isize {
     const old_value = cell[0];
     switch (get_trap_kind(old_value)) {
         obj.non_trap_kind, obj.trap_unassigned => {},
@@ -267,7 +267,7 @@ fn assignVariableCache(
     value: obj.SchemeObject,
     value_ret: *obj.SchemeObject,
     force_p: bool,
-) c_long {
+) isize {
     const old_value = obj.cacheValue(cache);
     switch (get_trap_kind(old_value)) {
         obj.non_trap_kind, obj.trap_unassigned => {},
@@ -285,7 +285,7 @@ fn assignVariableCache(
     return abi.prim_done;
 }
 
-fn updateUuoLinks(cache: obj.SchemeObject, new_value: obj.SchemeObject) c_long {
+fn updateUuoLinks(cache: obj.SchemeObject, new_value: obj.SchemeObject) isize {
     const needed = countReferences(cacheKindRefs(cache, .operator_cache)) * space_per_uuo_link + cache_size;
     if (abi.gcNeededP(needed)) {
         abi.requestGc(needed);
@@ -308,7 +308,7 @@ pub export fn define_variable(
     environment: obj.SchemeObject,
     symbol: obj.SchemeObject,
     value: obj.SchemeObject,
-) callconv(.c) c_long {
+) callconv(.c) isize {
     if (!(obj.environmentP(environment) and obj.symbolP(symbol))) {
         return abi.err_bad_frame;
     }
@@ -330,7 +330,7 @@ pub export fn define_variable(
     else
         obj.sharp_f;
 
-    const needed: c_ulong = 2 + if (old_cache != obj.sharp_f) updateCacheRefsSpace(old_cache, environment, symbol) else 0;
+    const needed: usize = 2 + if (old_cache != obj.sharp_f) updateCacheRefsSpace(old_cache, environment, symbol) else 0;
     if (abi.gcNeededP(needed)) {
         abi.requestGc(needed);
         return abi.prim_interrupt;
@@ -351,7 +351,7 @@ fn extendEnvironment(environment: obj.SchemeObject, symbol: obj.SchemeObject, va
     return obj.pairCdrLoc(pair);
 }
 
-fn guaranteeExtensionSpace(environment: obj.SchemeObject) c_long {
+fn guaranteeExtensionSpace(environment: obj.SchemeObject) isize {
     if (obj.extendedFrameP(environment)) {
         const length = obj.extendedFrameLength(environment);
         if (length == obj.extendedFrameMaxLength(environment)) {
@@ -376,10 +376,10 @@ fn guaranteeExtensionSpace(environment: obj.SchemeObject) c_long {
 }
 
 fn allocateFrameExtension(
-    length: c_ulong,
+    length: usize,
     procedure: obj.SchemeObject,
     extension_ret: *obj.SchemeObject,
-) c_long {
+) isize {
     const n_words = frame_extension_min_size + length;
     if (abi.gcNeededP(n_words)) {
         abi.requestGc(n_words);
@@ -398,7 +398,7 @@ pub export fn link_variables(
     target_symbol: obj.SchemeObject,
     source_environment: obj.SchemeObject,
     source_symbol: obj.SchemeObject,
-) callconv(.c) c_long {
+) callconv(.c) isize {
     if (!(obj.environmentP(target_environment) and
         obj.environmentP(source_environment) and
         obj.symbolP(target_symbol) and
@@ -477,7 +477,7 @@ pub export fn unbind_variable(
     environment: obj.SchemeObject,
     symbol: obj.SchemeObject,
     value_ret: *obj.SchemeObject,
-) callconv(.c) c_long {
+) callconv(.c) isize {
     var frame: obj.SchemeObject = 0;
     const cell = findBindingCell(environment, symbol, &frame);
     if (obj.globalFrameP(frame)) {
@@ -523,7 +523,7 @@ fn unbindCachedVariable(
     cell: [*]obj.SchemeObject,
     frame: obj.SchemeObject,
     symbol: obj.SchemeObject,
-) c_long {
+) isize {
     const cache = obj.ptrRefTrapCache(cell[0]);
     const shadowed_cell = findBindingCell(obj.envParent(frame), symbol, null);
     const needed = updateCacheRefsSpace(cache, frame, symbol);
@@ -570,19 +570,19 @@ comptime {
     }
 }
 
-fn compilerCacheLookup(name: obj.SchemeObject, block: obj.SchemeObject, offset: c_ulong) callconv(.c) c_long {
+fn compilerCacheLookup(name: obj.SchemeObject, block: obj.SchemeObject, offset: usize) callconv(.c) isize {
     return addCacheReference(abi.cc_block_environment(block), name, block, offset, .lookup_cache);
 }
 
-fn compilerCacheAssignment(name: obj.SchemeObject, block: obj.SchemeObject, offset: c_ulong) callconv(.c) c_long {
+fn compilerCacheAssignment(name: obj.SchemeObject, block: obj.SchemeObject, offset: usize) callconv(.c) isize {
     return addCacheReference(abi.cc_block_environment(block), name, block, offset, .assignment_cache);
 }
 
-fn compilerCacheOperator(name: obj.SchemeObject, block: obj.SchemeObject, offset: c_ulong) callconv(.c) c_long {
+fn compilerCacheOperator(name: obj.SchemeObject, block: obj.SchemeObject, offset: usize) callconv(.c) isize {
     return addCacheReference(abi.cc_block_environment(block), name, block, offset, .operator_cache);
 }
 
-fn compilerCacheGlobalOperator(name: obj.SchemeObject, block: obj.SchemeObject, offset: c_ulong) callconv(.c) c_long {
+fn compilerCacheGlobalOperator(name: obj.SchemeObject, block: obj.SchemeObject, offset: usize) callconv(.c) isize {
     return addCacheReference(obj.the_global_env, name, block, offset, .operator_cache);
 }
 
@@ -599,11 +599,11 @@ fn compilerVarError(cache: obj.SchemeObject, block: obj.SchemeObject, kind: abi.
     }.f) orelse obj.sharp_f;
 }
 
-fn compilerLookupTrap(cache: obj.SchemeObject, value_ret: *obj.SchemeObject) callconv(.c) c_long {
+fn compilerLookupTrap(cache: obj.SchemeObject, value_ret: *obj.SchemeObject) callconv(.c) isize {
     return lookupVariableCache(cache, value_ret);
 }
 
-fn compilerSafeLookupTrap(cache: obj.SchemeObject, value_ret: *obj.SchemeObject) callconv(.c) c_long {
+fn compilerSafeLookupTrap(cache: obj.SchemeObject, value_ret: *obj.SchemeObject) callconv(.c) isize {
     const result = lookupVariableCache(cache, value_ret);
     if (result == abi.err_unassigned_variable) {
         value_ret.* = externalUnassignedObject();
@@ -612,7 +612,7 @@ fn compilerSafeLookupTrap(cache: obj.SchemeObject, value_ret: *obj.SchemeObject)
     return result;
 }
 
-fn compilerUnassignedPTrap(cache: obj.SchemeObject, value_ret: *obj.SchemeObject) callconv(.c) c_long {
+fn compilerUnassignedPTrap(cache: obj.SchemeObject, value_ret: *obj.SchemeObject) callconv(.c) isize {
     var dummy: obj.SchemeObject = undefined;
     const result = lookupVariableCache(cache, &dummy);
     switch (result) {
@@ -632,12 +632,12 @@ fn compilerAssignmentTrap(
     cache: obj.SchemeObject,
     value: obj.SchemeObject,
     value_ret: *obj.SchemeObject,
-) callconv(.c) c_long {
+) callconv(.c) isize {
     const target_cache = if (obj.cacheCloneP(cache)) obj.cacheClone(cache) else cache;
     return assignVariableCache(target_cache, value, value_ret, false);
 }
 
-fn compilerOperatorReferenceTrap(cache: obj.SchemeObject, value_ret: *obj.SchemeObject) callconv(.c) c_long {
+fn compilerOperatorReferenceTrap(cache: obj.SchemeObject, value_ret: *obj.SchemeObject) callconv(.c) isize {
     return lookupVariableCache(cache, value_ret);
 }
 
@@ -645,9 +645,9 @@ fn addCacheReference(
     environment: obj.SchemeObject,
     symbol: obj.SchemeObject,
     block: obj.SchemeObject,
-    offset: c_ulong,
+    offset: usize,
     kind: abi.CacheRefKind,
-) c_long {
+) isize {
     var frame: obj.SchemeObject = 0;
     var cell = findBindingCell(environment, symbol, &frame);
     if (cell == null) {
@@ -675,7 +675,7 @@ fn addReference(
     palist: *obj.SchemeObject,
     symbol: obj.SchemeObject,
     block: obj.SchemeObject,
-    offset: c_ulong,
+    offset: usize,
 ) void {
     if (findReferencesNamed(palist, symbol)) |prefs_init| {
         var prefs = prefs_init;
@@ -700,7 +700,7 @@ fn addReference(
     palist.* = abi.cons(abi.cons(symbol, abi.cons(reference, obj.empty_list)), alist);
 }
 
-fn installCache(cache: obj.SchemeObject, block: obj.SchemeObject, offset: c_ulong, kind: abi.CacheRefKind) void {
+fn installCache(cache: obj.SchemeObject, block: obj.SchemeObject, offset: usize, kind: abi.CacheRefKind) void {
     switch (kind) {
         .lookup_cache => abi.write_variable_cache(cache, block, offset),
         .assignment_cache => {
@@ -711,7 +711,7 @@ fn installCache(cache: obj.SchemeObject, block: obj.SchemeObject, offset: c_ulon
     }
 }
 
-fn installOperatorCache(cache: obj.SchemeObject, block: obj.SchemeObject, offset: c_ulong) void {
+fn installOperatorCache(cache: obj.SchemeObject, block: obj.SchemeObject, offset: usize) void {
     const value = obj.cacheValue(cache);
     dieIfError(abi.make_uuo_link(value, cache, block, offset));
 }
@@ -720,7 +720,7 @@ fn updateCacheRefsSpace(
     from_cache: obj.SchemeObject,
     environment: obj.SchemeObject,
     symbol: obj.SchemeObject,
-) c_ulong {
+) usize {
     if (!build_options.cc_support) return 0;
     return updateCacheRefsSpace1(from_cache, .lookup_cache, environment, symbol) +
         updateCacheRefsSpace1(from_cache, .assignment_cache, environment, symbol) +
@@ -732,10 +732,10 @@ fn updateCacheRefsSpace1(
     kind: abi.CacheRefKind,
     environment: obj.SchemeObject,
     symbol: obj.SchemeObject,
-) c_ulong {
+) usize {
     const from_palist = cacheKindRefs(from_cache, kind);
     const n_refs = refPairsToMove(from_palist, environment, symbol);
-    var result: c_ulong = 0;
+    var result: usize = 0;
     if (n_refs > 0) {
         result += cache_size + 4;
         if (kind == .operator_cache) {
@@ -750,7 +750,7 @@ fn updateCacheReferences(
     to_cell: ?[*]obj.SchemeObject,
     environment: obj.SchemeObject,
     symbol: obj.SchemeObject,
-) c_long {
+) isize {
     if (to_cell) |tc| {
         dieIfError(guaranteeCache(tc));
         const to_cache = obj.ptrRefTrapCache(tc[0]);
@@ -769,9 +769,9 @@ fn updateCacheReferences(
     return abi.prim_done;
 }
 
-fn refPairsToMove(palist: *obj.SchemeObject, environment: obj.SchemeObject, symbol: obj.SchemeObject) c_ulong {
+fn refPairsToMove(palist: *obj.SchemeObject, environment: obj.SchemeObject, symbol: obj.SchemeObject) usize {
     var prefs = findReferencesNamed(palist, symbol) orelse return 0;
-    var n_refs: c_ulong = 0;
+    var n_refs: usize = 0;
     while (obj.pairP(prefs.*)) {
         const ref = obj.pairCar(prefs.*);
         if (obj.cacheRefBlock(ref) == obj.gc_reclaimed) {
@@ -916,9 +916,9 @@ fn scanProcedureBindings(
     return null;
 }
 
-fn countReferences(palist: *obj.SchemeObject) c_ulong {
-    var count: c_ulong = 0;
-    const Ctx = struct { count: *c_ulong };
+fn countReferences(palist: *obj.SchemeObject) usize {
+    var count: usize = 0;
+    const Ctx = struct { count: *usize };
     const ctx: Ctx = .{ .count = &count };
     _ = walkReferences(palist, ctx, struct {
         fn f(c: Ctx, _: obj.SchemeObject, _: *obj.SchemeObject) ?obj.SchemeObject {
@@ -955,7 +955,7 @@ fn updateAssignmentReferences(cache: obj.SchemeObject) void {
     }.f);
 }
 
-fn guaranteeCache(cell: [*]obj.SchemeObject) c_long {
+fn guaranteeCache(cell: [*]obj.SchemeObject) isize {
     if (get_trap_kind(cell[0]) == obj.trap_compiler_cached) return abi.prim_done;
     const needed = ptr_ref_trap_size + cache_size + cache_refs_size;
     if (abi.gcNeededP(needed)) {
@@ -985,7 +985,7 @@ fn updateClone(cache: obj.SchemeObject) void {
     }
 }
 
-fn makeClone(cache: obj.SchemeObject, cache_ret: *obj.SchemeObject) c_long {
+fn makeClone(cache: obj.SchemeObject, cache_ret: *obj.SchemeObject) isize {
     if (abi.gcNeededP(cache_size)) {
         abi.requestGc(cache_size);
         return abi.prim_interrupt;
@@ -996,9 +996,9 @@ fn makeClone(cache: obj.SchemeObject, cache_ret: *obj.SchemeObject) c_long {
 
 fn makeCacheReference(
     block: obj.SchemeObject,
-    offset: c_ulong,
+    offset: usize,
     ref_ret: *obj.SchemeObject,
-) c_long {
+) isize {
     if (abi.gcNeededP(2)) {
         abi.requestGc(2);
         return abi.prim_interrupt;

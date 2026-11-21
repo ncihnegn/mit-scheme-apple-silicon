@@ -139,7 +139,7 @@ pub export fn Prim_dld_unload_file() callconv(.c) obj.SchemeObject {
 // long.  Invoke it, and return the corresponding Scheme integer.")
 pub export fn Prim_invoke_C_thunk() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    const thunk_ptr: *const fn () callconv(.c) c_ulong = @ptrFromInt(@as(usize, @intCast(abi.arg_ulong_integer(1))));
+    const thunk_ptr: *const fn () callconv(.c) usize = @ptrFromInt(@as(usize, @intCast(abi.arg_ulong_integer(1))));
     return artutl.ulong_to_integer(thunk_ptr());
 }
 
@@ -154,7 +154,7 @@ pub export fn Prim_address_to_string() callconv(.c) obj.SchemeObject {
     return string.char_pointer_to_string(ptr);
 }
 
-fn testSampleThunk() callconv(.c) c_ulong {
+fn testSampleThunk() callconv(.c) usize {
     return 123456;
 }
 
@@ -168,12 +168,12 @@ test "pruxdld dlopen self, dlsym, dlclose, invoke-c-thunk, and address-to-string
 
     const thunk_addr = artutl.ulong_to_integer(@intCast(@intFromPtr(&testSampleThunk)));
     stubs.setArgs(&.{thunk_addr});
-    try std.testing.expectEqual(@as(c_ulong, 123456), artutl.integer_to_ulong(Prim_invoke_C_thunk()));
+    try std.testing.expectEqual(@as(usize, 123456), artutl.integer_to_ulong(Prim_invoke_C_thunk()));
 
     const msg: [*:0]const u8 = "hello-dld";
     stubs.setArgs(&.{artutl.ulong_to_integer(@intCast(@intFromPtr(msg)))});
     const str_obj = Prim_address_to_string();
-    try std.testing.expectEqual(@as(c_ulong, 9), obj.legacyStringLength(str_obj));
+    try std.testing.expectEqual(@as(usize, 9), obj.legacyStringLength(str_obj));
     try std.testing.expectEqualStrings("hello-dld", obj.legacyStringData(str_obj)[0..9]);
 
     const wc = abi.system_pair_cons(@intCast(obj.tc_weak_cons), obj.sharp_f, obj.sharp_f);

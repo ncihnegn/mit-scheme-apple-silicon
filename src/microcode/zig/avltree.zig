@@ -9,7 +9,7 @@ pub const TreeNode = extern struct {
     left: ?*TreeNode,
     rite: ?*TreeNode,
     name: ?[*:0]const u8,
-    value: c_ulong,
+    value: usize,
 };
 
 comptime {
@@ -45,7 +45,7 @@ fn updateHeight(node: *TreeNode) void {
     node.height = 1 + @max(branchHeight(node.left), branchHeight(node.rite));
 }
 
-fn leafMake(name: [*:0]const u8, value: c_ulong) ?*TreeNode {
+fn leafMake(name: [*:0]const u8, value: usize) ?*TreeNode {
     const raw = malloc(@sizeOf(TreeNode)) orelse {
         treeError("leaf_make: malloc failed.\n", null);
         return null;
@@ -103,7 +103,7 @@ fn rebalanceRite(tree: *TreeNode) *TreeNode {
     return rotateLeft(tree);
 }
 
-pub export fn tree_insert(tree: ?*TreeNode, name: [*:0]const u8, value: c_ulong) callconv(.c) ?*TreeNode {
+pub export fn tree_insert(tree: ?*TreeNode, name: [*:0]const u8, value: usize) callconv(.c) ?*TreeNode {
     const node = tree orelse return leafMake(name, value);
     const cmp = strcmp_ci(name, node.name.?);
     if (cmp == 0) {
@@ -129,9 +129,9 @@ pub export fn tree_lookup(tree: ?*TreeNode, name: [*:0]const u8) callconv(.c) ?*
 }
 
 pub export fn tree_build(
-    high: c_ulong,
+    high: usize,
     names: ?[*]const [*:0]const u8,
-    value: c_ulong,
+    value: usize,
 ) callconv(.c) ?*TreeNode {
     if (high == 0) return null;
     if (high == 1) return leafMake(names.?[0], value);
@@ -143,12 +143,12 @@ pub export fn tree_build(
         tree_build_bias = 1 - tree_build_bias;
     }
     const next: usize = middle + 1;
-    const tree = leafMake(names_arr[middle], value + @as(c_ulong, @intCast(middle))) orelse return null;
+    const tree = leafMake(names_arr[middle], value + @as(usize, @intCast(middle))) orelse return null;
     tree.left = tree_build(@intCast(middle), names_arr, value);
     tree.rite = tree_build(
         @intCast(@as(usize, @intCast(high)) - next),
         names_arr + next,
-        value + @as(c_ulong, @intCast(next)),
+        value + @as(usize, @intCast(next)),
     );
     updateHeight(tree);
     return tree;
@@ -189,9 +189,9 @@ test "avltree build, rotations, case-insensitive lookup, duplicate error, and fr
 
     for (sorted, 0..) |k, idx| {
         const found = tree_lookup(built, k).?;
-        try std.testing.expectEqual(@as(c_ulong, 100 + idx), found.value);
+        try std.testing.expectEqual(@as(usize, 100 + idx), found.value);
     }
-    try std.testing.expectEqual(@as(c_ulong, 103), tree_lookup(built, "DELTA").?.value);
+    try std.testing.expectEqual(@as(usize, 103), tree_lookup(built, "DELTA").?.value);
     try std.testing.expectEqual(@as(?*TreeNode, null), tree_lookup(built, "zulu"));
 
     // Duplicate insertion records error without corrupting tree.
@@ -218,7 +218,7 @@ test "avltree build, rotations, case-insensitive lookup, duplicate error, and fr
             _ = try checkAvlInvariant(root);
         }
         for (keys, 0..) |k, i| {
-            try std.testing.expectEqual(@as(c_ulong, @intCast(i)), tree_lookup(root, k).?.value);
+            try std.testing.expectEqual(@as(usize, @intCast(i)), tree_lookup(root, k).?.value);
         }
     }
 }

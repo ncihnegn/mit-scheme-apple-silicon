@@ -115,7 +115,7 @@ pub export fn Prim_read_byte_from_memory() callconv(.c) obj.SchemeObject {
 // Read a word from memory at ADDRESS and return it as an unsigned integer.")
 pub export fn Prim_read_word_from_memory() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    const ptr: *align(1) const c_ulong = @ptrFromInt(@as(usize, @intCast(abi.arg_ulong_integer(1))));
+    const ptr: *align(1) const usize = @ptrFromInt(@as(usize, @intCast(abi.arg_ulong_integer(1))));
     return artutl.ulong_to_integer(ptr.*);
 }
 
@@ -145,7 +145,7 @@ pub export fn Prim_write_byte_to_memory() callconv(.c) obj.SchemeObject {
 pub export fn Prim_write_word_to_memory() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     const word = abi.arg_ulong_integer(1);
-    const ptr: *align(1) c_ulong = @ptrFromInt(@as(usize, @intCast(abi.arg_ulong_integer(2))));
+    const ptr: *align(1) usize = @ptrFromInt(@as(usize, @intCast(abi.arg_ulong_integer(2))));
     ptr.* = word;
     return obj.unspecific;
 }
@@ -179,7 +179,7 @@ pub export fn Prim_cpoint_next_frame() callconv(.c) obj.SchemeObject {
         abi.error_bad_range_arg(2);
     }
     const next_index = abi.cpoint_next_frame(cpoint, index);
-    if (next_index == std.math.maxInt(c_ulong)) return obj.sharp_f;
+    if (next_index == std.math.maxInt(usize)) return obj.sharp_f;
     if (!(next_index == length or
         (next_index < length and
             (obj.vectorRef(cpoint, @intCast(index)) == obj.makeReturnCode(abi.rc_hardware_trap) or
@@ -227,7 +227,7 @@ test "sysprim heap status, free pointer, trap state, and raw memory access" {
 
     stubs.setArgs(&.{});
     const status = Prim_gc_space_status();
-    try std.testing.expectEqual(@as(c_ulong, 12), obj.vectorLength(status));
+    try std.testing.expectEqual(@as(usize, 12), obj.vectorLength(status));
     try std.testing.expectEqual(obj.ulongToFixnum(@sizeOf(obj.SchemeObject)), obj.vectorRef(status, 0));
 
     stubs.mock_under_emacs = 1;

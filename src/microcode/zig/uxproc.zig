@@ -18,8 +18,8 @@ pub var scheme_jc_status: abi.ProcessJcStatus = .no_ctty;
 
 var scheme_ctty_fd: c_int = -1;
 var foreground_child_process: abi.Tprocess = abi.no_process;
-var process_tick: c_long = 0;
-var sync_tick: c_long = 0;
+var process_tick: isize = 0;
+var sync_tick: isize = 0;
 var grabbed_signal_mask: std.c.sigset_t = std.mem.zeroes(std.c.sigset_t);
 
 const tiocsctty: c_ulong = if (builtin.os.tag.isDarwin()) 0x20007461 else 0x540E;
@@ -35,8 +35,8 @@ extern "c" fn getpgrp() std.c.pid_t;
 extern "c" fn cfsetispeed(t: *std.c.termios, speed: RawSpeedT) c_int;
 extern "c" fn cfsetospeed(t: *std.c.termios, speed: RawSpeedT) c_int;
 
-inline fn volatileReadTick(ptr: *const c_long) c_long {
-    return @as(*const volatile c_long, ptr).*;
+inline fn volatileReadTick(ptr: *const isize) isize {
+    return @as(*const volatile isize, ptr).*;
 }
 
 inline fn volatileReadRawStatus(p: abi.Tprocess) abi.ProcessStatus {

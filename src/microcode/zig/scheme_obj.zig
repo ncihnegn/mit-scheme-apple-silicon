@@ -5,7 +5,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-pub const SchemeObject = c_ulong;
+pub const SchemeObject = usize;
 
 pub const heap_in_low_memory: bool =
     builtin.cpu.arch == .aarch64 or builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86;
@@ -21,95 +21,95 @@ pub const fixnum_length: u6 = datum_length - 1;
 pub const fixnum_mask: SchemeObject = (@as(SchemeObject, 1) << fixnum_length) - 1;
 pub const fixnum_sign_bit: SchemeObject = @as(SchemeObject, 1) << fixnum_length;
 pub const sign_mask: SchemeObject = ~fixnum_mask;
-pub const smallest_fixnum: c_long = -(@as(c_long, 1) << fixnum_length);
-pub const biggest_fixnum: c_long = (@as(c_long, 1) << fixnum_length) - 1;
+pub const smallest_fixnum: isize = -(@as(isize, 1) << fixnum_length);
+pub const biggest_fixnum: isize = (@as(isize, 1) << fixnum_length) - 1;
 
 // Type codes (`src/microcode/types.h`)
-pub const tc_false: c_ulong = 0x00;
-pub const tc_pair: c_ulong = 0x01;
-pub const tc_list: c_ulong = tc_pair;
-pub const tc_character: c_ulong = 0x02;
-pub const tc_scode_quote: c_ulong = 0x03;
-pub const tc_compiled_return: c_ulong = 0x04;
-pub const tc_uninterned_symbol: c_ulong = 0x05;
-pub const tc_big_flonum: c_ulong = 0x06;
-pub const tc_apply_hook: c_ulong = 0x07;
-pub const tc_constant: c_ulong = 0x08;
-pub const tc_extended_procedure: c_ulong = 0x09;
-pub const tc_vector: c_ulong = 0x0A;
-pub const tc_return_code: c_ulong = 0x0B;
-pub const tc_manifest_closure: c_ulong = 0x0D;
-pub const tc_big_fixnum: c_ulong = 0x0E;
-pub const tc_procedure: c_ulong = 0x0F;
-pub const tc_entity: c_ulong = 0x10;
-pub const tc_delay: c_ulong = 0x11;
-pub const tc_environment: c_ulong = 0x12;
-pub const tc_delayed: c_ulong = 0x13;
-pub const tc_extended_lambda: c_ulong = 0x14;
-pub const tc_comment: c_ulong = 0x15;
-pub const tc_non_marked_vector: c_ulong = 0x16;
-pub const tc_lambda: c_ulong = 0x17;
-pub const tc_primitive: c_ulong = 0x18;
-pub const tc_sequence: c_ulong = 0x19;
-pub const tc_fixnum: c_ulong = 0x1A;
-pub const tc_unicode_string: c_ulong = 0x1B;
-pub const tc_control_point: c_ulong = 0x1C;
-pub const tc_interned_symbol: c_ulong = 0x1D;
-pub const tc_character_string: c_ulong = 0x1E;
-pub const tc_access: c_ulong = 0x1F;
-pub const tc_hunk3_a: c_ulong = 0x20;
-pub const tc_definition: c_ulong = 0x21;
-pub const tc_broken_heart: c_ulong = 0x22;
-pub const tc_assignment: c_ulong = 0x23;
-pub const tc_hunk3_b: c_ulong = 0x24;
-pub const tc_hunk3: c_ulong = tc_hunk3_b;
-pub const tc_tagged_object: c_ulong = 0x25;
-pub const tc_combination: c_ulong = 0x26;
-pub const tc_manifest_nm_vector: c_ulong = 0x27;
-pub const tc_compiled_entry: c_ulong = 0x28;
-pub const tc_lexpr: c_ulong = 0x29;
-pub const tc_ephemeron: c_ulong = 0x2B;
-pub const tc_variable: c_ulong = 0x2C;
-pub const tc_the_environment: c_ulong = 0x2D;
-pub const tc_syntax_error: c_ulong = 0x2E;
-pub const tc_vector_1b: c_ulong = 0x2F;
-pub const tc_bit_string: c_ulong = tc_vector_1b;
-pub const tc_reference_trap: c_ulong = 0x32;
-pub const tc_bytevector: c_ulong = 0x33;
-pub const tc_conditional: c_ulong = 0x34;
-pub const tc_disjunction: c_ulong = 0x35;
-pub const tc_cell: c_ulong = 0x36;
-pub const tc_weak_cons: c_ulong = 0x37;
-pub const tc_quad: c_ulong = 0x38;
-pub const tc_linkage_section: c_ulong = 0x39;
-pub const tc_ratnum: c_ulong = 0x3A;
-pub const tc_stack_environment: c_ulong = 0x3B;
-pub const tc_complex: c_ulong = 0x3C;
-pub const tc_compiled_code_block: c_ulong = 0x3D;
-pub const tc_record: c_ulong = 0x3E;
+pub const tc_false: usize = 0x00;
+pub const tc_pair: usize = 0x01;
+pub const tc_list: usize = tc_pair;
+pub const tc_character: usize = 0x02;
+pub const tc_scode_quote: usize = 0x03;
+pub const tc_compiled_return: usize = 0x04;
+pub const tc_uninterned_symbol: usize = 0x05;
+pub const tc_big_flonum: usize = 0x06;
+pub const tc_apply_hook: usize = 0x07;
+pub const tc_constant: usize = 0x08;
+pub const tc_extended_procedure: usize = 0x09;
+pub const tc_vector: usize = 0x0A;
+pub const tc_return_code: usize = 0x0B;
+pub const tc_manifest_closure: usize = 0x0D;
+pub const tc_big_fixnum: usize = 0x0E;
+pub const tc_procedure: usize = 0x0F;
+pub const tc_entity: usize = 0x10;
+pub const tc_delay: usize = 0x11;
+pub const tc_environment: usize = 0x12;
+pub const tc_delayed: usize = 0x13;
+pub const tc_extended_lambda: usize = 0x14;
+pub const tc_comment: usize = 0x15;
+pub const tc_non_marked_vector: usize = 0x16;
+pub const tc_lambda: usize = 0x17;
+pub const tc_primitive: usize = 0x18;
+pub const tc_sequence: usize = 0x19;
+pub const tc_fixnum: usize = 0x1A;
+pub const tc_unicode_string: usize = 0x1B;
+pub const tc_control_point: usize = 0x1C;
+pub const tc_interned_symbol: usize = 0x1D;
+pub const tc_character_string: usize = 0x1E;
+pub const tc_access: usize = 0x1F;
+pub const tc_hunk3_a: usize = 0x20;
+pub const tc_definition: usize = 0x21;
+pub const tc_broken_heart: usize = 0x22;
+pub const tc_assignment: usize = 0x23;
+pub const tc_hunk3_b: usize = 0x24;
+pub const tc_hunk3: usize = tc_hunk3_b;
+pub const tc_tagged_object: usize = 0x25;
+pub const tc_combination: usize = 0x26;
+pub const tc_manifest_nm_vector: usize = 0x27;
+pub const tc_compiled_entry: usize = 0x28;
+pub const tc_lexpr: usize = 0x29;
+pub const tc_ephemeron: usize = 0x2B;
+pub const tc_variable: usize = 0x2C;
+pub const tc_the_environment: usize = 0x2D;
+pub const tc_syntax_error: usize = 0x2E;
+pub const tc_vector_1b: usize = 0x2F;
+pub const tc_bit_string: usize = tc_vector_1b;
+pub const tc_reference_trap: usize = 0x32;
+pub const tc_bytevector: usize = 0x33;
+pub const tc_conditional: usize = 0x34;
+pub const tc_disjunction: usize = 0x35;
+pub const tc_cell: usize = 0x36;
+pub const tc_weak_cons: usize = 0x37;
+pub const tc_quad: usize = 0x38;
+pub const tc_linkage_section: usize = 0x39;
+pub const tc_ratnum: usize = 0x3A;
+pub const tc_stack_environment: usize = 0x3B;
+pub const tc_complex: usize = 0x3C;
+pub const tc_compiled_code_block: usize = 0x3D;
+pub const tc_record: usize = 0x3E;
 
-pub const tc_manifest_vector: c_ulong = tc_false;
-pub const n_type_codes: c_ulong = 0x40;
+pub const tc_manifest_vector: usize = tc_false;
+pub const n_type_codes: usize = 0x40;
 
 pub const floating_alignment: usize = 0;
 
-pub inline fn objectType(obj: SchemeObject) c_ulong {
+pub inline fn objectType(obj: SchemeObject) usize {
     return obj >> datum_length;
 }
 
-pub inline fn objectDatum(obj: SchemeObject) c_ulong {
+pub inline fn objectDatum(obj: SchemeObject) usize {
     return obj & datum_mask;
 }
 
-pub inline fn makeObject(tc: c_ulong, datum: c_ulong) SchemeObject {
+pub inline fn makeObject(tc: usize, datum: usize) SchemeObject {
     return (tc << datum_length) | datum;
 }
 
-pub inline fn objectNewDatum(type_obj: SchemeObject, datum: c_ulong) SchemeObject {
+pub inline fn objectNewDatum(type_obj: SchemeObject, datum: usize) SchemeObject {
     return makeObject(objectType(type_obj), datum);
 }
 
-pub inline fn objectNewType(tc: c_ulong, o: SchemeObject) SchemeObject {
+pub inline fn objectNewType(tc: usize, o: SchemeObject) SchemeObject {
     return makeObject(tc, objectDatum(o));
 }
 
@@ -126,35 +126,35 @@ pub const empty_list: SchemeObject = makeObject(tc_constant, 9);
 pub const gc_reclaimed: SchemeObject = makeObject(tc_constant, 10);
 pub const the_global_env: SchemeObject = makeObject(tc_false, 0);
 pub const the_null_env: SchemeObject = makeObject(tc_false, 1);
-pub const half_datum_length: std.math.Log2Int(SchemeObject) = if (@sizeOf(c_ulong) == 4) 13 else 29;
+pub const half_datum_length: std.math.Log2Int(SchemeObject) = if (@sizeOf(usize) == 4) 13 else 29;
 pub const broken_heart_zero: SchemeObject = makeObject(tc_broken_heart, 0);
 pub const unassigned_object: SchemeObject = makeObject(tc_reference_trap, 0);
 pub const unbound_object: SchemeObject = makeObject(tc_reference_trap, 2);
-pub const trap_max_immediate: c_ulong = 9;
-pub const trap_unassigned: c_ulong = 0;
-pub const trap_unbound: c_ulong = 2;
-pub const trap_expensive: c_ulong = 6;
-pub const trap_compiler_cached: c_ulong = 14;
-pub const trap_macro: c_ulong = 15;
-pub const non_trap_kind: c_ulong = 32;
+pub const trap_max_immediate: usize = 9;
+pub const trap_unassigned: usize = 0;
+pub const trap_unbound: usize = 2;
+pub const trap_expensive: usize = 6;
+pub const trap_compiler_cached: usize = 14;
+pub const trap_macro: usize = 15;
+pub const non_trap_kind: usize = 32;
 pub const expensive_object: SchemeObject = makeObject(tc_reference_trap, trap_expensive);
 
-pub const tc_history_unmarked: c_ulong = tc_hunk3_a;
-pub const tc_history_marked: c_ulong = tc_hunk3_b;
-pub const history_mark_type: c_ulong = tc_history_unmarked ^ tc_history_marked;
+pub const tc_history_unmarked: usize = tc_hunk3_a;
+pub const tc_history_marked: usize = tc_hunk3_b;
+pub const history_mark_type: usize = tc_history_unmarked ^ tc_history_marked;
 pub const history_mark_mask: SchemeObject = @as(SchemeObject, history_mark_type) << datum_length;
 
-pub const fasdump_record_marker_start: c_ulong = 0x100;
-pub const fasdump_record_marker_end: c_ulong = 0x200;
+pub const fasdump_record_marker_start: usize = 0x100;
+pub const fasdump_record_marker_end: usize = 0x200;
 
-pub inline fn datumToAddress(datum: c_ulong) [*]SchemeObject {
+pub inline fn datumToAddress(datum: usize) [*]SchemeObject {
     if (heap_in_low_memory) {
         return @ptrFromInt(@as(usize, @intCast(datum)));
     }
     return memory_base + @as(usize, @intCast(datum));
 }
 
-pub inline fn addressToDatum(addr: [*]const SchemeObject) c_ulong {
+pub inline fn addressToDatum(addr: [*]const SchemeObject) usize {
     if (heap_in_low_memory) {
         return @intCast(@intFromPtr(addr));
     }
@@ -165,7 +165,7 @@ pub inline fn objectAddress(obj: SchemeObject) [*]SchemeObject {
     return datumToAddress(objectDatum(obj));
 }
 
-pub inline fn makePointerObject(tc: c_ulong, addr: [*]const SchemeObject) SchemeObject {
+pub inline fn makePointerObject(tc: usize, addr: [*]const SchemeObject) SchemeObject {
     return makeObject(tc, addressToDatum(addr));
 }
 
@@ -181,14 +181,14 @@ pub inline fn objectNewRawAddress(type_obj: SchemeObject, raw_addr: usize) Schem
     return objectNewDatum(type_obj, rawAddressToDatum(raw_addr));
 }
 
-pub inline fn datumToRawAddress(datum: c_ulong) usize {
+pub inline fn datumToRawAddress(datum: usize) usize {
     if (heap_in_low_memory) {
         return @intCast(datum);
     }
     return @intFromPtr(memory_base) + @as(usize, @intCast(datum)) * @sizeOf(SchemeObject);
 }
 
-pub inline fn rawAddressToDatum(addr: usize) c_ulong {
+pub inline fn rawAddressToDatum(addr: usize) usize {
     if (heap_in_low_memory) {
         return @intCast(addr);
     }
@@ -249,15 +249,15 @@ pub inline fn makeBrokenHeart(addr: [*]const SchemeObject) SchemeObject {
     return makePointerObject(tc_broken_heart, addr);
 }
 
-pub inline fn makePrimitiveObject(index: c_ulong) SchemeObject {
+pub inline fn makePrimitiveObject(index: usize) SchemeObject {
     return makeObject(tc_primitive, index);
 }
 
-pub inline fn primitiveNumber(prim: SchemeObject) c_ulong {
+pub inline fn primitiveNumber(prim: SchemeObject) usize {
     return objectDatum(prim);
 }
 
-pub inline fn makeReturnCode(n: c_ulong) SchemeObject {
+pub inline fn makeReturnCode(n: usize) SchemeObject {
     return makeObject(tc_return_code, n);
 }
 
@@ -422,15 +422,15 @@ pub inline fn setFrameExtensionProc(ext: SchemeObject, proc: SchemeObject) void 
     vectorSet(ext, 1, proc);
 }
 
-pub inline fn frameExtensionLength(ext: SchemeObject) c_ulong {
+pub inline fn frameExtensionLength(ext: SchemeObject) usize {
     return fixnumToUlong(vectorRef(ext, 2));
 }
 
-pub inline fn setFrameExtensionLength(ext: SchemeObject, n: c_ulong) void {
+pub inline fn setFrameExtensionLength(ext: SchemeObject, n: usize) void {
     vectorSet(ext, 2, ulongToFixnum(n));
 }
 
-pub inline fn frameExtensionMaxLength(ext: SchemeObject) c_ulong {
+pub inline fn frameExtensionMaxLength(ext: SchemeObject) usize {
     return vectorLength(ext) - 3;
 }
 
@@ -450,15 +450,15 @@ pub inline fn extendedFrameBindings(frame: SchemeObject) [*]SchemeObject {
     return frameExtensionBindings(envProc(frame));
 }
 
-pub inline fn extendedFrameLength(frame: SchemeObject) c_ulong {
+pub inline fn extendedFrameLength(frame: SchemeObject) usize {
     return frameExtensionLength(envProc(frame));
 }
 
-pub inline fn extendedFrameMaxLength(frame: SchemeObject) c_ulong {
+pub inline fn extendedFrameMaxLength(frame: SchemeObject) usize {
     return frameExtensionMaxLength(envProc(frame));
 }
 
-pub inline fn setExtendedFrameLength(frame: SchemeObject, n: c_ulong) void {
+pub inline fn setExtendedFrameLength(frame: SchemeObject, n: usize) void {
     setFrameExtensionLength(envProc(frame), n);
 }
 
@@ -470,7 +470,7 @@ pub inline fn lambdaParams(exp: SchemeObject) [*]SchemeObject {
     return vectorLoc(lambdaNames(exp), 1);
 }
 
-pub inline fn lambdaNParams(exp: SchemeObject) c_ulong {
+pub inline fn lambdaNParams(exp: SchemeObject) usize {
     return vectorLength(lambdaNames(exp)) - 1;
 }
 
@@ -482,15 +482,15 @@ pub inline fn elambdaArgCounts(exp: SchemeObject) SchemeObject {
     return memoryRef(exp, 2);
 }
 
-pub inline fn elambdaReqs(exp: SchemeObject) c_ulong {
+pub inline fn elambdaReqs(exp: SchemeObject) usize {
     return (elambdaArgCounts(exp) >> 8) & 0xFF;
 }
 
-pub inline fn elambdaOpts(exp: SchemeObject) c_ulong {
+pub inline fn elambdaOpts(exp: SchemeObject) usize {
     return elambdaArgCounts(exp) & 0xFF;
 }
 
-pub inline fn elambdaRest(exp: SchemeObject) c_ulong {
+pub inline fn elambdaRest(exp: SchemeObject) usize {
     return (elambdaArgCounts(exp) >> 16) & 0x1;
 }
 
@@ -514,7 +514,7 @@ pub inline fn variableSafeP(exp: SchemeObject) bool {
     return memoryRef(exp, 1) == sharp_f;
 }
 
-pub inline fn combinationSize(exp: SchemeObject) c_ulong {
+pub inline fn combinationSize(exp: SchemeObject) usize {
     return vectorLength(exp);
 }
 
@@ -594,11 +594,11 @@ pub inline fn setCacheRefBlock(ref: SchemeObject, block: SchemeObject) void {
     setPairCar(ref, block);
 }
 
-pub inline fn cacheRefOffset(ref: SchemeObject) c_ulong {
+pub inline fn cacheRefOffset(ref: SchemeObject) usize {
     return objectDatum(pairCdr(ref));
 }
 
-pub inline fn setCacheRefOffset(ref: SchemeObject, offset: c_ulong) void {
+pub inline fn setCacheRefOffset(ref: SchemeObject, offset: usize) void {
     setPairCdr(ref, ulongToFixnum(offset));
 }
 
@@ -646,11 +646,11 @@ pub inline fn entityData(o: SchemeObject) SchemeObject {
     return memoryRef(o, 1);
 }
 
-pub inline fn ustringBytesPerCp(obj: SchemeObject) c_ulong {
+pub inline fn ustringBytesPerCp(obj: SchemeObject) usize {
     return objectType(nmVectorSubheader(obj)) & 0x3;
 }
 
-pub inline fn ustringLength(s: SchemeObject) c_ulong {
+pub inline fn ustringLength(s: SchemeObject) usize {
     return objectDatum(nmVectorSubheader(s));
 }
 
@@ -710,17 +710,17 @@ pub const code_length = 21;
 pub const bits_length = 4;
 pub const mit_ascii_length = 25;
 
-pub const max_ascii: c_ulong = @as(c_ulong, 1) << ascii_length;
-pub const max_code: c_ulong = @as(c_ulong, 1) << code_length;
-pub const max_bits: c_ulong = @as(c_ulong, 1) << bits_length;
-pub const max_mit_ascii: c_ulong = @as(c_ulong, 1) << mit_ascii_length;
+pub const max_ascii: usize = @as(usize, 1) << ascii_length;
+pub const max_code: usize = @as(usize, 1) << code_length;
+pub const max_bits: usize = @as(usize, 1) << bits_length;
+pub const max_mit_ascii: usize = @as(usize, 1) << mit_ascii_length;
 
-pub const mask_ascii: c_ulong = max_ascii - 1;
-pub const char_mask_code: c_ulong = max_code - 1;
-pub const char_mask_bits: c_ulong = max_bits - 1;
-pub const mask_mit_ascii: c_ulong = max_mit_ascii - 1;
+pub const mask_ascii: usize = max_ascii - 1;
+pub const char_mask_code: usize = max_code - 1;
+pub const char_mask_bits: usize = max_bits - 1;
+pub const mask_mit_ascii: usize = max_mit_ascii - 1;
 
-pub inline fn asciiToChar(ascii: c_ulong) SchemeObject {
+pub inline fn asciiToChar(ascii: usize) SchemeObject {
     return makeObject(tc_character, ascii);
 }
 
@@ -728,19 +728,19 @@ pub inline fn charToAsciiP(obj: SchemeObject) bool {
     return objectDatum(obj) < max_ascii;
 }
 
-pub inline fn charToAscii(obj: SchemeObject) c_ulong {
+pub inline fn charToAscii(obj: SchemeObject) usize {
     return obj & mask_ascii;
 }
 
-pub inline fn makeChar(bits: c_ulong, code: c_ulong) SchemeObject {
+pub inline fn makeChar(bits: usize, code: usize) SchemeObject {
     return makeObject(tc_character, (bits << code_length) | code);
 }
 
-pub inline fn charBits(c: SchemeObject) c_ulong {
+pub inline fn charBits(c: SchemeObject) usize {
     return (objectDatum(c) >> code_length) & char_mask_bits;
 }
 
-pub inline fn charCode(c: SchemeObject) c_ulong {
+pub inline fn charCode(c: SchemeObject) usize {
     return objectDatum(c) & char_mask_code;
 }
 
@@ -785,34 +785,34 @@ pub inline fn unsignedFixnumP(obj: SchemeObject) bool {
     return fixnumP(obj) and !fixnumNegativeP(obj);
 }
 
-pub inline fn unsignedFixnumToLong(fixnum: SchemeObject) c_long {
+pub inline fn unsignedFixnumToLong(fixnum: SchemeObject) isize {
     return @intCast(objectDatum(fixnum));
 }
 
-pub inline fn longToUnsignedFixnum(n: c_long) SchemeObject {
+pub inline fn longToUnsignedFixnum(n: isize) SchemeObject {
     return makeObject(tc_fixnum, @bitCast(n));
 }
 
-pub inline fn longToFixnumP(n: c_long) bool {
-    const bits: c_ulong = @bitCast(n);
+pub inline fn longToFixnumP(n: isize) bool {
+    const bits: usize = @bitCast(n);
     return (bits & sign_mask) == 0 or (bits & sign_mask) == sign_mask;
 }
 
-pub inline fn longToFixnum(n: c_long) SchemeObject {
-    const bits: c_ulong = @bitCast(n);
+pub inline fn longToFixnum(n: isize) SchemeObject {
+    const bits: usize = @bitCast(n);
     return makeObject(tc_fixnum, bits & datum_mask);
 }
 
-pub inline fn fixnumToLong(fixnum: SchemeObject) c_long {
+pub inline fn fixnumToLong(fixnum: SchemeObject) isize {
     const raw = (fixnum ^ fixnum_sign_bit) -% ((tc_fixnum << datum_length) | fixnum_sign_bit);
     return @bitCast(raw);
 }
 
-pub inline fn ulongToFixnumP(n: c_ulong) bool {
+pub inline fn ulongToFixnumP(n: usize) bool {
     return (n & sign_mask) == 0;
 }
 
-pub inline fn ulongToFixnum(n: c_ulong) SchemeObject {
+pub inline fn ulongToFixnum(n: usize) SchemeObject {
     return makeObject(tc_fixnum, n);
 }
 
@@ -820,21 +820,21 @@ pub inline fn fixnumToUlongP(fixnum: SchemeObject) bool {
     return (objectDatum(fixnum) & sign_mask) == 0;
 }
 
-pub inline fn fixnumToUlong(fixnum: SchemeObject) c_ulong {
+pub inline fn fixnumToUlong(fixnum: SchemeObject) usize {
     return objectDatum(fixnum);
 }
 
 // Vectors, NMVs, Bytevectors, Flonum vectors
-pub inline fn makeVectorHeader(length: c_ulong) SchemeObject {
+pub inline fn makeVectorHeader(length: usize) SchemeObject {
     return makeObject(tc_manifest_vector, length);
 }
 
-pub inline fn makeNmvHeader(length: c_ulong) SchemeObject {
+pub inline fn makeNmvHeader(length: usize) SchemeObject {
     return makeObject(tc_manifest_nm_vector, length);
 }
 
-pub inline fn bytesToWords(nbytes: c_ulong) c_ulong {
-    const word_bytes: c_ulong = @sizeOf(SchemeObject);
+pub inline fn bytesToWords(nbytes: usize) usize {
+    const word_bytes: usize = @sizeOf(SchemeObject);
     return (nbytes + word_bytes - 1) / word_bytes;
 }
 
@@ -846,11 +846,11 @@ pub inline fn setVectorHeader(v: SchemeObject, header: SchemeObject) void {
     memorySet(v, 0, header);
 }
 
-pub inline fn vectorLength(v: SchemeObject) c_ulong {
+pub inline fn vectorLength(v: SchemeObject) usize {
     return objectDatum(vectorHeader(v));
 }
 
-pub inline fn setVectorLength(v: SchemeObject, new_length: c_ulong) void {
+pub inline fn setVectorLength(v: SchemeObject, new_length: usize) void {
     setVectorHeader(v, objectNewDatum(vectorHeader(v), new_length));
 }
 
@@ -894,24 +894,24 @@ pub inline fn bytevectorSet(bv: SchemeObject, index: usize, b: u8) void {
     bytevectorLoc(bv, index)[0] = b;
 }
 
-pub inline fn bytevectorLengthToGcLength(nbytes: c_ulong) c_ulong {
+pub inline fn bytevectorLengthToGcLength(nbytes: usize) usize {
     return 1 + bytesToWords(nbytes + 1);
 }
 
-pub inline fn makeBytevectorSubheader(nbytes: c_ulong) SchemeObject {
+pub inline fn makeBytevectorSubheader(nbytes: usize) SchemeObject {
     return makeObject(0, nbytes);
 }
 
-pub inline fn bytevectorLength(bv: SchemeObject) c_ulong {
+pub inline fn bytevectorLength(bv: SchemeObject) usize {
     return objectDatum(nmVectorSubheader(bv));
 }
 
-pub inline fn setBytevectorLength(bv: SchemeObject, nbytes: c_ulong) void {
+pub inline fn setBytevectorLength(bv: SchemeObject, nbytes: usize) void {
     setNmVectorSubheader(bv, makeBytevectorSubheader(nbytes));
     bytevectorSet(bv, @intCast(nbytes), 0x00);
 }
 
-pub inline fn legacyStringLength(s: SchemeObject) c_ulong {
+pub inline fn legacyStringLength(s: SchemeObject) usize {
     return bytevectorLength(s);
 }
 
@@ -931,28 +931,28 @@ pub inline fn legacyStringSet(s: SchemeObject, index: usize, c: u8) void {
     legacyStringLoc(s, index)[0] = c;
 }
 
-pub inline fn setLegacyStringLength(s: SchemeObject, nbytes: c_ulong) void {
+pub inline fn setLegacyStringLength(s: SchemeObject, nbytes: usize) void {
     setBytevectorLength(s, nbytes);
 }
 
-pub inline fn legacyStringMaxLength(s: SchemeObject) c_ulong {
+pub inline fn legacyStringMaxLength(s: SchemeObject) usize {
     return (vectorLength(s) - 1) * @sizeOf(SchemeObject) - 1;
 }
 
-pub inline fn setLegacyStringMaxLength(s: SchemeObject, nbytes: c_ulong) void {
+pub inline fn setLegacyStringMaxLength(s: SchemeObject, nbytes: usize) void {
     setVectorHeader(s, makeNmvHeader(bytevectorLengthToGcLength(nbytes)));
 }
 
 pub inline fn hashToFixnum(h: u32) SchemeObject {
     if (fixnum_length >= 32) {
-        return ulongToFixnum(@as(c_ulong, h));
+        return ulongToFixnum(@as(usize, h));
     }
-    return ulongToFixnum((@as(c_ulong, h) >> fixnum_length) ^ (@as(c_ulong, h) & fixnum_mask));
+    return ulongToFixnum((@as(usize, h) >> fixnum_length) ^ (@as(usize, h) & fixnum_mask));
 }
 
-pub const flonum_size: c_ulong = bytesToWords(@sizeOf(f64));
+pub const flonum_size: usize = bytesToWords(@sizeOf(f64));
 
-pub inline fn floatingVectorLength(v: SchemeObject) c_ulong {
+pub inline fn floatingVectorLength(v: SchemeObject) usize {
     return vectorLength(v) / flonum_size;
 }
 
@@ -985,14 +985,14 @@ test "scheme_obj bit layout, fixnums, chars, and bytevector gc length" {
         try std.testing.expectEqual(@as(SchemeObject, 0x03FF_FFFF_FFFF_FFFF), datum_mask);
         const v = makeVectorHeader(17);
         try std.testing.expectEqual(tc_manifest_vector, objectType(v));
-        try std.testing.expectEqual(@as(c_ulong, 17), objectDatum(v));
+        try std.testing.expectEqual(@as(usize, 17), objectDatum(v));
         const nmv = makeNmvHeader(42);
         try std.testing.expectEqual(tc_manifest_nm_vector, objectType(nmv));
-        try std.testing.expectEqual(@as(c_ulong, 42), objectDatum(nmv));
+        try std.testing.expectEqual(@as(usize, 42), objectDatum(nmv));
     }
 
     // Fixnum sign-extension round trips
-    const samples = [_]c_long{ 0, 1, -1, 42, -42, smallest_fixnum, biggest_fixnum };
+    const samples = [_]isize{ 0, 1, -1, 42, -42, smallest_fixnum, biggest_fixnum };
     for (samples) |s| {
         try std.testing.expect(longToFixnumP(s));
         const fx = longToFixnum(s);
@@ -1000,7 +1000,7 @@ test "scheme_obj bit layout, fixnums, chars, and bytevector gc length" {
         try std.testing.expectEqual(s, fixnumToLong(fx));
         if (s >= 0) {
             try std.testing.expect(fixnumToUlongP(fx));
-            try std.testing.expectEqual(@as(c_ulong, @intCast(s)), fixnumToUlong(fx));
+            try std.testing.expectEqual(@as(usize, @intCast(s)), fixnumToUlong(fx));
         } else {
             try std.testing.expect(!fixnumToUlongP(fx));
         }
@@ -1011,16 +1011,16 @@ test "scheme_obj bit layout, fixnums, chars, and bytevector gc length" {
     // Character packing
     const ch = makeChar(0xA, 'Z');
     try std.testing.expect(characterP(ch));
-    try std.testing.expectEqual(@as(c_ulong, 0xA), charBits(ch));
-    try std.testing.expectEqual(@as(c_ulong, 'Z'), charCode(ch));
+    try std.testing.expectEqual(@as(usize, 0xA), charBits(ch));
+    try std.testing.expectEqual(@as(usize, 'Z'), charCode(ch));
     try std.testing.expect(!charToAsciiP(ch));
     const ascii_ch = asciiToChar('a');
     try std.testing.expect(charToAsciiP(ascii_ch));
-    try std.testing.expectEqual(@as(c_ulong, 'a'), charToAscii(ascii_ch));
+    try std.testing.expectEqual(@as(usize, 'a'), charToAscii(ascii_ch));
 
     // Bytevector GC length (subheader + ceil((nbytes + 1) / word_bytes))
-    try std.testing.expectEqual(@as(c_ulong, 2), bytevectorLengthToGcLength(0));
-    try std.testing.expectEqual(@as(c_ulong, 2), bytevectorLengthToGcLength(7));
-    try std.testing.expectEqual(@as(c_ulong, 3), bytevectorLengthToGcLength(8));
-    try std.testing.expectEqual(@as(c_ulong, 10), bytevectorLengthToGcLength(64));
+    try std.testing.expectEqual(@as(usize, 2), bytevectorLengthToGcLength(0));
+    try std.testing.expectEqual(@as(usize, 2), bytevectorLengthToGcLength(7));
+    try std.testing.expectEqual(@as(usize, 3), bytevectorLengthToGcLength(8));
+    try std.testing.expectEqual(@as(usize, 10), bytevectorLengthToGcLength(64));
 }

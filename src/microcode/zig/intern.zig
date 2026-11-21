@@ -7,11 +7,11 @@ const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
 const str = @import("string.zig");
 
-fn findSymbolInternal(length: c_ulong, name: ?[*]const u8) *obj.SchemeObject {
+fn findSymbolInternal(length: usize, name: ?[*]const u8) *obj.SchemeObject {
     const obarray = obj.vectorRef(abi.fixed_objects, abi.fixobj_obarray);
     const obarray_len = obj.vectorLength(obarray);
     const hash = abi.memory_hash(length, name);
-    var bucket = obj.vectorLoc(obarray, @intCast(@as(c_ulong, hash) % obarray_len));
+    var bucket = obj.vectorLoc(obarray, @intCast(@as(usize, hash) % obarray_len));
     while (true) {
         const list = bucket[0];
         if (obj.weakPairP(list) or obj.pairP(list)) {
@@ -34,7 +34,7 @@ fn findSymbolInternal(length: c_ulong, name: ?[*]const u8) *obj.SchemeObject {
     }
 }
 
-fn replaceSymbolBucketType(symbol: obj.SchemeObject, new_tc: c_ulong) void {
+fn replaceSymbolBucketType(symbol: obj.SchemeObject, new_tc: usize) void {
     if (obj.uninternedSymbolP(symbol)) return;
     std.debug.assert(obj.internedSymbolP(symbol));
 
@@ -43,7 +43,7 @@ fn replaceSymbolBucketType(symbol: obj.SchemeObject, new_tc: c_ulong) void {
     const length = obj.legacyStringLength(name);
     const char_pointer = obj.legacyStringData(name);
     const hash = abi.memory_hash(length, char_pointer);
-    var bucket = obj.vectorLoc(obarray, @intCast(@as(c_ulong, hash) % obj.vectorLength(obarray)));
+    var bucket = obj.vectorLoc(obarray, @intCast(@as(usize, hash) % obj.vectorLength(obarray)));
     while (true) {
         const list = bucket[0];
         std.debug.assert(obj.weakPairP(list) or obj.pairP(list));
@@ -78,12 +78,12 @@ fn makeSymbol(name: obj.SchemeObject, cell: *obj.SchemeObject) obj.SchemeObject 
     return symbol;
 }
 
-pub export fn find_symbol(length: c_ulong, name: ?[*]const u8) callconv(.c) obj.SchemeObject {
+pub export fn find_symbol(length: usize, name: ?[*]const u8) callconv(.c) obj.SchemeObject {
     const cell = findSymbolInternal(length, name);
     return if (obj.internedSymbolP(cell.*)) cell.* else obj.sharp_f;
 }
 
-pub export fn memory_to_symbol(length: c_ulong, name: ?*const anyopaque) callconv(.c) obj.SchemeObject {
+pub export fn memory_to_symbol(length: usize, name: ?*const anyopaque) callconv(.c) obj.SchemeObject {
     const cell = findSymbolInternal(length, @ptrCast(name));
     return if (obj.internedSymbolP(cell.*))
         cell.*
@@ -163,7 +163,7 @@ pub export fn Prim_string_hash_mod() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     abi.checkArg(1, str.string_p);
     const string = abi.argRef(1);
-    const h: c_ulong = abi.memory_hash(obj.legacyStringLength(string), obj.legacyStringData(string));
+    const h: usize = abi.memory_hash(obj.legacyStringLength(string), obj.legacyStringData(string));
     const denom = abi.arg_ulong_integer(2);
     if (denom == 0) abi.error_bad_range_arg(2);
     return obj.hashToFixnum(@intCast(h % denom));
@@ -195,7 +195,7 @@ test "intern symbol lookup, weak-pair pruning, strengthen/weaken, and string has
 
     // Strengthen then weaken symbol updates bucket pair tag
     const h = abi.memory_hash(3, "foo");
-    const bucket_idx: usize = @intCast(@as(c_ulong, h) % 17);
+    const bucket_idx: usize = @intCast(@as(usize, h) % 17);
     try std.testing.expect(obj.weakPairP(obj.vectorRef(obarray, bucket_idx)));
     strengthen_symbol(sym_foo);
     try std.testing.expect(obj.pairP(obj.vectorRef(obarray, bucket_idx)));
@@ -221,7 +221,7 @@ test "intern symbol lookup, weak-pair pruning, strengthen/weaken, and string has
     // STRING-HASH / STRING-HASH-MOD
     stubs.setArgs(&.{s_foo});
     const h_fx = Prim_string_hash();
-    try std.testing.expectEqual(@as(c_ulong, h), obj.fixnumToUlong(h_fx));
+    try std.testing.expectEqual(@as(usize, h), obj.fixnumToUlong(h_fx));
     stubs.setArgs(&.{ s_foo, obj.ulongToFixnum(97) });
-    try std.testing.expectEqual(@as(c_ulong, h % 97), obj.fixnumToUlong(Prim_string_hash_mod()));
+    try std.testing.expectEqual(@as(usize, h % 97), obj.fixnumToUlong(Prim_string_hash_mod()));
 }

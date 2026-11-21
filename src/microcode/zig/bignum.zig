@@ -7,9 +7,9 @@ const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
 const bits = @import("bits.zig");
 
-const BignumDigit = c_long;
-const UnsignedDigit = c_ulong;
-const BignumLength = c_long;
+const BignumDigit = isize;
+const UnsignedDigit = usize;
+const BignumLength = isize;
 
 const bignum_out_of_band: obj.SchemeObject = obj.sharp_f;
 
@@ -31,8 +31,8 @@ inline fn bignumAssert(ok: bool) void {
     if (!ok) abi.error_external_return();
 }
 
-inline fn bignumLengthToGcLength(length: BignumLength) c_ulong {
-    return obj.bytesToWords((@as(c_ulong, @intCast(length)) + 1) * @sizeOf(BignumDigit));
+inline fn bignumLengthToGcLength(length: BignumLength) usize {
+    return obj.bytesToWords((@as(usize, @intCast(length)) + 1) * @sizeOf(BignumDigit));
 }
 
 inline fn bignumToPointer(bignum: obj.SchemeObject) [*]UnsignedDigit {
@@ -972,32 +972,32 @@ fn bignumToUint(comptime U: type, bignum: obj.SchemeObject) U {
     return acc;
 }
 
-pub export fn long_to_bignum(n: c_long) callconv(.c) obj.SchemeObject {
-    return intToBignum(c_long, c_ulong, n);
+pub export fn long_to_bignum(n: isize) callconv(.c) obj.SchemeObject {
+    return intToBignum(isize, usize, n);
 }
 
 pub export fn intmax_to_bignum(n: i64) callconv(.c) obj.SchemeObject {
     return intToBignum(i64, u64, n);
 }
 
-pub export fn bignum_to_long(bignum: obj.SchemeObject) callconv(.c) c_long {
-    return bignumToInt(c_long, c_ulong, bignum);
+pub export fn bignum_to_long(bignum: obj.SchemeObject) callconv(.c) isize {
+    return bignumToInt(isize, usize, bignum);
 }
 
 pub export fn bignum_to_intmax(bignum: obj.SchemeObject) callconv(.c) i64 {
     return bignumToInt(i64, u64, bignum);
 }
 
-pub export fn ulong_to_bignum(n: c_ulong) callconv(.c) obj.SchemeObject {
-    return uintToBignum(c_ulong, n);
+pub export fn ulong_to_bignum(n: usize) callconv(.c) obj.SchemeObject {
+    return uintToBignum(usize, n);
 }
 
 pub export fn uintmax_to_bignum(n: u64) callconv(.c) obj.SchemeObject {
     return uintToBignum(u64, n);
 }
 
-pub export fn bignum_to_ulong(bignum: obj.SchemeObject) callconv(.c) c_ulong {
-    return bignumToUint(c_ulong, bignum);
+pub export fn bignum_to_ulong(bignum: obj.SchemeObject) callconv(.c) usize {
+    return bignumToUint(usize, bignum);
 }
 
 pub export fn bignum_to_uintmax(bignum: obj.SchemeObject) callconv(.c) u64 {
@@ -1143,7 +1143,7 @@ pub export fn bignum_to_double(bignum: obj.SchemeObject) callconv(.c) f64 {
 
 pub export fn bignum_fits_in_word_p(
     bignum: obj.SchemeObject,
-    word_length: c_long,
+    word_length: isize,
     twos_complement_p: c_int,
 ) callconv(.c) c_int {
     if (twos_complement_p == 0 and bignumNegativeP(bignum)) return 0;
@@ -1321,13 +1321,13 @@ pub export fn bignum_bitwise_nand(x: obj.SchemeObject, y: obj.SchemeObject) call
     return bitwiseCombine(.nand_op, x, y);
 }
 
-pub export fn bignum_length_in_bits(bignum: obj.SchemeObject) callconv(.c) c_ulong {
+pub export fn bignum_length_in_bits(bignum: obj.SchemeObject) callconv(.c) usize {
     if (bignumZeroP(bignum)) return 0;
     const index: usize = @intCast(bignumLength(bignum) - 1);
-    return @as(c_ulong, bits.ulongLengthInBits(bignumRef(bignum, index))) + (bignum_digit_length * @as(c_ulong, @intCast(index)));
+    return @as(usize, bits.ulongLengthInBits(bignumRef(bignum, index))) + (bignum_digit_length * @as(usize, @intCast(index)));
 }
 
-pub export fn bignum_integer_length(bignum: obj.SchemeObject) callconv(.c) c_ulong {
+pub export fn bignum_integer_length(bignum: obj.SchemeObject) callconv(.c) usize {
     const len_in_bits = bignum_length_in_bits(bignum);
     if (bignumZeroP(bignum) or bignumPositiveP(bignum)) return len_in_bits;
     const ptr = bignumStartPtr(bignum);
@@ -1339,7 +1339,7 @@ pub export fn bignum_integer_length(bignum: obj.SchemeObject) callconv(.c) c_ulo
     return if ((msd & (msd - 1)) == 0) len_in_bits - 1 else len_in_bits;
 }
 
-pub export fn bignum_first_set_bit(bignum: obj.SchemeObject) callconv(.c) c_long {
+pub export fn bignum_first_set_bit(bignum: obj.SchemeObject) callconv(.c) isize {
     if (bignumZeroP(bignum)) return -1;
     const ptr = bignumStartPtr(bignum);
     const len: usize = @intCast(bignumLength(bignum));
@@ -1353,27 +1353,27 @@ pub export fn bignum_first_set_bit(bignum: obj.SchemeObject) callconv(.c) c_long
     unreachable;
 }
 
-fn digitsBitCount(ptr: [*]const UnsignedDigit, count: usize) c_ulong {
-    var total: c_ulong = 0;
+fn digitsBitCount(ptr: [*]const UnsignedDigit, count: usize) usize {
+    var total: usize = 0;
     for (0..count) |i| {
         total += bits.ulongBitCount(ptr[i]);
     }
     return total;
 }
 
-fn digitsHammingDistance(x_ptr: [*]const UnsignedDigit, y_ptr: [*]const UnsignedDigit, count: usize) c_ulong {
-    var total: c_ulong = 0;
+fn digitsHammingDistance(x_ptr: [*]const UnsignedDigit, y_ptr: [*]const UnsignedDigit, count: usize) usize {
+    var total: usize = 0;
     for (0..count) |i| {
         total += bits.ulongBitCount(x_ptr[i] ^ y_ptr[i]);
     }
     return total;
 }
 
-fn bignumBitCountUnsigned(x: obj.SchemeObject) c_ulong {
+fn bignumBitCountUnsigned(x: obj.SchemeObject) usize {
     return digitsBitCount(bignumStartPtr(x), @intCast(bignumLength(x)));
 }
 
-fn bignumPositiveHammingDistance(x_in: obj.SchemeObject, y_in: obj.SchemeObject) c_ulong {
+fn bignumPositiveHammingDistance(x_in: obj.SchemeObject, y_in: obj.SchemeObject) usize {
     var x = x_in;
     var y = y_in;
     bignumAssert(!bignumZeroP(x) and !bignumZeroP(y) and bignumPositiveP(x) and bignumPositiveP(y));
@@ -1387,7 +1387,7 @@ fn bignumPositiveHammingDistance(x_in: obj.SchemeObject, y_in: obj.SchemeObject)
     return digitsHammingDistance(x_ptr, y_ptr, y_len) + digitsBitCount(x_ptr + y_len, x_len - y_len);
 }
 
-fn bignumNegativeHammingDistance(x_in: obj.SchemeObject, y_in: obj.SchemeObject) c_ulong {
+fn bignumNegativeHammingDistance(x_in: obj.SchemeObject, y_in: obj.SchemeObject) usize {
     const x = bignum_bitwise_not(x_in);
     const y = bignum_bitwise_not(y_in);
     if (bignumZeroP(x)) return bignumBitCountUnsigned(y);
@@ -1395,13 +1395,13 @@ fn bignumNegativeHammingDistance(x_in: obj.SchemeObject, y_in: obj.SchemeObject)
     return bignumPositiveHammingDistance(x, y);
 }
 
-pub export fn bignum_bit_count(x: obj.SchemeObject) callconv(.c) c_ulong {
+pub export fn bignum_bit_count(x: obj.SchemeObject) callconv(.c) usize {
     if (bignumZeroP(x)) return 0;
     if (bignumNegativeP(x)) return bignumBitCountUnsigned(bignum_bitwise_not(x));
     return bignumBitCountUnsigned(x);
 }
 
-pub export fn bignum_hamming_distance(x: obj.SchemeObject, y: obj.SchemeObject) callconv(.c) c_long {
+pub export fn bignum_hamming_distance(x: obj.SchemeObject, y: obj.SchemeObject) callconv(.c) isize {
     if (x == y) return 0;
     if (bignumZeroP(x)) return if (bignumNegativeP(y)) -1 else @intCast(bignumBitCountUnsigned(y));
     if (bignumZeroP(y)) return if (bignumNegativeP(x)) -1 else @intCast(bignumBitCountUnsigned(x));
@@ -1412,17 +1412,17 @@ pub export fn bignum_hamming_distance(x: obj.SchemeObject, y: obj.SchemeObject) 
     }
 }
 
-pub export fn bignum_nonnegative_one_bits(size: c_ulong, position: c_ulong) callconv(.c) obj.SchemeObject {
+pub export fn bignum_nonnegative_one_bits(size: usize, position: usize) callconv(.c) obj.SchemeObject {
     return bignum_shift_left(bignum_bitwise_not(bignum_shift_left(bignum_make_one(1), size)), position);
 }
 
-pub export fn bignum_negative_zero_bits(n: c_ulong, m: c_ulong) callconv(.c) obj.SchemeObject {
+pub export fn bignum_negative_zero_bits(n: usize, m: usize) callconv(.c) obj.SchemeObject {
     return bignum_bitwise_not(bignum_nonnegative_one_bits(n, m));
 }
 
-fn bignumShiftRightUnsigned(n: obj.SchemeObject, digits_arg: c_ulong, shift_bits: c_ulong) obj.SchemeObject {
+fn bignumShiftRightUnsigned(n: obj.SchemeObject, digits_arg: usize, shift_bits: usize) obj.SchemeObject {
     const n_len_raw = bignumLength(n);
-    if (digits_arg >= @as(c_ulong, @intCast(n_len_raw))) return bignum_make_zero();
+    if (digits_arg >= @as(usize, @intCast(n_len_raw))) return bignum_make_zero();
     const digits: usize = @intCast(digits_arg);
     const n_len: usize = @intCast(n_len_raw);
     const n_ptr = bignumStartPtr(n);
@@ -1456,10 +1456,10 @@ fn bignumShiftRightUnsigned(n: obj.SchemeObject, digits_arg: c_ulong, shift_bits
     return r;
 }
 
-pub export fn bignum_shift_right(n: obj.SchemeObject, m: c_ulong) callconv(.c) obj.SchemeObject {
+pub export fn bignum_shift_right(n: obj.SchemeObject, m: usize) callconv(.c) obj.SchemeObject {
     const digits = m / bignum_digit_length;
     const shift_bits = m % bignum_digit_length;
-    if (digits >= @as(c_ulong, @intCast(bignumLength(n)))) {
+    if (digits >= @as(usize, @intCast(bignumLength(n)))) {
         return if (bignumNegativeP(n)) bignum_make_one(1) else bignum_make_zero();
     }
     if (bignumNegativeP(n)) {
@@ -1468,10 +1468,10 @@ pub export fn bignum_shift_right(n: obj.SchemeObject, m: c_ulong) callconv(.c) o
     return bignumShiftRightUnsigned(n, digits, shift_bits);
 }
 
-pub export fn bignum_shift_left(n: obj.SchemeObject, m: c_ulong) callconv(.c) obj.SchemeObject {
+pub export fn bignum_shift_left(n: obj.SchemeObject, m: usize) callconv(.c) obj.SchemeObject {
     if (m == 0 or bignumZeroP(n)) return n;
     const ln: usize = @intCast(bignumLength(n));
-    const delta: c_ulong = bits.ulongLengthInBits(bignumRef(n, ln - 1));
+    const delta: usize = bits.ulongLengthInBits(bignumRef(n, ln - 1));
     const total = delta + m;
     const zeroes: usize = @intCast(m / bignum_digit_length);
     const shift: usize = @intCast(m % bignum_digit_length);
@@ -1497,10 +1497,10 @@ pub export fn bignum_shift_left(n: obj.SchemeObject, m: c_ulong) callconv(.c) ob
     return result;
 }
 
-pub export fn unsigned_long_to_shifted_bignum(n_in: c_ulong, m: c_ulong, sign: c_int) callconv(.c) obj.SchemeObject {
+pub export fn unsigned_long_to_shifted_bignum(n_in: usize, m: usize, sign: c_int) callconv(.c) obj.SchemeObject {
     if (n_in == 0) return bignum_make_zero();
     var n = n_in;
-    const delta: c_ulong = bits.ulongLengthInBits(n);
+    const delta: usize = bits.ulongLengthInBits(n);
     const total = delta + m;
     const zeroes: usize = @intCast(m / bignum_digit_length);
     const shift: usize = @intCast(m % bignum_digit_length);
@@ -1528,10 +1528,10 @@ pub export fn digit_stream_to_bignum(
     radix: c_uint,
     negative_p: c_int,
 ) callconv(.c) obj.SchemeObject {
-    bignumAssert(@as(c_ulong, radix) > 1 and @as(c_ulong, radix) <= bignum_radix_root);
+    bignumAssert(@as(usize, radix) > 1 and @as(usize, radix) <= bignum_radix_root);
     if (n_digits_in == 0) return bignum_make_zero();
     if (n_digits_in == 1) {
-        const digit: c_long = @intCast(producer(context));
+        const digit: isize = @intCast(producer(context));
         return long_to_bignum(if (negative_p != 0) -digit else digit);
     }
     const total_bits: usize = @as(usize, n_digits_in) * @as(usize, bits.ulongLengthInBits(radix));
@@ -1548,10 +1548,10 @@ pub export fn digit_stream_to_bignum(
 pub export fn bignum_to_digit_stream(
     bignum: obj.SchemeObject,
     radix: c_uint,
-    consumer: *const fn (?*anyopaque, c_long) callconv(.c) void,
+    consumer: *const fn (?*anyopaque, isize) callconv(.c) void,
     context: ?*anyopaque,
 ) callconv(.c) void {
-    bignumAssert(@as(c_ulong, radix) > 1 and @as(c_ulong, radix) <= bignum_radix_root);
+    bignumAssert(@as(usize, radix) > 1 and @as(usize, radix) <= bignum_radix_root);
     if (bignumZeroP(bignum)) return;
     const working_copy = bignumCopy(bignum);
     const start = bignumStartPtr(working_copy);
@@ -1565,7 +1565,7 @@ pub export fn bignum_to_digit_stream(
     }
 }
 
-pub export fn bignum_max_digit_stream_radix() callconv(.c) c_long {
+pub export fn bignum_max_digit_stream_radix() callconv(.c) isize {
     return @intCast(bignum_radix_root);
 }
 
@@ -1582,15 +1582,15 @@ test "bignum arithmetic, division, conversions, floats, and bitwise operations" 
     try std.testing.expectEqual(@as(c_int, 1), bignum_test(neg_one));
     try std.testing.expectEqual(@as(c_int, 1), bignum_equal_p(one, bignum_negate(neg_one)));
 
-    const min_l = std.math.minInt(c_long);
-    const max_ul = std.math.maxInt(c_ulong);
+    const min_l = std.math.minInt(isize);
+    const max_ul = std.math.maxInt(usize);
     const b_min_l = long_to_bignum(min_l);
     const b_max_ul = ulong_to_bignum(max_ul);
     try std.testing.expectEqual(min_l, bignum_to_long(b_min_l));
     try std.testing.expectEqual(max_ul, bignum_to_ulong(b_max_ul));
-    try std.testing.expectEqual(@as(c_int, 1), bignum_fits_in_word_p(b_min_l, @bitSizeOf(c_long), 1));
-    try std.testing.expectEqual(@as(c_int, 0), bignum_fits_in_word_p(bignum_subtract(b_min_l, one), @bitSizeOf(c_long), 1));
-    try std.testing.expectEqual(@as(c_int, 1), bignum_fits_in_word_p(b_max_ul, @bitSizeOf(c_ulong), 0));
+    try std.testing.expectEqual(@as(c_int, 1), bignum_fits_in_word_p(b_min_l, @bitSizeOf(isize), 1));
+    try std.testing.expectEqual(@as(c_int, 0), bignum_fits_in_word_p(bignum_subtract(b_min_l, one), @bitSizeOf(isize), 1));
+    try std.testing.expectEqual(@as(c_int, 1), bignum_fits_in_word_p(b_max_ul, @bitSizeOf(usize), 0));
 
     // Multi-digit arithmetic + small/medium/Knuth D division
     const a = bignum_shift_left(b_max_ul, 70);
@@ -1604,7 +1604,7 @@ test "bignum arithmetic, division, conversions, floats, and bitwise operations" 
     try std.testing.expectEqual(@as(c_int, 1), bignum_equal_p(prod, bignum_add(bignum_multiply(q, long_to_bignum(97)), r)));
 
     // Medium divisor (bignum_radix_root <= d < bignum_radix)
-    const med_d = ulong_to_bignum((@as(c_ulong, 1) << 40) + 1337);
+    const med_d = ulong_to_bignum((@as(usize, 1) << 40) + 1337);
     try std.testing.expectEqual(@as(c_int, 0), bignum_divide(prod, med_d, &q, &r));
     try std.testing.expectEqual(@as(c_int, 1), bignum_equal_p(prod, bignum_add(bignum_multiply(q, med_d), r)));
 
@@ -1629,21 +1629,21 @@ test "bignum arithmetic, division, conversions, floats, and bitwise operations" 
     // Bitwise, shifts, bit lengths & counts
     const p62 = bignum_shift_left(one, 62);
     const neg_p62 = bignum_negate(p62);
-    try std.testing.expectEqual(@as(c_ulong, 63), bignum_length_in_bits(neg_p62));
-    try std.testing.expectEqual(@as(c_ulong, 62), bignum_integer_length(neg_p62));
-    try std.testing.expectEqual(@as(c_ulong, 63), bignum_integer_length(bignum_subtract(neg_p62, one)));
+    try std.testing.expectEqual(@as(usize, 63), bignum_length_in_bits(neg_p62));
+    try std.testing.expectEqual(@as(usize, 62), bignum_integer_length(neg_p62));
+    try std.testing.expectEqual(@as(usize, 63), bignum_integer_length(bignum_subtract(neg_p62, one)));
     try std.testing.expectEqual(@as(c_int, 1), bignum_equal_p(neg_one, bignum_shift_right(neg_p62, 62)));
     try std.testing.expectEqual(@as(c_int, 1), bignum_equal_p(neg_one, bignum_shift_right(neg_p62, 63)));
-    try std.testing.expectEqual(@as(c_long, 62), bignum_first_set_bit(neg_p62));
-    try std.testing.expectEqual(@as(c_ulong, 62), bignum_bit_count(neg_p62));
-    try std.testing.expectEqual(@as(c_long, -1), bignum_hamming_distance(p62, neg_p62));
-    try std.testing.expectEqual(@as(c_long, 62), bignum_hamming_distance(neg_p62, neg_one));
+    try std.testing.expectEqual(@as(isize, 62), bignum_first_set_bit(neg_p62));
+    try std.testing.expectEqual(@as(usize, 62), bignum_bit_count(neg_p62));
+    try std.testing.expectEqual(@as(isize, -1), bignum_hamming_distance(p62, neg_p62));
+    try std.testing.expectEqual(@as(isize, 62), bignum_hamming_distance(neg_p62, neg_one));
 
     // Digit stream roundtrip
     const Ctx = struct {
         digits: [4]c_uint = .{ 1, 2, 3, 4 },
         idx: usize = 0,
-        out: [16]c_long = undefined,
+        out: [16]isize = undefined,
         out_len: usize = 0,
     };
     var ctx = Ctx{};
@@ -1656,14 +1656,14 @@ test "bignum arithmetic, division, conversions, floats, and bitwise operations" 
         }
     }.next;
     const cons_fn = struct {
-        fn emit(p: ?*anyopaque, d: c_long) callconv(.c) void {
+        fn emit(p: ?*anyopaque, d: isize) callconv(.c) void {
             const c: *Ctx = @ptrCast(@alignCast(p.?));
             c.out[c.out_len] = d;
             c.out_len += 1;
         }
     }.emit;
     const from_stream = digit_stream_to_bignum(4, &prod_fn, &ctx, 10, 0);
-    try std.testing.expectEqual(@as(c_long, 1234), bignum_to_long(from_stream));
+    try std.testing.expectEqual(@as(isize, 1234), bignum_to_long(from_stream));
     bignum_to_digit_stream(from_stream, 10, &cons_fn, &ctx);
-    try std.testing.expectEqualSlices(c_long, &.{ 4, 3, 2, 1 }, ctx.out[0..ctx.out_len]);
+    try std.testing.expectEqualSlices(isize, &.{ 4, 3, 2, 1 }, ctx.out[0..ctx.out_len]);
 }

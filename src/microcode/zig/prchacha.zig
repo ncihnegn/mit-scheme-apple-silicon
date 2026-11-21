@@ -21,21 +21,21 @@ fn doChachaCore(
     comptime selftest_fn: fn () callconv(.c) c_int,
     selftestedp: *bool,
 ) void {
-    var noutput: c_ulong = 0;
+    var noutput: usize = 0;
     const output = abi.arg_bytevector(1, &noutput);
     if (noutput < chacha.output_bytes) abi.error_bad_range_arg(1);
 
     const offset: usize = @intCast(abi.arg_ulong_index_integer(2, noutput - chacha.output_bytes + 1));
 
-    var ninput: c_ulong = 0;
+    var ninput: usize = 0;
     const input = abi.arg_bytevector(3, &ninput);
     if (ninput != chacha.input_bytes) abi.error_bad_range_arg(3);
 
-    var nkey: c_ulong = 0;
+    var nkey: usize = 0;
     const key = abi.arg_bytevector(4, &nkey);
     if (nkey != chacha.key_bytes) abi.error_bad_range_arg(4);
 
-    var nconstant: c_ulong = 0;
+    var nconstant: usize = 0;
     const constant = abi.arg_bytevector(5, &nconstant);
     if (nconstant != chacha.const_bytes) abi.error_bad_range_arg(5);
 

@@ -122,7 +122,7 @@ pub fn writeCcEntryOffset(ceo: *abi.CcEntryOffset, address: [*]u8) callconv(.c) 
     return false;
 }
 
-pub fn compiledClosureCount(block: [*]obj.SchemeObject) callconv(.c) c_ulong {
+pub fn compiledClosureCount(block: [*]obj.SchemeObject) callconv(.c) usize {
     return @intCast(readU16(@ptrCast(block)));
 }
 
@@ -167,15 +167,15 @@ pub fn writeUuoTarget(target: [*]u8, saddr: [*]obj.SchemeObject) callconv(.c) vo
     saddr[1] = @intCast(@intFromPtr(target));
 }
 
-pub fn trampolineEntrySize(n_entries: c_ulong) callconv(.c) c_ulong {
+pub fn trampolineEntrySize(n_entries: usize) callconv(.c) usize {
     return obj.bytesToWords(n_entries * (cc_entry_header_size + 2));
 }
 
-pub fn trampolineEntryAddr(block: [*]obj.SchemeObject, index: c_ulong) callconv(.c) [*]u8 {
+pub fn trampolineEntryAddr(block: [*]obj.SchemeObject, index: usize) callconv(.c) [*]u8 {
     return @as([*]u8, @ptrCast(block + 2)) + (@as(usize, @intCast(index)) * (cc_entry_header_size + 2)) + cc_entry_header_size;
 }
 
-pub fn trampolineReturnAddr(block: [*]obj.SchemeObject, index: c_ulong) callconv(.c) [*]u8 {
+pub fn trampolineReturnAddr(block: [*]obj.SchemeObject, index: usize) callconv(.c) [*]u8 {
     return trampolineEntryAddr(block, index);
 }
 
@@ -253,7 +253,7 @@ test "svm1 cc_entry type/offset, closure layout, uuo links, and trampolines" {
     var closure_ceo: abi.CcEntryOffset = undefined;
     try std.testing.expect(!readCcEntryOffset(&closure_ceo, closure_entry));
     try std.testing.expectEqual(
-        @as(c_ulong, @sizeOf(obj.SchemeObject) + closure_entry_offset + 2 * closure_entry_size),
+        @as(usize, @sizeOf(obj.SchemeObject) + closure_entry_offset + 2 * closure_entry_size),
         closure_ceo.offset,
     );
     try std.testing.expect(!closure_ceo.continued_p);
@@ -281,7 +281,7 @@ test "svm1 cc_entry type/offset, closure layout, uuo links, and trampolines" {
     try std.testing.expect(!writeCcEntryOffset(&ceo, entry));
     var got_ceo: abi.CcEntryOffset = undefined;
     try std.testing.expect(!readCcEntryOffset(&got_ceo, entry));
-    try std.testing.expectEqual(@as(c_ulong, 120), got_ceo.offset);
+    try std.testing.expectEqual(@as(usize, 120), got_ceo.offset);
     try std.testing.expect(got_ceo.continued_p);
 
     // 64-bit closure layout matching svm1.c doc comment (lines 220-247)
@@ -289,7 +289,7 @@ test "svm1 cc_entry type/offset, closure layout, uuo links, and trampolines" {
     const block = cwords[1..].ptr;
     writeU16(3, @ptrCast(block));
     var cur = compiledClosureStart(block);
-    try std.testing.expectEqual(@as(c_ulong, 3), compiledClosureCount(block));
+    try std.testing.expectEqual(@as(usize, 3), compiledClosureCount(block));
     try std.testing.expectEqual(@as(usize, @intFromPtr(&cwords[1])) + closure_entry_start, @intFromPtr(cur));
     // Place ENTER_CLOSURE + index 0, 1, 2
     for (0..3) |i| {
