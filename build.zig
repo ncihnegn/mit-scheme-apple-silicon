@@ -131,6 +131,7 @@ const zig_prim_sources = [_][]const u8{
     "src/microcode/zig/prospty.zig",
     "src/microcode/zig/prosterm.zig",
     "src/microcode/zig/prostty.zig",
+    "src/microcode/zig/pruxdld.zig",
     "src/microcode/zig/pruxio.zig",
     "src/microcode/zig/pruxsock.zig",
     "src/microcode/zig/purify.zig",
@@ -647,7 +648,6 @@ pub fn build(b: *std.Build) void {
     }
 
     scheme_c_sources.appendSlice(b.allocator, &.{
-        "src/microcode/pruxdld.c",
         "src/microcode/pruxffi.c",
         "src/microcode/cmpint.c",
         cmpintmd_c,
