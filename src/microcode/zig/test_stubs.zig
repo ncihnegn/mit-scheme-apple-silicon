@@ -32,6 +32,7 @@ comptime {
 }
 
 pub export var compiler_processor_type: c_uint = abi.compiler_aarch64_type;
+pub export var compiler_interface_version: c_uint = 4;
 pub export var current_gc_table: ?*anyopaque = null;
 var mock_saved_argv = [_]?[*:0]const u8{ "scheme", "--batch-mode", null };
 var mock_unused_argv = [_]?[*:0]const u8{ "--extra", null };
@@ -75,6 +76,7 @@ pub fn resetMockRuntime() void {
     mock_trap_state = 4;
     mock_under_emacs = 0;
     compiler_processor_type = abi.compiler_aarch64_type;
+    compiler_interface_version = 4;
     boot.OS_Name = "unix";
     boot.OS_Variant = "macOS";
     boot.scheme_program_name = "mit-scheme-unit";
@@ -481,6 +483,7 @@ pub export fn update_weak_pointers() callconv(.c) void {
 comptime {
     if (build_options.cc_is_native and builtin.cpu.arch == .aarch64) {
         @export(&mockAarch64FlushICache, .{ .name = "aarch64_flush_i_cache" });
+        @export(&mockAarch64FlushICacheRegion, .{ .name = "aarch64_flush_i_cache_region" });
     }
     if (build_options.debugging) {
         @export(&mockDebugVerifyHeap, .{ .name = "debug_verify_heap" });
@@ -492,6 +495,10 @@ comptime {
 }
 
 fn mockAarch64FlushICache() callconv(.c) void {
+    mock_icache_flush_calls += 1;
+}
+
+fn mockAarch64FlushICacheRegion(_: [*]obj.SchemeObject, _: usize) callconv(.c) void {
     mock_icache_flush_calls += 1;
 }
 
@@ -640,4 +647,28 @@ fn mockBkptP(_: ?*anyopaque) callconv(.c) bool {
 
 fn mockBkptProceed(_: ?*anyopaque, _: obj.SchemeObject, state: obj.SchemeObject) callconv(.c) obj.SchemeObject {
     return state;
+}
+
+pub export fn compiler_reset(utilities: obj.SchemeObject) callconv(.c) void {
+    _ = utilities;
+}
+
+pub export fn abort_to_interpreter_argument() callconv(.c) c_int {
+    return @intCast(abi.err_fasl_file_bad_data);
+}
+
+pub export fn initialize_gc_table(table: *abi.GcTable, _: bool) callconv(.c) void {
+    table.* = std.mem.zeroes(abi.GcTable);
+}
+
+pub export fn gc_handle_non_pointer(scan: [*]obj.SchemeObject, _: obj.SchemeObject) callconv(.c) [*]obj.SchemeObject {
+    return scan + 1;
+}
+
+pub export fn gc_handle_pair(scan: [*]obj.SchemeObject, _: obj.SchemeObject) callconv(.c) [*]obj.SchemeObject {
+    return scan + 1;
+}
+
+pub export fn gc_handle_unaligned_vector(scan: [*]obj.SchemeObject, _: obj.SchemeObject) callconv(.c) [*]obj.SchemeObject {
+    return scan + 1;
 }

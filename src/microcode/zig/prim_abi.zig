@@ -2,6 +2,7 @@
 // Copyright (C) 1986-2022 Massachusetts Institute of Technology
 // Licensed under the GNU General Public License (GPL v2 or later); see src/COPYING.
 
+const std = @import("std");
 const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 
@@ -27,11 +28,13 @@ pub const int_suspend: c_ulong = 0x0100;
 pub const int_mask: c_ulong = (@as(c_ulong, 1) << 16) - 1;
 pub const max_interrupt_number: c_ulong = 0xF;
 
+pub const term_disk_restore: c_int = 0x01;
 pub const term_bad_stack: c_int = 0x06;
 pub const term_stack_overflow: c_int = 0x07;
 pub const term_no_interrupt_handler: c_int = 0x0A;
 pub const term_exit: c_int = 0x0C;
 pub const term_no_space: c_int = 0x15;
+pub const max_error: c_int = 0x3F;
 pub const err_bad_error_code: c_long = 0x00;
 pub const err_unbound_variable: c_long = 0x01;
 pub const err_unassigned_variable: c_long = 0x02;
@@ -48,6 +51,8 @@ pub const err_arg_1_bad_range: c_long = 0x10;
 pub const err_arg_2_bad_range: c_long = 0x11;
 pub const err_arg_3_bad_range: c_long = 0x12;
 pub const err_macro_binding: c_long = 0x13;
+pub const err_fasl_file_too_big: c_long = 0x17;
+pub const err_fasl_file_bad_data: c_long = 0x18;
 pub const err_out_of_file_handles: c_long = 0x20;
 pub const err_arg_4_bad_range: c_long = 0x22;
 pub const err_arg_5_bad_range: c_long = 0x23;
@@ -67,6 +72,8 @@ pub const err_floating_overflow: c_long = 0x32;
 pub const err_unimplemented_primitive: c_long = 0x33;
 pub const err_illegal_reference_trap: c_long = 0x34;
 pub const err_wrong_arity_primitives: c_long = 0x36;
+pub const err_fasload_band: c_long = 0x39;
+pub const err_fasload_compiled_mismatch: c_long = 0x3A;
 pub const err_process_terminated: c_long = 0x3F;
 pub const prim_done: c_long = -1;
 pub const prim_do_expression: c_long = -2;
@@ -404,8 +411,39 @@ pub extern "c" fn record_applicator(obj.SchemeObject) obj.SchemeObject;
 pub const GcTospaceAllocator = *const fn (c_ulong, *?[*]obj.SchemeObject, *?[*]obj.SchemeObject) callconv(.c) void;
 pub const GcAbortHandler = *const fn () callconv(.c) noreturn;
 pub const GcWalkProc = *const fn ([*]obj.SchemeObject, [*]obj.SchemeObject, ?*anyopaque) callconv(.c) bool;
+pub const GcHandler = *const fn ([*]obj.SchemeObject, obj.SchemeObject) callconv(.c) [*]obj.SchemeObject;
+pub const GcTupleHandler = *const fn (obj.SchemeObject, c_uint) callconv(.c) obj.SchemeObject;
+pub const GcVectorHandler = *const fn (obj.SchemeObject, bool) callconv(.c) obj.SchemeObject;
+pub const GcObjectHandler = *const fn (obj.SchemeObject) callconv(.c) obj.SchemeObject;
+pub const GcPrecheckFrom = *const fn ([*]obj.SchemeObject) callconv(.c) ?[*]obj.SchemeObject;
+pub const GcTransportWords = *const fn ([*]obj.SchemeObject, c_ulong, bool) callconv(.c) [*]obj.SchemeObject;
+pub const GcIgnoreObjectP = *const fn (obj.SchemeObject) callconv(.c) bool;
+pub const GcRawAddressToObject = *const fn (c_uint, [*]obj.SchemeObject) callconv(.c) obj.SchemeObject;
+pub const GcObjectToRawAddress = *const fn (obj.SchemeObject) callconv(.c) [*]obj.SchemeObject;
+pub const GcRawAddressToCcEntry = *const fn (?*anyopaque) callconv(.c) obj.SchemeObject;
+pub const GcCcEntryToRawAddress = *const fn (obj.SchemeObject) callconv(.c) ?*anyopaque;
+
+pub const GcTable = extern struct {
+    handlers: [64]?GcHandler,
+    tuple_handler: ?GcTupleHandler,
+    vector_handler: ?GcVectorHandler,
+    cc_entry_handler: ?GcObjectHandler,
+    cc_return_handler: ?GcObjectHandler,
+    precheck_from: ?GcPrecheckFrom,
+    transport_words: ?GcTransportWords,
+    ignore_object_p: ?GcIgnoreObjectP,
+    raw_address_to_object: ?GcRawAddressToObject,
+    object_to_raw_address: ?GcObjectToRawAddress,
+    raw_address_to_cc_entry: ?GcRawAddressToCcEntry,
+    cc_entry_to_raw_address: ?GcCcEntryToRawAddress,
+};
+
+comptime {
+    std.debug.assert(@sizeOf(GcTable) == 75 * @sizeOf(usize));
+}
 
 pub extern var compiler_utilities: obj.SchemeObject;
+pub extern var compiler_interface_version: c_uint;
 pub extern "c" fn OS_malloc_init(usize) ?*anyopaque;
 pub extern "c" fn outf_flush_fatal() void;
 pub extern "c" fn initialize_gc(c_ulong, *?[*]obj.SchemeObject, *?[*]obj.SchemeObject, GcTospaceAllocator, GcAbortHandler) void;
@@ -414,6 +452,7 @@ pub extern "c" fn tospace_to_newspace(?*anyopaque) ?*anyopaque;
 pub extern "c" fn gc_scan_oldspace([*]obj.SchemeObject, [*]obj.SchemeObject) void;
 pub extern "c" fn gc_drain_tospace_and_code_arena([*]obj.SchemeObject) void;
 pub extern "c" fn aarch64_flush_i_cache() void;
+pub extern "c" fn aarch64_flush_i_cache_region([*]obj.SchemeObject, usize) void;
 pub extern "c" fn debug_verify_heap() void;
 pub extern "c" fn std_gc_death([*:0]const u8, ...) noreturn;
 pub extern "c" fn initialize_gc_object_references() void;
@@ -422,6 +461,12 @@ pub extern "c" fn collect_gc_object_references(obj.SchemeObject, obj.SchemeObjec
 pub extern "c" fn init_exit_scheme() void;
 pub extern "c" fn read_command_line_options(c_int, [*]?[*:0]const u8) void;
 pub extern "c" fn compiler_initialize(bool) void;
+pub extern "c" fn compiler_reset(obj.SchemeObject) void;
+pub extern "c" fn abort_to_interpreter_argument() c_int;
+pub extern "c" fn initialize_gc_table(*GcTable, bool) void;
+pub extern "c" fn gc_handle_non_pointer([*]obj.SchemeObject, obj.SchemeObject) [*]obj.SchemeObject;
+pub extern "c" fn gc_handle_pair([*]obj.SchemeObject, obj.SchemeObject) [*]obj.SchemeObject;
+pub extern "c" fn gc_handle_unaligned_vector([*]obj.SchemeObject, obj.SchemeObject) [*]obj.SchemeObject;
 pub extern "c" fn OS_initialize() void;
 pub extern "c" fn OS_announcement() void;
 pub extern "c" fn Interpret() void;

@@ -280,7 +280,7 @@ pub export fn std_gc_pt1() callconv(.c) void {
     abi.update_weak_pointers();
 }
 
-fn ccTransportEnd() void {
+pub fn ccTransportEnd() void {
     if (build_options.cc_support) {
         abi.Registers[abi.regblock_closure_free] = 0;
         abi.Registers[abi.regblock_closure_space] = 0;
