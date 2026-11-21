@@ -48,6 +48,27 @@ _\name:
 	adrp	\reg, _\name@PAGE
 	add	\reg, \reg, #_\name@PAGEOFF
 .endm
+#elif defined(_WIN32)
+#  define SYMBOL(x) x
+
+.macro GLOBAL name
+	.globl	\name
+	.p2align 2
+\name:
+.endm
+
+.macro LOCAL name
+	.p2align 2
+\name:
+.endm
+
+.macro END name
+.endm
+
+.macro ADRL reg, name
+	adrp	\reg, \name
+	add	\reg, \reg, #:lo12:\name
+.endm
 #else
 #  define SYMBOL(x) x
 
@@ -137,6 +158,25 @@ _\name:
 	//	3. Defer to interface_to_scheme.
 	//
 GLOBAL C_to_interface
+#ifdef _WIN32
+	// Push frame and save frame pointer, return address, and
+	// Windows ARM64 callee-saved GPRs (x19-x28) and FPRs (d8-d15).
+	stp	fp, lr, [sp,#-160]!
+
+	// Set our own frame pointer for fun.
+	mov	fp, sp
+
+	// Save callee-saves registers.
+	stp	x19, x20, [sp,#16]
+	stp	x21, x22, [sp,#32]
+	stp	x23, x24, [sp,#48]
+	stp	x25, x26, [sp,#64]
+	stp	x27, x28, [sp,#80]
+	stp	d8, d9, [sp,#96]
+	stp	d10, d11, [sp,#112]
+	stp	d12, d13, [sp,#128]
+	stp	d14, d15, [sp,#144]
+#else
 	// Push frame and save frame pointer and return address.
 	stp	fp, lr, [sp,#-96]!
 
@@ -149,6 +189,7 @@ GLOBAL C_to_interface
 	stp	x23, x24, [sp,#48]
 	stp	x25, x26, [sp,#64]
 	stp	x27, x28, [sp,#80]
+#endif
 
 	// Fast path: skip the expensive W^X execute-mode restore when
 	// jit_write_depth is already zero (maintained by jit_write_end
@@ -203,6 +244,21 @@ GLOBAL interface_to_C
 	// Set return value.
 	mov	x0, x1
 
+#ifdef _WIN32
+	// Restore callee-saves registers.
+	ldp	d8, d9, [sp,#96]
+	ldp	d10, d11, [sp,#112]
+	ldp	d12, d13, [sp,#128]
+	ldp	d14, d15, [sp,#144]
+	ldp	x19, x20, [sp,#16]
+	ldp	x21, x22, [sp,#32]
+	ldp	x23, x24, [sp,#48]
+	ldp	x25, x26, [sp,#64]
+	ldp	x27, x28, [sp,#80]
+
+	// Restore frame pointer and return address and pop frame.
+	ldp	fp, lr, [sp],#160
+#else
 	// Restore callee-saves registers.
 	ldp	x19, x20, [sp,#16]
 	ldp	x21, x22, [sp,#32]
@@ -212,6 +268,7 @@ GLOBAL interface_to_C
 
 	// Restore frame pointer and return address and pop frame.
 	ldp	fp, lr, [sp],#96
+#endif
 
 	// And we're done.
 	ret

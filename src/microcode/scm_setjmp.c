@@ -25,6 +25,13 @@ USA.
 
 */
 
+#ifdef _WIN32
+/* Native compiled-code transitions (C_to_interface / scheme_to_interface)
+   do not emit SEH unwind tables; use MinGW's non-SEH setjmp/longjmp so
+   unwinding out of compiled code does not invoke RtlUnwindEx. */
+#  define __USE_MINGW_SETJMP_NON_SEH 1
+#endif
+
 #include <setjmp.h>
 
 extern void scm_setjmp_loop (void **, void (*) (int, void *), void *);
