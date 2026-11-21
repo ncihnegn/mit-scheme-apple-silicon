@@ -73,6 +73,12 @@ pub var mock_pty_ops: usize = 0;
 pub export var OS_process_table_size: abi.Tprocess = 4;
 var mock_proc_valid: [4]bool = @splat(false);
 pub var mock_last_proc_sig: c_int = 0;
+pub var mock_sock_accept_none: bool = false;
+pub var mock_last_sock_shutdown: c_ulong = 0;
+pub var mock_sock_listen_calls: usize = 0;
+var mock_host_addr_1: [4]u8 = .{ 127, 0, 0, 1 };
+var mock_host_addr_2: [4]u8 = .{ 10, 0, 0, 2 };
+var mock_host_addrs = [_]?[*]u8{ &mock_host_addr_1, &mock_host_addr_2, null };
 pub var mock_write_var_cache_calls: usize = 0;
 pub var mock_make_uuo_link_calls: usize = 0;
 pub var mock_apply_compiled_calls: usize = 0;
@@ -167,6 +173,9 @@ pub fn resetMockRuntime() void {
     OS_process_table_size = 4;
     mock_proc_valid = @splat(false);
     mock_last_proc_sig = 0;
+    mock_sock_accept_none = false;
+    mock_last_sock_shutdown = 0;
+    mock_sock_listen_calls = 0;
     storage.memory_block_end = null;
     storage.heap_reserved = 0;
     storage.ephemeron_array = obj.sharp_f;
@@ -1129,3 +1138,98 @@ pub export fn OS_process_hangup(_: abi.Tprocess) callconv(.c) void {}
 pub export fn OS_process_continue_background(_: abi.Tprocess) callconv(.c) void {}
 pub export fn OS_process_continue_foreground(_: abi.Tprocess) callconv(.c) void {}
 pub export fn OS_process_wait(_: abi.Tprocess) callconv(.c) void {}
+
+fn mockDupCString(s: []const u8) [*:0]const u8 {
+    const mem: [*]u8 = @ptrCast(OS_malloc(s.len + 1).?);
+    @memcpy(mem[0..s.len], s);
+    mem[s.len] = 0;
+    return @ptrCast(mem);
+}
+
+pub export fn UX_channel_descriptor(ch: abi.Tchannel) callconv(.c) c_int {
+    return @intCast(ch + 10);
+}
+pub export fn OS_open_tcp_stream_socket(_: ?*anyopaque, _: c_uint) callconv(.c) abi.Tchannel {
+    const ch: abi.Tchannel = 7;
+    setMockChannel(ch, @intFromEnum(abi.ChannelType.tcp_stream_socket), false);
+    return ch;
+}
+pub export fn OS_shutdown_socket(_: abi.Tchannel, action: c_ulong) callconv(.c) void {
+    mock_last_sock_shutdown = action;
+}
+pub export fn OS_get_service_by_name(service: [*:0]const u8, _: [*:0]const u8) callconv(.c) c_int {
+    const name = std.mem.span(service);
+    if (std.mem.eql(u8, name, "http")) return 80 << 8;
+    return -1;
+}
+pub export fn OS_get_service_by_number(port: c_ulong) callconv(.c) c_ulong {
+    return ((port & 0xff) << 8) | ((port >> 8) & 0xff);
+}
+pub export fn OS_host_address_length() callconv(.c) c_uint {
+    return 4;
+}
+pub export fn OS_get_host_by_name(name: [*:0]const u8) callconv(.c) ?[*]?[*]u8 {
+    if (std.mem.eql(u8, std.mem.span(name), "missing.invalid")) return null;
+    return &mock_host_addrs;
+}
+pub export fn OS_get_host_name() callconv(.c) ?[*:0]const u8 {
+    return mockDupCString("mock-host");
+}
+pub export fn OS_canonical_host_name(name: [*:0]const u8) callconv(.c) ?[*:0]const u8 {
+    if (std.mem.eql(u8, std.mem.span(name), "missing.invalid")) return null;
+    return mockDupCString("mock-host.local");
+}
+pub export fn OS_get_host_by_address(addr: [*:0]const u8) callconv(.c) ?[*:0]const u8 {
+    _ = addr;
+    return mockDupCString("localhost");
+}
+pub export fn OS_host_address_any(addr: ?*anyopaque) callconv(.c) void {
+    const dst: [*]u8 = @ptrCast(addr.?);
+    @memset(dst[0..4], 0);
+}
+pub export fn OS_host_address_loopback(addr: ?*anyopaque) callconv(.c) void {
+    const dst: [*]u8 = @ptrCast(addr.?);
+    dst[0] = 127;
+    dst[1] = 0;
+    dst[2] = 0;
+    dst[3] = 1;
+}
+pub export fn OS_open_unix_stream_socket(_: [*:0]const u8, _: c_int) callconv(.c) abi.Tchannel {
+    const ch: abi.Tchannel = 8;
+    setMockChannel(ch, @intFromEnum(abi.ChannelType.unix_stream_socket), false);
+    return ch;
+}
+pub export fn OS_create_unix_server_socket(_: [*:0]const u8, _: c_int) callconv(.c) abi.Tchannel {
+    if (mock_sock_accept_none) return abi.no_channel;
+    const ch: abi.Tchannel = 9;
+    setMockChannel(ch, @intFromEnum(abi.ChannelType.unix_server_socket), false);
+    return ch;
+}
+pub export fn OS_unix_server_connection_accept(_: abi.Tchannel) callconv(.c) abi.Tchannel {
+    if (mock_sock_accept_none) return abi.no_channel;
+    const ch: abi.Tchannel = 10;
+    setMockChannel(ch, @intFromEnum(abi.ChannelType.unix_stream_socket), false);
+    return ch;
+}
+pub export fn OS_create_tcp_server_socket() callconv(.c) abi.Tchannel {
+    const ch: abi.Tchannel = 11;
+    setMockChannel(ch, @intFromEnum(abi.ChannelType.tcp_server_socket), false);
+    return ch;
+}
+pub export fn OS_bind_tcp_server_socket(_: abi.Tchannel, _: ?*anyopaque, _: c_uint) callconv(.c) void {}
+pub export fn OS_listen_tcp_server_socket(_: abi.Tchannel) callconv(.c) void {
+    mock_sock_listen_calls += 1;
+}
+pub export fn OS_tcp_server_connection_accept(_: abi.Tchannel, peer_host: ?*anyopaque, _: ?*c_uint) callconv(.c) abi.Tchannel {
+    if (mock_sock_accept_none) return abi.no_channel;
+    if (peer_host) |dst_raw| {
+        const dst: [*]u8 = @ptrCast(dst_raw);
+        dst[0] = 10;
+        dst[1] = 0;
+        dst[2] = 0;
+        dst[3] = 2;
+    }
+    const ch: abi.Tchannel = 12;
+    setMockChannel(ch, @intFromEnum(abi.ChannelType.tcp_stream_socket), false);
+    return ch;
+}

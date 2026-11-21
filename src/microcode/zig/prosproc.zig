@@ -207,7 +207,12 @@ pub export fn Prim_process_continue_foreground() callconv(.c) obj.SchemeObject {
     return obj.unspecific;
 }
 
-fn stringVectorP(vector: obj.SchemeObject) bool {
+pub fn stringVectorArg(arg_num: c_int) [*]const ?[*:0]const u8 {
+    abi.checkArg(arg_num, stringVectorP);
+    return convertStringVector(abi.argRef(@intCast(arg_num)));
+}
+
+pub fn stringVectorP(vector: obj.SchemeObject) bool {
     if (!obj.vectorP(vector)) return false;
     const length: usize = @intCast(obj.vectorLength(vector));
     const scan = obj.vectorLoc(vector, 0);
@@ -217,7 +222,7 @@ fn stringVectorP(vector: obj.SchemeObject) bool {
     return true;
 }
 
-fn convertStringVector(vector: obj.SchemeObject) [*]const ?[*:0]const u8 {
+pub fn convertStringVector(vector: obj.SchemeObject) [*]const ?[*:0]const u8 {
     const length: usize = @intCast(obj.vectorLength(vector));
     const raw = wind.dstack_alloc(@intCast((length + 1) * @sizeOf(?[*:0]const u8))).?;
     const result: [*]?[*:0]const u8 = @ptrCast(@alignCast(raw));
@@ -229,12 +234,12 @@ fn convertStringVector(vector: obj.SchemeObject) [*]const ?[*:0]const u8 {
     return result;
 }
 
-const ChannelSpec = struct {
+pub const ChannelSpec = struct {
     channel_type: abi.ProcessChannelType,
     channel: abi.Tchannel,
 };
 
-fn processChannelArg(arg_num: c_int, ctty_type: abi.ProcessCttyType) ChannelSpec {
+pub fn processChannelArg(arg_num: c_int, ctty_type: abi.ProcessCttyType) ChannelSpec {
     const val = abi.argRef(@intCast(arg_num));
     if (val == obj.sharp_f) {
         return .{ .channel_type = .none, .channel = abi.no_channel };

@@ -76,6 +76,8 @@ pub const prostty = @import("prostty.zig");
 pub const prosterm = @import("prosterm.zig");
 pub const prospty = @import("prospty.zig");
 pub const prosproc = @import("prosproc.zig");
+pub const pruxio = @import("pruxio.zig");
+pub const pruxsock = @import("pruxsock.zig");
 
 comptime {
     _ = chacha;
@@ -152,6 +154,8 @@ comptime {
     _ = prosterm;
     _ = prospty;
     _ = prosproc;
+    _ = pruxio;
+    _ = pruxsock;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -235,4 +239,6 @@ test "microcode zig scaffold" {
     _ = prosterm;
     _ = prospty;
     _ = prosproc;
+    _ = pruxio;
+    _ = pruxsock;
 }
