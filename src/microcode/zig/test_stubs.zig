@@ -25,6 +25,9 @@ comptime {
     }
 }
 
+pub export var OS_Name: [*:0]const u8 = "unix";
+pub export var OS_Variant: [*:0]const u8 = "macOS";
+pub export var compiler_processor_type: c_uint = abi.compiler_aarch64_type;
 pub export var scheme_program_name: [*:0]const u8 = "mit-scheme-unit";
 pub export var MAX_STATIC_PRIMITIVE: c_long = 1;
 pub export var Static_Primitive_Procedure_Table = [_]abi.PrimitiveProcedure{ &mockDummyPrim, &mockDummyPrim };
@@ -40,6 +43,7 @@ pub fn resetMockRuntime() void {
     printed_continuation_count = 0;
     mock_trap_state = 4;
     mock_under_emacs = 0;
+    compiler_processor_type = abi.compiler_aarch64_type;
     mock_return_to_interpreter = obj.makeObject(obj.tc_compiled_return, 1);
     mock_reflect_to_interface = obj.makeObject(obj.tc_compiled_return, 2);
     mock_heap = @splat(0);
@@ -351,4 +355,47 @@ fn mockCpointCompiledAddressNext(_: obj.SchemeObject, idx: c_ulong) callconv(.c)
 
 fn mockCpointReflectToInterfaceNext(_: obj.SchemeObject, idx: c_ulong) callconv(.c) c_ulong {
     return idx + 5;
+}
+
+comptime {
+    if (@import("build_options").cc_support) {
+        @export(&mockMakeReflectCodeTable, .{ .name = "make_reflect_code_table" });
+    }
+}
+
+fn mockMakeReflectCodeTable() callconv(.c) obj.SchemeObject {
+    return abi.make_vector(4, obj.sharp_f, true);
+}
+
+var mock_syscall_names_arr = [_]?[*:0]const u8{ "open", null, "read" };
+var mock_syserr_names_arr = [_]?[*:0]const u8{ "EPERM", "ENOENT" };
+
+pub export fn OS_tty_x_size() callconv(.c) c_uint {
+    return 80;
+}
+
+pub export fn OS_tty_y_size() callconv(.c) c_uint {
+    return 24;
+}
+
+pub export fn OS_syscall_names(len_out: *c_ulong, names_out: *[*]?[*:0]const u8) callconv(.c) void {
+    len_out.* = mock_syscall_names_arr.len;
+    names_out.* = &mock_syscall_names_arr;
+}
+
+pub export fn OS_syserr_names(len_out: *c_ulong, names_out: *[*]?[*:0]const u8) callconv(.c) void {
+    len_out.* = mock_syserr_names_arr.len;
+    names_out.* = &mock_syserr_names_arr;
+}
+
+pub export fn initialize_history() callconv(.c) obj.SchemeObject {
+    return abi.make_vector(3, obj.sharp_f, false);
+}
+
+pub export fn initialize_interrupt_handler_vector() callconv(.c) obj.SchemeObject {
+    return abi.make_vector(16, obj.sharp_f, false);
+}
+
+pub export fn initialize_interrupt_mask_vector() callconv(.c) obj.SchemeObject {
+    return abi.make_vector(16, obj.ulongToFixnum(0), false);
 }

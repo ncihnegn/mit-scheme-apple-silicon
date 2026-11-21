@@ -60,11 +60,45 @@ pub const OutfChannel = extern struct {
     cookie: ?*anyopaque,
 };
 
+pub const fixobj_non_object: usize = 0x00;
+pub const fixobj_system_interrupt_vector: usize = 0x01;
+pub const fixobj_system_error_vector: usize = 0x02;
 pub const fixobj_obarray: usize = 0x03;
+pub const fixobj_types_vector: usize = 0x04;
+pub const fixobj_returns_vector: usize = 0x05;
+pub const fixobj_interrupt_mask_vector: usize = 0x06;
+pub const fixobj_errors_vector: usize = 0x07;
+pub const fixobj_identification_vector: usize = 0x08;
+pub const fixobj_system_call_names: usize = 0x09;
+pub const fixobj_system_call_errors: usize = 0x0A;
+pub const fixobj_gc_daemon: usize = 0x0B;
+pub const fixobj_edwin_auto_save: usize = 0x0D;
 pub const fixobj_stepper_state: usize = 0x0E;
+pub const fixobj_fixed_objects_slots: usize = 0x0F;
+pub const fixobj_files_to_delete: usize = 0x10;
 pub const fixobj_record_tag: usize = 0x11;
 pub const fixobj_record_app_index: usize = 0x12;
+pub const fixobj_dummy_history: usize = 0x13;
+pub const fixobj_bignum_one: usize = 0x14;
 pub const fixobj_proxied_record_types: usize = 0x15;
+pub const fixobj_termination_vector: usize = 0x16;
+pub const fixobj_termination_proc_vector: usize = 0x17;
+pub const fixobj_gc_reclaimed: usize = 0x18;
+pub const fixobj_return_frames_vector: usize = 0x1A;
+pub const fixobj_reflect_code_names: usize = 0x1B;
+pub const fixobj_return_codes_vector: usize = 0x1C;
+pub const fixobj_error_procedure: usize = 0x1D;
+pub const n_fixed_objects: c_ulong = 0x45;
+pub const obarray_size: c_ulong = 32771;
+pub const fasdump_record_marker_start: c_ulong = 0x100;
+pub const fasdump_record_marker_end: c_ulong = 0x200;
+
+pub const compiler_none_type: c_uint = 0;
+pub const compiler_ia32_type: c_uint = 9;
+pub const compiler_c_type: c_uint = 12;
+pub const compiler_svm_type: c_uint = 13;
+pub const compiler_x86_64_type: c_uint = 14;
+pub const compiler_aarch64_type: c_uint = 15;
 
 pub const fixobj_generic_trampoline_zero_p: usize = 0x24;
 pub const fixobj_generic_trampoline_positive_p: usize = 0x25;
@@ -142,6 +176,9 @@ pub extern var trapping: bool;
 pub extern var constant_start: [*]obj.SchemeObject;
 pub extern var constant_alloc_next: [*]obj.SchemeObject;
 pub extern var constant_end: [*]obj.SchemeObject;
+pub extern var compiler_processor_type: c_uint;
+pub extern var OS_Name: [*:0]const u8;
+pub extern var OS_Variant: [*:0]const u8;
 pub extern var scheme_program_name: [*:0]const u8;
 pub extern var MAX_PRIMITIVE: c_ulong;
 pub extern var Primitive_Arity_Table: ?[*]c_int;
@@ -179,6 +216,14 @@ pub extern "c" fn termination_normal(c_int) noreturn;
 pub extern "c" fn OS_restartable_exit() void;
 pub extern "c" fn OS_under_emacs_p() c_int;
 pub extern "c" fn OS_set_trap_state(c_int) c_int;
+pub extern "c" fn OS_tty_x_size() c_uint;
+pub extern "c" fn OS_tty_y_size() c_uint;
+pub extern "c" fn OS_syscall_names(*c_ulong, *[*]?[*:0]const u8) void;
+pub extern "c" fn OS_syserr_names(*c_ulong, *[*]?[*:0]const u8) void;
+pub extern "c" fn initialize_history() obj.SchemeObject;
+pub extern "c" fn initialize_interrupt_handler_vector() obj.SchemeObject;
+pub extern "c" fn initialize_interrupt_mask_vector() obj.SchemeObject;
+pub extern "c" fn make_reflect_code_table() obj.SchemeObject;
 pub extern "c" fn cc_block_linkage_info(obj.SchemeObject) obj.SchemeObject;
 pub extern "c" fn return_address_p(obj.SchemeObject) bool;
 pub extern "c" fn cpoint_next_frame(obj.SchemeObject, c_ulong) c_ulong;
@@ -240,6 +285,7 @@ pub const BignumComparison = enum(c_int) {
     greater = 2,
 };
 
+pub const dbl_min_exp: c_long = -1021;
 pub const dbl_max_exp: c_long = 1024;
 pub const dbl_mant_dig: c_long = 53;
 

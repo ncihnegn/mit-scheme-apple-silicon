@@ -81,7 +81,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/outf.c",
     "src/microcode/purify.c",
     "src/microcode/term.c",
-    "src/microcode/utabmd.c",
     "src/microcode/utils.c",
     "src/microcode/prosenv.c",
     "src/microcode/prosfile.c",
@@ -215,6 +214,7 @@ fn addMicrocodeConfig(
     // sys_icache_invalidate are always present on arm64 SDKs.
     const is_apple_jit = is_darwin and t.cpu.arch == .aarch64;
 
+    const package_version = "13.0.50";
     const defs_header = b.addConfigHeader(.{
         .style = .blank,
         .include_path = "config_defs.h",
@@ -222,10 +222,10 @@ fn addMicrocodeConfig(
     }, .{
         .PACKAGE_BUGREPORT = "bug-mit-scheme@gnu.org",
         .PACKAGE_NAME = "MIT/GNU Scheme",
-        .PACKAGE_STRING = "MIT/GNU Scheme 13.0.50",
+        .PACKAGE_STRING = "MIT/GNU Scheme " ++ package_version,
         .PACKAGE_TARNAME = "mit-scheme",
         .PACKAGE_URL = "",
-        .PACKAGE_VERSION = "13.0.50",
+        .PACKAGE_VERSION = package_version,
 
         .PROTOTYPES = @as(i64, 1),
         .__PROTOTYPES = @as(i64, 1),
@@ -686,6 +686,7 @@ pub fn build(b: *std.Build) void {
     zig_options.addOption(bool, "cc_is_native", arch.is_native);
     zig_options.addOption(bool, "cc_support", arch.is_native or arch.is_svm);
     zig_options.addOption(bool, "debugging", debugging);
+    zig_options.addOption([]const u8, "package_version", "13.0.50");
 
     const microcode_zig_mod = b.createModule(.{
         .root_source_file = b.path("src/microcode/zig/root.zig"),
