@@ -94,7 +94,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/intern.c",
     "src/microcode/interp.c",
     "src/microcode/intprm.c",
-    "src/microcode/jit.c",
     "src/microcode/list.c",
     "src/microcode/lookprm.c",
     "src/microcode/lookup.c",
@@ -690,12 +689,16 @@ pub fn build(b: *std.Build) void {
     else
         null;
 
+    const zig_options = b.addOptions();
+    zig_options.addOption(bool, "cc_is_native", arch.is_native);
+
     const microcode_zig_mod = b.createModule(.{
         .root_source_file = b.path("src/microcode/zig/root.zig"),
         .target = target,
         .optimize = optimize,
         .link_libc = true,
     });
+    microcode_zig_mod.addOptions("build_options", zig_options);
     const microcode_zig_obj = b.addObject(.{
         .name = "microcode_zig",
         .root_module = microcode_zig_mod,
@@ -790,14 +793,16 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_scheme.step);
 
     // `zig build test-smoke`
-    const smoke_dstack_obj = b.addObject(.{
-        .name = "smoke_dstack",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/microcode/zig/transact.zig"),
-            .target = target,
-            .optimize = optimize,
-            .link_libc = true,
-        }),
+    const smoke_runtime_mod = b.createModule(.{
+        .root_source_file = b.path("src/microcode/zig/smoke_runtime.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    smoke_runtime_mod.addOptions("build_options", zig_options);
+    const smoke_runtime_obj = b.addObject(.{
+        .name = "smoke_runtime",
+        .root_module = smoke_runtime_mod,
     });
     const smoke_step = b.step("test-smoke", "Build and run standalone microcode C smoke tests");
     const smoke_specs = [_]struct {
@@ -811,7 +816,6 @@ pub fn build(b: *std.Build) void {
             .name = "jit-smoke",
             .src = "tests/microcode/jit-smoke.c",
             .deps = &.{
-                "src/microcode/jit.c",
                 "src/microcode/code_arena.c",
             },
             .needs_cmpintmd = true,
@@ -822,7 +826,6 @@ pub fn build(b: *std.Build) void {
             .src = "tests/microcode/arena-smoke.c",
             .deps = &.{
                 "src/microcode/code_arena.c",
-                "src/microcode/jit.c",
             },
             .needs_cmpintmd = false,
             .needs_native = false,
@@ -833,7 +836,6 @@ pub fn build(b: *std.Build) void {
             .deps = &.{
                 "src/microcode/gcloop.c",
                 "src/microcode/code_arena.c",
-                "src/microcode/jit.c",
             },
             .needs_cmpintmd = true,
             .needs_native = false,
@@ -845,7 +847,6 @@ pub fn build(b: *std.Build) void {
                 "src/microcode/fasl.c",
                 "src/microcode/gcloop.c",
                 "src/microcode/code_arena.c",
-                "src/microcode/jit.c",
             },
             .needs_cmpintmd = true,
             .needs_native = false,
@@ -857,7 +858,6 @@ pub fn build(b: *std.Build) void {
                 "src/microcode/cmpint.c",
                 "src/microcode/gcloop.c",
                 "src/microcode/code_arena.c",
-                "src/microcode/jit.c",
             },
             .needs_cmpintmd = true,
             .needs_native = true,
@@ -881,7 +881,7 @@ pub fn build(b: *std.Build) void {
         if (target.result.os.tag == .linux) {
             smoke_exe.root_module.linkSystemLibrary("m", .{});
         }
-        smoke_exe.root_module.addObject(smoke_dstack_obj);
+        smoke_exe.root_module.addObject(smoke_runtime_obj);
         smoke_exe.root_module.addCSourceFile(.{ .file = b.path(spec.src), .flags = c_flags });
         if (spec.needs_cmpintmd) {
             smoke_exe.root_module.addCSourceFile(.{ .file = b.path(cmpintmd_c), .flags = c_flags });
@@ -907,6 +907,7 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
+    unit_tests.root_module.addOptions("build_options", zig_options);
     unit_test_step.dependOn(&b.addRunArtifact(unit_tests).step);
 
     const findprim_tests = b.addTest(.{
