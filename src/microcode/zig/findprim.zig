@@ -174,7 +174,7 @@ const State = struct {
                     if (pos.* >= source.len) return null;
                     const next = source[pos.*];
                     pos.* += 1;
-                    if (next == '*') {
+                    if (!is_zig and next == '*') {
                         var inner: u8 = if (pos.* < source.len) source[pos.*] else return error.UnterminatedComment;
                         pos.* += 1;
                         while (true) {
@@ -647,4 +647,42 @@ test "findprim parses C and Zig primitive definitions, sorts case-insensitively,
     try std.testing.expect(std.mem.indexOf(u8, out.items, "  -1,\n") != null); // LEXPR -> -1
     try std.testing.expect(std.mem.indexOf(u8, out.items, "\"Zig doc.\"") != null);
     try std.testing.expect(std.mem.indexOf(u8, out.items, "long MAX_STATIC_PRIMITIVE = 2; /* = 0x2 */") != null);
+}
+
+test "findprim matches C output byte-for-byte on multiline zig docstring" {
+    var arena_impl = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_impl.deinit();
+    const arena = arena_impl.allocator();
+
+    const c_src =
+        \\DEFINE_PRIMITIVE ("CHACHA8-CORE", Prim_chacha8_core, 5, 5,
+        \\  "(OUTPUT OFFSET INPUT KEY CONSTANT)\n\
+        \\Compute the ChaCha8 core hash function:\n\
+        \\OUTPUT[OFFSET, OFFSET+1, ..., OFFSET+63] := ChaCha8(INPUT, KEY, CONST).")
+        \\
+    ;
+    const zig_src =
+        \\// /* ensure slash-star in zig code does not swallow primitives
+        \\// DEFINE_PRIMITIVE ("CHACHA8-CORE", Prim_chacha8_core, 5, 5,
+        \\//   "(OUTPUT OFFSET INPUT KEY CONSTANT)\n\
+        \\// Compute the ChaCha8 core hash function:\n\
+        \\// OUTPUT[OFFSET, OFFSET+1, ..., OFFSET+63] := ChaCha8(INPUT, KEY, CONST).")
+        \\pub export fn Prim_chacha8_core() callconv(.c) c_ulong { return 0; }
+        \\
+    ;
+
+    var c_state = State.init(arena, "findprim-c");
+    try c_state.processSource("prchacha.ext", c_src);
+    try c_state.sortAndCheckDuplicates();
+    var c_out: std.ArrayList(u8) = .empty;
+    try c_state.emit(&c_out, arena);
+
+    var z_state = State.init(arena, "findprim-z");
+    try z_state.processSource("prchacha.zig", zig_src);
+    try z_state.sortAndCheckDuplicates();
+    var z_out: std.ArrayList(u8) = .empty;
+    try z_state.emit(&z_out, arena);
+
+    const z_normalized = try std.mem.replaceOwned(u8, arena, z_out.items, "in prchacha.zig */", "in prchacha.ext */");
+    try std.testing.expectEqualStrings(c_out.items, z_normalized);
 }

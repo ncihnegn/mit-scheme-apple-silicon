@@ -12,6 +12,11 @@ pub const avltree = @import("avltree.zig");
 pub const jit = @import("jit.zig");
 pub const scheme_obj = @import("scheme_obj.zig");
 pub const code_arena = @import("code_arena.zig");
+pub const prim_abi = @import("prim_abi.zig");
+pub const prchacha = @import("prchacha.zig");
+pub const prkeccak = @import("prkeccak.zig");
+pub const prmd5 = @import("prmd5.zig");
+pub const prentropy = @import("prentropy.zig");
 
 comptime {
     _ = chacha;
@@ -24,6 +29,11 @@ comptime {
     _ = avltree;
     _ = jit;
     _ = code_arena;
+    _ = prim_abi;
+    _ = prchacha;
+    _ = prkeccak;
+    _ = prmd5;
+    _ = prentropy;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -43,4 +53,9 @@ test "microcode zig scaffold" {
     _ = jit;
     _ = scheme_obj;
     _ = code_arena;
+    _ = prim_abi;
+    _ = prchacha;
+    _ = prkeccak;
+    _ = prmd5;
+    _ = prentropy;
 }

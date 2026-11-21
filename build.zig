@@ -102,12 +102,8 @@ const std_c_sources = [_][]const u8{
     "src/microcode/osscheme.c",
     "src/microcode/ostty.c",
     "src/microcode/outf.c",
-    "src/microcode/prchacha.c",
-    "src/microcode/prentropy.c",
     "src/microcode/prim.c",
     "src/microcode/primutl.c",
-    "src/microcode/prkeccak.c",
-    "src/microcode/prmd5.c",
     "src/microcode/purify.c",
     "src/microcode/purutl.c",
     "src/microcode/regex.c",
@@ -150,6 +146,13 @@ const std_c_sources = [_][]const u8{
     "src/microcode/uxtrap.c",
     "src/microcode/uxtty.c",
     "src/microcode/uxutil.c",
+};
+
+const zig_prim_sources = [_][]const u8{
+    "src/microcode/zig/prchacha.zig",
+    "src/microcode/zig/prentropy.zig",
+    "src/microcode/zig/prkeccak.zig",
+    "src/microcode/zig/prmd5.zig",
 };
 
 const config_h_bottom =
@@ -682,6 +685,9 @@ pub fn build(b: *std.Build) void {
     for (scheme_c_sources.items) |src_rel| {
         fp_run.addFileArg(b.path(src_rel));
     }
+    for (zig_prim_sources) |src_rel| {
+        fp_run.addFileArg(b.path(src_rel));
+    }
 
     const cmpauxmd_s: ?std.Build.LazyPath = if (arch.cmpauxmd) |m4_arch|
         makeM4Assembly(b, target, m4_arch, valgrind)
@@ -690,6 +696,7 @@ pub fn build(b: *std.Build) void {
 
     const zig_options = b.addOptions();
     zig_options.addOption(bool, "cc_is_native", arch.is_native);
+    zig_options.addOption(bool, "debugging", debugging);
 
     const microcode_zig_mod = b.createModule(.{
         .root_source_file = b.path("src/microcode/zig/root.zig"),
