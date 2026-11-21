@@ -154,6 +154,30 @@ define_c_label within_c_stack
 	movq	%rsp,%rbp
 	movq	%rax,%rsp			// Switch to C stack
 	movq	$0,SYMBOL(C_Stack_Pointer)(%rip)
+#ifdef _WIN64
+	pushq	$0				// Align sp to 16 bytes
+	pushq	%rbp				// Save stack pointer
+	subq	$32,%rsp			// Win64 32-byte shadow space
+	movq	%rcx,%rax			// arg1 (fn) -> rax
+	movq	%rdx,%rcx			// arg2 (arg) -> arg1
+	call	*%rax				// call fn(arg)
+
+define_debugging_label within_c_stack_restore
+	addq	$32,%rsp			// Pop Win64 shadow space
+	movq	%rsp,%rax			// Restore C stack ptr
+	addq	$16,%rax
+	movq	%rax,SYMBOL(C_Stack_Pointer)(%rip)
+	popq	%rsp				// Restore stack pointer
+						//   and switch back to
+						//   Scheme stack
+	popq	%rbp				// Restore frame pointer
+	ret
+
+define_debugging_label within_c_stack_from_c
+	movq	%rcx,%rax			// arg1 (fn) -> rax
+	movq	%rdx,%rcx			// arg2 (arg) -> arg1
+	jmp	*%rax				// tail-call fn(arg)
+#else
 	pushq	$0				// Align sp to 16 bytes
 	pushq	%rbp				// Save stack pointer
 	movq	%rdi,%rax			// arg1 (fn) -> rax
@@ -174,6 +198,7 @@ define_debugging_label within_c_stack_from_c
 	movq	%rdi,%rax			// arg1 (fn) -> rax
 	movq	%rsi,%rdi			// arg2 (arg) -> arg1
 	jmp	*%rax				// tail-call fn(arg)
+#endif
 
 // C_to_interface passes control from C into Scheme.
 //
@@ -191,6 +216,36 @@ define_debugging_label within_c_stack_from_c
 // which we must pop off in interface_to_C.
 
 define_c_label C_to_interface
+#ifdef _WIN64
+	// rcx = compiled entry address
+	// rdx = compiled PC
+	pushq	%rbp				// Link according
+	movq	%rsp,%rbp			//  to C's conventions
+	pushq	%rbx				// Save Win64 callee-saves
+	pushq	%rdi				//  GPRs
+	pushq	%rsi
+	pushq	%r12
+	pushq	%r13
+	pushq	%r14
+	pushq	%r15
+	pushq	$0				// Align stack to 16 bytes
+	subq	$160,%rsp			// Save Win64 callee-saves
+	movdqa	%xmm6,0(%rsp)			//  XMM6..XMM15 (16-byte aligned)
+	movdqa	%xmm7,16(%rsp)
+	movdqa	%xmm8,32(%rsp)
+	movdqa	%xmm9,48(%rsp)
+	movdqa	%xmm10,64(%rsp)
+	movdqa	%xmm11,80(%rsp)
+	movdqa	%xmm12,96(%rsp)
+	movdqa	%xmm13,112(%rsp)
+	movdqa	%xmm14,128(%rsp)
+	movdqa	%xmm15,144(%rsp)
+						// Preserve frame ptr
+	movq	%rbp,SYMBOL(C_Frame_Pointer)(%rip)
+						// Preserve stack ptr
+	movq	%rsp,SYMBOL(C_Stack_Pointer)(%rip)
+	jmp	SYMBOL(interface_to_scheme)
+#else
 	// rdi = compiled entry address
 	// rsi = compiled PC
 	pushq	%rbp				// Link according
@@ -208,6 +263,7 @@ define_c_label C_to_interface
 						// Preserve stack ptr
 	movq	%rsp,SYMBOL(C_Stack_Pointer)(%rip)
 	jmp	SYMBOL(interface_to_scheme)
+#endif
 
 define_hook_label trampoline_to_interface
 define_debugging_label trampoline_to_interface
@@ -251,6 +307,42 @@ define_debugging_label scheme_to_interface
 	// Signal to within_c_stack that we are now in C land.
 	movq	$0,SYMBOL(C_Stack_Pointer)(%rip)
 
+#ifdef _WIN64
+	// Stack layout before call (80 bytes, preserves 16-byte alignment):
+	//   0(%rsp)..31(%rsp) : Win64 32-byte shadow space
+	//  32(%rsp)           : 5th argument (incoming r8 = utility arg4)
+	//  40(%rsp)           : padding
+	//  48(%rsp)..71(%rsp) : utility_result_t (24 bytes)
+	//  72(%rsp)           : padding
+	subq	$80,%rsp
+
+	// Look up utility_table[r9b] into rax before overwriting r9.
+	leaq	SYMBOL(utility_table)(%rip),%r10
+	andq	$0xff,%r9
+	movq	(%r10,%r9,8),%rax
+
+	// Map Scheme utility args to Win64 ABI:
+	//   arg5 (32(%rsp)) <- r8
+	//   arg4 (r9)       <- rcx
+	//   arg3 (r8)       <- rdx
+	//   arg2 (rdx)      <- rbx
+	//   arg1 (rcx)      <- &utility_result_t (48(%rsp))
+	movq	%r8,32(%rsp)
+	movq	%rcx,%r9
+	movq	%rdx,%r8
+	movq	%rbx,%rdx
+	leaq	48(%rsp),%rcx
+
+	call	*%rax
+
+define_debugging_label scheme_to_interface_return
+	// Load utility_result_t contents and pop frame
+	movq	48(%rsp),%rax			// interface_dispatch
+	movq	56(%rsp),%rcx			// interp code / compiled ptr
+	movq	64(%rsp),%rdx			// interp garbage / compiled pc
+	addq	$80,%rsp
+	jmp	*%rax				// Invoke handler
+#else
 	subq	$32,%rsp			// alloc struct return;
 						// preserve 16-byte alignment
 	movq	%rsp,%rdi			// Structure is first argument.
@@ -274,6 +366,7 @@ define_debugging_label scheme_to_interface_return
 	popq	%rdx				// interp garbage / compiled pc
 	addq	$8,%rsp				// pop alignment padding
 	jmp	*%rax				// Invoke handler
+#endif
 
 define_c_label interface_to_scheme
 	// rax = interface_to_scheme [??? -- not referred to]
@@ -305,6 +398,28 @@ define_c_label interface_to_C
 	// rcx = interpreter code
 	// rdx = garbage
 	movq	%rcx,%rax			// Set up result
+#ifdef _WIN64
+	movdqa	0(%rsp),%xmm6			// Restore Win64 callee-saves
+	movdqa	16(%rsp),%xmm7			//  XMM6..XMM15
+	movdqa	32(%rsp),%xmm8
+	movdqa	48(%rsp),%xmm9
+	movdqa	64(%rsp),%xmm10
+	movdqa	80(%rsp),%xmm11
+	movdqa	96(%rsp),%xmm12
+	movdqa	112(%rsp),%xmm13
+	movdqa	128(%rsp),%xmm14
+	movdqa	144(%rsp),%xmm15
+	addq	$168,%rsp			// Pop XMM save area + align pad
+	popq	%r15				// Restore Win64 callee-saves
+	popq	%r14				//  GPRs
+	popq	%r13
+	popq	%r12
+	popq	%rsi
+	popq	%rdi
+	popq	%rbx
+	leave
+	ret
+#else
 	// We need a dummy register for the POP (which is three bytes
 	// shorter than ADD $8,RSP); since we're about to pop into r15
 	// anyway, we may as well use that.
@@ -316,6 +431,7 @@ define_c_label interface_to_C
 	popq	%rbx
 	leave
 	ret
+#endif
 
 //	Assembly language hooks used to reduce code size.
 //	There is no time advantage to using these over using
@@ -874,7 +990,11 @@ define_c_label sse_read_mxcsr
 
 define_c_label sse_write_mxcsr
 	enter	$8,$0
+#ifdef _WIN64
+	movl	%ecx,(%rsp)
+#else
 	movl	%edi,(%rsp)
+#endif
 	ldmxcsr	(%rsp)
 	leave
 	ret
@@ -896,7 +1016,11 @@ define_c_label x87_read_control_word
 
 define_c_label x87_write_control_word
 	enter	$4,$0
+#ifdef _WIN64
+	movw	%cx,(%rsp)
+#else
 	movw	%di,(%rsp)
+#endif
 	fldcw	(%rsp)
 	leave
 	ret
@@ -909,14 +1033,25 @@ define_c_label x87_read_status_word
 	ret
 
 define_c_label x87_read_environment
+#ifdef _WIN64
+	fnstenv	(%rcx)
+	// fnstenv masks all exceptions (go figure), so we must load
+	// the control word back in order to undo that.
+	fldcw	(%rcx)
+#else
 	fnstenv	(%rdi)
 	// fnstenv masks all exceptions (go figure), so we must load
 	// the control word back in order to undo that.
 	fldcw	(%rdi)
+#endif
 	ret
 
 define_c_label x87_write_environment
+#ifdef _WIN64
+	fldenv	(%rcx)
+#else
 	fldenv	(%rdi)
+#endif
 	ret
 
 // Mark the C stack nonexecutable.
