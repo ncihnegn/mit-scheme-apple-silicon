@@ -91,6 +91,7 @@ pub const uxfile = @import("uxfile.zig");
 pub const uxfs = @import("uxfs.zig");
 pub const uxsock = @import("uxsock.zig");
 pub const uxterm = @import("uxterm.zig");
+pub const uxtop = @import("uxtop.zig");
 pub const uxtty = @import("uxtty.zig");
 pub const uxutil = @import("uxutil.zig");
 pub const tterm = if (build_options.use_termcap) @import("tterm.zig") else struct {};
@@ -184,6 +185,7 @@ comptime {
     _ = uxfs;
     _ = uxsock;
     _ = uxterm;
+    _ = uxtop;
     _ = uxtty;
     _ = uxutil;
     if (build_options.use_termcap) {
@@ -286,6 +288,7 @@ test "microcode zig scaffold" {
     _ = uxfs;
     _ = uxsock;
     _ = uxterm;
+    _ = uxtop;
     _ = uxtty;
     _ = uxutil;
     if (build_options.use_termcap) {

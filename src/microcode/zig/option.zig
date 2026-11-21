@@ -59,7 +59,7 @@ pub export var option_batch_mode: bool = false;
 pub export var option_show_version: bool = false;
 pub export var option_show_help: bool = false;
 
-var option_macosx_application_storage: bool = false;
+pub var option_macosx_application_storage: bool = false;
 comptime {
     if (builtin.os.tag.isDarwin()) {
         @export(&option_macosx_application_storage, .{ .name = "option_macosx_application" });

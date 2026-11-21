@@ -660,6 +660,19 @@ pub extern var Primitive_Documentation_Table: ?[*]?[*:0]const u8;
 
 pub extern "c" fn error_wrong_type_arg(c_int) noreturn;
 pub extern "c" fn error_bad_range_arg(c_int) noreturn;
+
+pub extern "c" fn fflush(stream: ?*std.c.FILE) c_int;
+
+pub inline fn cStdout() *std.c.FILE {
+    if (builtin.os.tag.isDarwin()) {
+        return (struct {
+            extern "c" var __stdoutp: *std.c.FILE;
+        }).__stdoutp;
+    }
+    return (struct {
+        extern "c" var stdout: *std.c.FILE;
+    }).stdout;
+}
 pub extern "c" fn error_external_return() noreturn;
 pub extern "c" fn signal_error_from_primitive(c_long) noreturn;
 pub extern "c" fn signal_interrupt_from_primitive() noreturn;

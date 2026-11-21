@@ -78,7 +78,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/uxio.c",
     "src/microcode/uxproc.c",
     "src/microcode/uxsig.c",
-    "src/microcode/uxtop.c",
     "src/microcode/uxtrap.c",
 };
 
@@ -922,6 +921,9 @@ pub fn build(b: *std.Build) void {
         }),
     });
     unit_tests.root_module.addOptions("build_options", zig_options);
+    if (target.result.os.tag.isDarwin()) {
+        unit_tests.root_module.linkFramework("CoreFoundation", .{});
+    }
     unit_test_step.dependOn(&b.addRunArtifact(unit_tests).step);
 
     const findprim_tests = b.addTest(.{
