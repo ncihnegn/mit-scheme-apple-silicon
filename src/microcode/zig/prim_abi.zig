@@ -363,6 +363,26 @@ pub const RelocRef = extern struct {
     new_addr: ?*anyopaque,
 };
 
+pub const trampoline_k_return_to_interpreter: u8 = 0;
+pub const trampoline_k_apply: u8 = 1;
+pub const trampoline_k_arity: u8 = 2;
+pub const trampoline_k_entity: u8 = 3;
+pub const trampoline_k_interpreted: u8 = 4;
+pub const trampoline_k_lexpr_primitive: u8 = 5;
+pub const trampoline_k_primitive: u8 = 6;
+pub const trampoline_k_lookup: u8 = 7;
+pub const trampoline_k_1_0: u8 = 8;
+pub const trampoline_k_2_1: u8 = 9;
+pub const trampoline_k_2_0: u8 = 10;
+pub const trampoline_k_3_2: u8 = 11;
+pub const trampoline_k_3_1: u8 = 12;
+pub const trampoline_k_3_0: u8 = 13;
+pub const trampoline_k_4_3: u8 = 14;
+pub const trampoline_k_4_2: u8 = 15;
+pub const trampoline_k_4_1: u8 = 16;
+pub const trampoline_k_4_0: u8 = 17;
+pub const trampoline_k_reflect_to_interface: u8 = 0x3A;
+
 pub const Tchannel = c_uint;
 pub const no_channel: Tchannel = std.math.maxInt(Tchannel);
 pub const SelectRegistry = ?*anyopaque;
@@ -1111,9 +1131,18 @@ pub extern "c" fn start_closure_relocation([*]obj.SchemeObject, *RelocRef) void;
 pub extern "c" fn compiled_closure_start([*]obj.SchemeObject) ?*anyopaque;
 pub extern "c" fn compiled_closure_count([*]obj.SchemeObject) c_ulong;
 pub extern "c" fn compiled_closure_next(?*anyopaque) ?*anyopaque;
-pub extern "c" fn read_compiled_closure_target(?*anyopaque, *RelocRef) ?*anyopaque;
+pub extern "c" fn read_compiled_closure_target(?*anyopaque, ?*RelocRef) ?*anyopaque;
 pub extern "c" fn write_compiled_closure_target(?*anyopaque, ?*anyopaque) void;
 pub extern "c" fn skip_compiled_closure_padding(?*anyopaque) [*]obj.SchemeObject;
+pub extern "c" fn decode_old_style_format_word(*CcEntryType, u16) bool;
+pub extern "c" fn encode_old_style_format_word(*CcEntryType, *u16) bool;
+pub extern "c" fn make_compiled_procedure_type(*CcEntryType, c_uint, c_uint, bool) void;
+pub extern "c" fn make_compiled_continuation_type(*CcEntryType, c_ulong) void;
+pub extern "c" fn make_cc_entry_type(*CcEntryType, CcEntryTypeMarker) void;
+pub extern "c" fn declare_builtin(c_ulong, [*:0]const u8) void;
+pub extern "c" fn jit_force_execute_mode() void;
+pub extern "c" fn jit_flush_icache(?*anyopaque, usize) void;
+pub extern "c" fn code_arena_flush_icache() void;
 pub extern "c" fn init_exit_scheme() void;
 pub extern "c" fn read_command_line_options(c_int, [*]?[*:0]const u8) void;
 pub extern "c" fn compiler_initialize(bool) void;

@@ -617,6 +617,7 @@ pub fn build(b: *std.Build) void {
     const c_flags = c_flags_list.items;
 
     // Assemble optional microcode C source list.
+    const use_zig_cmpintmd = arch.cc_arch_id == 15;
     const cmpintmd_c = b.fmt("src/microcode/cmpintmd/{s}.c", .{arch.cmpintmd});
     var scheme_c_sources: std.ArrayList([]const u8) = .empty;
     scheme_c_sources.appendSlice(b.allocator, &std_c_sources) catch @panic("OOM");
@@ -627,10 +628,10 @@ pub fn build(b: *std.Build) void {
         .none => {},
     }
 
-    scheme_c_sources.appendSlice(b.allocator, &.{
-        "src/microcode/cmpint.c",
-        cmpintmd_c,
-    }) catch @panic("OOM");
+    scheme_c_sources.append(b.allocator, "src/microcode/cmpint.c") catch @panic("OOM");
+    if (!use_zig_cmpintmd) {
+        scheme_c_sources.append(b.allocator, cmpintmd_c) catch @panic("OOM");
+    }
 
     if (arch.is_svm) {
         scheme_c_sources.append(b.allocator, "src/microcode/svm1-interp.c") catch @panic("OOM");
@@ -808,6 +809,17 @@ pub fn build(b: *std.Build) void {
         .name = "gcloop_smoke",
         .root_module = gcloop_smoke_mod,
     });
+    const cmpintmd_smoke_mod = b.createModule(.{
+        .root_source_file = b.path("src/microcode/zig/cmpintmd.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    cmpintmd_smoke_mod.addOptions("build_options", zig_options);
+    const cmpintmd_smoke_obj = b.addObject(.{
+        .name = "cmpintmd_smoke",
+        .root_module = cmpintmd_smoke_mod,
+    });
     const smoke_step = b.step("test-smoke", "Build and run standalone microcode C smoke tests");
     const smoke_specs = [_]struct {
         name: []const u8,
@@ -893,7 +905,11 @@ pub fn build(b: *std.Build) void {
         }
         smoke_exe.root_module.addCSourceFile(.{ .file = b.path(spec.src), .flags = c_flags });
         if (spec.needs_cmpintmd) {
-            smoke_exe.root_module.addCSourceFile(.{ .file = b.path(cmpintmd_c), .flags = c_flags });
+            if (use_zig_cmpintmd) {
+                smoke_exe.root_module.addObject(cmpintmd_smoke_obj);
+            } else {
+                smoke_exe.root_module.addCSourceFile(.{ .file = b.path(cmpintmd_c), .flags = c_flags });
+            }
         }
         smoke_exe.root_module.addCSourceFiles(.{ .files = spec.deps, .flags = c_flags });
         if (spec.needs_native) {

@@ -724,7 +724,7 @@ fn mockCompiledClosureNext(ptr: ?*anyopaque) callconv(.c) ?*anyopaque {
     return ptr;
 }
 
-fn mockReadCompiledClosureTarget(_: ?*anyopaque, _: *abi.RelocRef) callconv(.c) ?*anyopaque {
+fn mockReadCompiledClosureTarget(_: ?*anyopaque, _: ?*abi.RelocRef) callconv(.c) ?*anyopaque {
     return null;
 }
 
@@ -744,6 +744,124 @@ fn mockPcToUtilityIndex(_: c_ulong) callconv(.c) c_int {
 }
 fn mockSvmExportIp(pc: c_ulong) callconv(.c) c_ulong {
     return pc;
+}
+
+pub var mock_declare_builtin_calls: usize = 0;
+
+pub export fn declare_builtin(_: c_ulong, _: [*:0]const u8) callconv(.c) void {
+    mock_declare_builtin_calls += 1;
+}
+
+pub export fn make_compiled_procedure_type(
+    cet: *abi.CcEntryType,
+    n_required: c_uint,
+    n_optional: c_uint,
+    rest_p: bool,
+) callconv(.c) void {
+    cet.marker = .procedure;
+    cet.args = .{ .for_procedure = .{
+        .n_required = n_required,
+        .n_optional = n_optional,
+        .rest_p = rest_p,
+    } };
+}
+
+pub export fn make_compiled_continuation_type(
+    cet: *abi.CcEntryType,
+    offset: c_ulong,
+) callconv(.c) void {
+    cet.marker = .continuation;
+    cet.args = .{ .for_continuation = .{ .offset = offset } };
+}
+
+pub export fn make_cc_entry_type(
+    cet: *abi.CcEntryType,
+    marker: abi.CcEntryTypeMarker,
+) callconv(.c) void {
+    std.debug.assert(marker != .procedure and marker != .continuation);
+    cet.* = std.mem.zeroes(abi.CcEntryType);
+    cet.marker = marker;
+}
+
+pub export fn decode_old_style_format_word(cet: *abi.CcEntryType, fw: u16) callconv(.c) bool {
+    var low: u16 = fw & 0x00FF;
+    const high: u16 = (fw & 0xFF00) >> 8;
+    var rest_p = false;
+
+    if (high < 0x80) {
+        if (high == 0x00 or low == 0x00 or low == 0x80) return true;
+        if (low > 0x80) {
+            low = 0xFF - low;
+            rest_p = true;
+        }
+        if (!(high <= low)) return true;
+        make_compiled_procedure_type(cet, high - 1, low - high, rest_p);
+        return false;
+    }
+    if (low < 0x80) return true;
+    if (low < 0xE0) {
+        make_compiled_continuation_type(cet, @as(c_ulong, ((low & 0x7F) << 7) | (high & 0x7F)));
+        return false;
+    }
+    if (high != 0xFF) return true;
+    const marker: abi.CcEntryTypeMarker = switch (low) {
+        0xFF => .expression,
+        0xFE => .internal_procedure,
+        0xFD => .trampoline,
+        0xFC => .internal_continuation,
+        0xFB => .return_to_interpreter,
+        0xFA => .closure,
+        else => return true,
+    };
+    make_cc_entry_type(cet, marker);
+    return false;
+}
+
+pub export fn encode_old_style_format_word(cet: *abi.CcEntryType, fw_r: *u16) callconv(.c) bool {
+    var low: u16 = 0;
+    var high: u16 = 0;
+    switch (cet.marker) {
+        .procedure => {
+            high = @intCast(cet.args.for_procedure.n_required + 1);
+            low = @intCast(high + cet.args.for_procedure.n_optional);
+            if (!(low < 0x80)) return true;
+            if (cet.args.for_procedure.rest_p) {
+                low = 0xFF - low;
+            }
+        },
+        .continuation => {
+            const n = cet.args.for_continuation.offset;
+            if (!(n < 0x3000)) return true;
+            high = @intCast((n & 0x7F) | 0x80);
+            low = @intCast((n >> 7) | 0x80);
+        },
+        .expression => {
+            low = 0xFF;
+            high = 0xFF;
+        },
+        .internal_procedure => {
+            low = 0xFE;
+            high = 0xFF;
+        },
+        .trampoline => {
+            low = 0xFD;
+            high = 0xFF;
+        },
+        .internal_continuation => {
+            low = 0xFC;
+            high = 0xFF;
+        },
+        .return_to_interpreter => {
+            low = 0xFB;
+            high = 0xFF;
+        },
+        .closure => {
+            low = 0xFA;
+            high = 0xFF;
+        },
+    }
+    fw_r.* = (high << 8) | low;
+    return false;
 }
 
 pub export fn compiler_reset(utilities: obj.SchemeObject) callconv(.c) void {
