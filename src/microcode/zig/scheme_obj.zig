@@ -408,6 +408,10 @@ pub inline fn vectorLength(v: SchemeObject) c_ulong {
     return objectDatum(vectorHeader(v));
 }
 
+pub inline fn setVectorLength(v: SchemeObject, new_length: c_ulong) void {
+    setVectorHeader(v, objectNewDatum(vectorHeader(v), new_length));
+}
+
 pub inline fn vectorRef(v: SchemeObject, index: usize) SchemeObject {
     return memoryRef(v, index + 1);
 }

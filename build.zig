@@ -67,7 +67,6 @@ fn resolveArch(option: ArchOption, cpu: std.Target.Cpu) ArchConfig {
 
 const std_c_sources = [_][]const u8{
     "src/microcode/bkpt.c",
-    "src/microcode/bignum.c",
     "src/microcode/boot.c",
     "src/microcode/daemon.c",
     "src/microcode/debug.c",
