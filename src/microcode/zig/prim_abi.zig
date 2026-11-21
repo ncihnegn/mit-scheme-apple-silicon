@@ -216,6 +216,7 @@ pub const fixobj_identification_vector: usize = 0x08;
 pub const fixobj_system_call_names: usize = 0x09;
 pub const fixobj_system_call_errors: usize = 0x0A;
 pub const fixobj_gc_daemon: usize = 0x0B;
+pub const fixobj_trap_handler: usize = 0x0C;
 pub const fixobj_edwin_auto_save: usize = 0x0D;
 pub const fixobj_stepper_state: usize = 0x0E;
 pub const fixobj_fixed_objects_slots: usize = 0x0F;
@@ -715,6 +716,17 @@ pub inline fn cStdout() *std.c.FILE {
         extern "c" var stdout: *std.c.FILE;
     }).stdout;
 }
+
+pub inline fn cStderr() *std.c.FILE {
+    if (builtin.os.tag.isDarwin()) {
+        return (struct {
+            extern "c" var __stderrp: *std.c.FILE;
+        }).__stderrp;
+    }
+    return (struct {
+        extern "c" var stderr: *std.c.FILE;
+    }).stderr;
+}
 pub extern "c" fn error_external_return() noreturn;
 pub extern "c" fn signal_error_from_primitive(c_long) noreturn;
 pub extern "c" fn signal_interrupt_from_primitive() noreturn;
@@ -1137,6 +1149,14 @@ pub extern "c" fn cc_return_to_block_address(obj.SchemeObject) [*]obj.SchemeObje
 pub extern "c" fn cc_block_debugging_info(obj.SchemeObject) obj.SchemeObject;
 pub extern "c" fn read_cc_entry_offset(*CcEntryOffset, ?*anyopaque) bool;
 pub extern "c" fn compiled_closure_objects([*]obj.SchemeObject) [*]obj.SchemeObject;
+pub extern "c" fn find_signal_name(c_int) [*:0]const u8;
+pub extern "c" fn reset_interruptable_extent() void;
+pub extern "c" fn termination_trap() noreturn;
+pub extern "c" fn userio_choose_option([*:0]const u8, [*:0]const u8, [*]const ?[*:0]const u8) u8;
+pub extern "c" fn plausible_cc_block_p([*]obj.SchemeObject) c_int;
+pub extern "c" fn pc_to_builtin_index(c_ulong) c_int;
+pub extern "c" fn pc_to_utility_index(c_ulong) c_int;
+pub extern "c" fn svm_export_instruction_pointer(c_ulong) c_ulong;
 pub extern "c" fn OS_initialize() void;
 pub extern "c" fn OS_announcement() void;
 pub extern "c" fn Interpret() void;

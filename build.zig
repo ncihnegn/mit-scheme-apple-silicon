@@ -76,7 +76,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/term.c",
     "src/microcode/intext.c",
     "src/microcode/uxsig.c",
-    "src/microcode/uxtrap.c",
 };
 
 const zig_prim_sources = [_][]const u8{

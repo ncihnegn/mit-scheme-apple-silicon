@@ -567,6 +567,12 @@ comptime {
         @export(&mockLinkageSectionCount, .{ .name = "linkage_section_count" });
         @export(&mockReadUuoTarget, .{ .name = "read_uuo_target" });
         @export(&mockWriteUuoTarget, .{ .name = "write_uuo_target" });
+        @export(&mockPlausibleCcBlockP, .{ .name = "plausible_cc_block_p" });
+        @export(&mockPcToBuiltinIndex, .{ .name = "pc_to_builtin_index" });
+        @export(&mockPcToUtilityIndex, .{ .name = "pc_to_utility_index" });
+    }
+    if (build_options.cc_is_svm) {
+        @export(&mockSvmExportIp, .{ .name = "svm_export_instruction_pointer" });
     }
     if (build_options.cc_is_native) {
         @export(&mockCcReturnAddressToEntryAddress, .{ .name = "cc_return_address_to_entry_address" });
@@ -726,6 +732,18 @@ fn mockWriteCompiledClosureTarget(_: ?*anyopaque, _: ?*anyopaque) callconv(.c) v
 
 fn mockSkipCompiledClosurePadding(ptr: ?*anyopaque) callconv(.c) [*]obj.SchemeObject {
     return @ptrCast(@alignCast(ptr.?));
+}
+fn mockPlausibleCcBlockP(_: [*]obj.SchemeObject) callconv(.c) c_int {
+    return 1;
+}
+fn mockPcToBuiltinIndex(_: c_ulong) callconv(.c) c_int {
+    return -1;
+}
+fn mockPcToUtilityIndex(_: c_ulong) callconv(.c) c_int {
+    return -1;
+}
+fn mockSvmExportIp(pc: c_ulong) callconv(.c) c_ulong {
+    return pc;
 }
 
 pub export fn compiler_reset(utilities: obj.SchemeObject) callconv(.c) void {
@@ -1358,6 +1376,20 @@ pub export fn userio_confirm(_: [*:0]const u8) callconv(.c) c_int {
     return 0;
 }
 pub export fn UX_dump_core() callconv(.c) void {}
+pub export fn find_signal_name(sig: c_int) callconv(.c) [*:0]const u8 {
+    return switch (sig) {
+        8 => "SIGFPE",
+        11 => "SIGSEGV",
+        else => "SIGTEST",
+    };
+}
+pub export fn reset_interruptable_extent() callconv(.c) void {}
+pub export fn termination_trap() callconv(.c) noreturn {
+    @panic("mock termination_trap");
+}
+pub export fn userio_choose_option(_: [*:0]const u8, _: [*:0]const u8, _: [*]const ?[*:0]const u8) callconv(.c) u8 {
+    return 'N';
+}
 pub export var stop_signal_hook: ?*const fn (c_int) callconv(.c) void = null;
 pub export var subprocess_death_hook: ?*const fn (abi.PidT, *c_int) callconv(.c) void = null;
 pub export fn OS_ctty_fd() callconv(.c) c_int {
