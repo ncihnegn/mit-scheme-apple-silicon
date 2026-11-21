@@ -49,6 +49,8 @@ pub fn resetMockRuntime() void {
     printed_continuation_count = 0;
     mock_trap_state = 4;
     mock_under_emacs = 0;
+    mock_return_to_interpreter = obj.makeObject(obj.tc_compiled_return, 1);
+    mock_reflect_to_interface = obj.makeObject(obj.tc_compiled_return, 2);
     mock_heap = @splat(0);
     mock_stack = @splat(0);
     mock_const = @splat(0);
@@ -315,18 +317,47 @@ pub export fn cc_block_linkage_info(block: obj.SchemeObject) callconv(.c) obj.Sc
     return block;
 }
 
-pub export fn return_address_p(o: obj.SchemeObject) callconv(.c) bool {
-    return obj.returnCodeP(o);
+var mock_return_to_interpreter: obj.SchemeObject = obj.makeObject(obj.tc_compiled_return, 1);
+var mock_reflect_to_interface: obj.SchemeObject = obj.makeObject(obj.tc_compiled_return, 2);
+
+comptime {
+    if (@import("build_options").cc_support) {
+        @export(&mock_return_to_interpreter, .{ .name = "return_to_interpreter" });
+        @export(&mock_reflect_to_interface, .{ .name = "reflect_to_interface" });
+        @export(&mockCcReturnAddressP, .{ .name = "cc_return_address_p" });
+        @export(&mockReflectToInterfaceFrameType, .{ .name = "reflect_to_interface_frame_type" });
+        @export(&mockCpointCompiledCodeNext, .{ .name = "cpoint_compiled_code_next" });
+        @export(&mockCpointCompiledAddressNext, .{ .name = "cpoint_compiled_address_next" });
+        @export(&mockCpointReflectToInterfaceNext, .{ .name = "cpoint_reflect_to_interface_next" });
+    }
 }
 
-pub export fn cpoint_next_frame(_: obj.SchemeObject, idx: c_ulong) callconv(.c) c_ulong {
-    return idx + 1;
+fn mockCcReturnAddressP(o: obj.SchemeObject) callconv(.c) bool {
+    return obj.ccReturnP(o) or obj.ccEntryP(o);
 }
 
-pub export fn return_frame_type(_: [*]obj.SchemeObject) callconv(.c) c_int {
-    return 1;
+fn mockReflectToInterfaceFrameType(frame: [*]obj.SchemeObject) callconv(.c) c_int {
+    if (!obj.fixnumP(frame[1]) or !obj.fixnumToUlongP(frame[1])) {
+        return @intFromEnum(abi.ReturnFrameType.undefined);
+    }
+    return switch (obj.fixnumToUlong(frame[1])) {
+        0 => @intFromEnum(abi.ReturnFrameType.cc_internal_apply),
+        1 => @intFromEnum(abi.ReturnFrameType.cc_restore_interrupt_mask),
+        2 => @intFromEnum(abi.ReturnFrameType.cc_stack_marker),
+        3 => @intFromEnum(abi.ReturnFrameType.cc_bkpt),
+        8 => @intFromEnum(abi.ReturnFrameType.cc_invocation),
+        else => @intFromEnum(abi.ReturnFrameType.undefined),
+    };
 }
 
-pub export fn return_code_frame_type(_: obj.SchemeObject) callconv(.c) c_int {
-    return 2;
+fn mockCpointCompiledCodeNext(_: obj.SchemeObject, idx: c_ulong) callconv(.c) c_ulong {
+    return idx + 3;
+}
+
+fn mockCpointCompiledAddressNext(_: obj.SchemeObject, idx: c_ulong) callconv(.c) c_ulong {
+    return idx + 4;
+}
+
+fn mockCpointReflectToInterfaceNext(_: obj.SchemeObject, idx: c_ulong) callconv(.c) c_ulong {
+    return idx + 5;
 }

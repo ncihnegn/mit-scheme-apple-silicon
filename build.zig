@@ -80,7 +80,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/option.c",
     "src/microcode/outf.c",
     "src/microcode/purify.c",
-    "src/microcode/returns.c",
     "src/microcode/storage.c",
     "src/microcode/term.c",
     "src/microcode/utabmd.c",
@@ -686,6 +685,7 @@ pub fn build(b: *std.Build) void {
 
     const zig_options = b.addOptions();
     zig_options.addOption(bool, "cc_is_native", arch.is_native);
+    zig_options.addOption(bool, "cc_support", arch.is_native or arch.is_svm);
     zig_options.addOption(bool, "debugging", debugging);
 
     const microcode_zig_mod = b.createModule(.{

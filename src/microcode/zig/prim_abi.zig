@@ -38,7 +38,18 @@ pub const prim_no_trap_eval: c_long = -5;
 pub const prim_no_trap_apply: c_long = -6;
 pub const prim_no_trap_pop_return: c_long = -11;
 pub const max_return_code: c_ulong = 0x5E;
+pub const rc_comp_interrupt_restart: c_ulong = 0x43;
+pub const rc_comp_lookup_trap_restart: c_ulong = 0x53;
+pub const rc_comp_assignment_trap_restart: c_ulong = 0x54;
+pub const rc_comp_op_ref_trap_restart: c_ulong = 0x56;
+pub const rc_comp_cache_ref_apply_restart: c_ulong = 0x57;
+pub const rc_comp_safe_ref_trap_restart: c_ulong = 0x58;
+pub const rc_comp_unassigned_trap_restart: c_ulong = 0x59;
 pub const rc_hardware_trap: c_ulong = 0x5C;
+pub const rc_comp_error_restart: c_ulong = 0x5E;
+pub const cont_size: usize = 2;
+pub const env_cont_size: usize = cont_size + 1;
+pub const history_cont_size: usize = cont_size + 2;
 pub const unknown_primitive_arity: c_int = -2;
 pub const syscall_malloc: c_int = 29;
 pub const syserr_not_enough_space: c_int = 33;
@@ -89,6 +100,29 @@ pub const GcPtrType = enum(c_int) {
     compiled_entry = 1,
     compiled_return = 2,
     not = 3,
+};
+
+pub const ReturnFrameType = enum(c_int) {
+    undefined = 0,
+    with_arg = 1,
+    with_arg_subproblem = 2,
+    exp_env = 3,
+    history = 4,
+    apply = 5,
+    combination_apply = 6,
+    compiled_code = 7,
+    compiled_code_subproblem = 8,
+    compiled_address = 9,
+    combination_save = 10,
+    stack_marker = 11,
+    hardware_trap = 12,
+    return_to_interpreter = 13,
+    cc_internal_apply = 14,
+    cc_restore_interrupt_mask = 15,
+    cc_stack_marker = 16,
+    cc_bkpt = 17,
+    cc_invocation = 18,
+    limit = 19,
 };
 
 pub extern var Registers: [14]obj.SchemeObject;
@@ -150,6 +184,14 @@ pub extern "c" fn return_address_p(obj.SchemeObject) bool;
 pub extern "c" fn cpoint_next_frame(obj.SchemeObject, c_ulong) c_ulong;
 pub extern "c" fn return_frame_type([*]obj.SchemeObject) c_int;
 pub extern "c" fn return_code_frame_type(obj.SchemeObject) c_int;
+
+pub extern var return_to_interpreter: obj.SchemeObject;
+pub extern var reflect_to_interface: obj.SchemeObject;
+pub extern "c" fn cc_return_address_p(obj.SchemeObject) bool;
+pub extern "c" fn reflect_to_interface_frame_type([*]obj.SchemeObject) c_int;
+pub extern "c" fn cpoint_compiled_code_next(obj.SchemeObject, c_ulong) c_ulong;
+pub extern "c" fn cpoint_compiled_address_next(obj.SchemeObject, c_ulong) c_ulong;
+pub extern "c" fn cpoint_reflect_to_interface_next(obj.SchemeObject, c_ulong) c_ulong;
 
 pub extern "c" fn arg_integer(c_int) c_long;
 pub extern "c" fn arg_nonnegative_integer(c_int) c_long;

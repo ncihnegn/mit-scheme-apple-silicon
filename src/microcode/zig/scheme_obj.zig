@@ -48,7 +48,9 @@ pub const tc_broken_heart: c_ulong = 0x22;
 pub const tc_hunk3_b: c_ulong = 0x24;
 pub const tc_hunk3: c_ulong = tc_hunk3_b;
 pub const tc_tagged_object: c_ulong = 0x25;
+pub const tc_combination: c_ulong = 0x26;
 pub const tc_manifest_nm_vector: c_ulong = 0x27;
+pub const tc_compiled_entry: c_ulong = 0x28;
 pub const tc_vector_1b: c_ulong = 0x2F;
 pub const tc_bit_string: c_ulong = tc_vector_1b;
 pub const tc_reference_trap: c_ulong = 0x32;
@@ -247,6 +249,22 @@ pub inline fn primitiveP(obj: SchemeObject) bool {
 
 pub inline fn cellP(obj: SchemeObject) bool {
     return objectType(obj) == tc_cell;
+}
+
+pub inline fn vectorHeaderP(obj: SchemeObject) bool {
+    return objectType(obj) == tc_manifest_vector;
+}
+
+pub inline fn combinationP(obj: SchemeObject) bool {
+    return objectType(obj) == tc_combination;
+}
+
+pub inline fn ccReturnP(obj: SchemeObject) bool {
+    return objectType(obj) == tc_compiled_return;
+}
+
+pub inline fn ccEntryP(obj: SchemeObject) bool {
+    return objectType(obj) == tc_compiled_entry;
 }
 
 pub inline fn cellContents(cell: SchemeObject) SchemeObject {
