@@ -91,6 +91,7 @@ pub const unspecific: SchemeObject = makeObject(tc_constant, 1);
 pub const empty_list: SchemeObject = makeObject(tc_constant, 9);
 pub const gc_reclaimed: SchemeObject = makeObject(tc_constant, 10);
 pub const unbound_object: SchemeObject = makeObject(tc_reference_trap, 2);
+pub const trap_max_immediate: c_ulong = 9;
 
 pub const fasdump_record_marker_start: c_ulong = 0x100;
 pub const fasdump_record_marker_end: c_ulong = 0x200;
@@ -242,6 +243,18 @@ pub inline fn returnCodeP(obj: SchemeObject) bool {
 
 pub inline fn primitiveP(obj: SchemeObject) bool {
     return objectType(obj) == tc_primitive;
+}
+
+pub inline fn cellP(obj: SchemeObject) bool {
+    return objectType(obj) == tc_cell;
+}
+
+pub inline fn cellContents(cell: SchemeObject) SchemeObject {
+    return memoryRef(cell, 0);
+}
+
+pub inline fn setCellContents(cell: SchemeObject, val: SchemeObject) void {
+    memorySet(cell, 0, val);
 }
 
 pub inline fn ustringBytesPerCp(obj: SchemeObject) c_ulong {
@@ -534,7 +547,10 @@ pub inline fn setLegacyStringMaxLength(s: SchemeObject, nbytes: c_ulong) void {
 }
 
 pub inline fn hashToFixnum(h: u32) SchemeObject {
-    return ulongToFixnum(@as(c_ulong, h));
+    if (fixnum_length >= 32) {
+        return ulongToFixnum(@as(c_ulong, h));
+    }
+    return ulongToFixnum((@as(c_ulong, h) >> fixnum_length) ^ (@as(c_ulong, h) & fixnum_mask));
 }
 
 pub const flonum_size: c_ulong = bytesToWords(@sizeOf(f64));

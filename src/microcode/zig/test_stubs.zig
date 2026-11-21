@@ -184,9 +184,31 @@ pub export fn gc_type_code(tc: c_uint) callconv(.c) c_int {
         obj.tc_fixnum,
         obj.tc_character,
         obj.tc_primitive,
+        obj.tc_return_code,
         => @intFromEnum(abi.GcType.non_pointer),
+        obj.tc_cell => @intFromEnum(abi.GcType.cell),
+        obj.tc_reference_trap => @intFromEnum(abi.GcType.special),
         else => @intFromEnum(abi.GcType.undefined),
     };
+}
+
+pub export fn gc_ptr_type(o: obj.SchemeObject) callconv(.c) c_int {
+    if (obj.objectType(o) == obj.tc_compiled_return) return @intFromEnum(abi.GcPtrType.compiled_return);
+    const gt = gc_type_code(@intCast(obj.objectType(o)));
+    if (gt > 0 or gt == @intFromEnum(abi.GcType.vector)) return @intFromEnum(abi.GcPtrType.normal);
+    return @intFromEnum(abi.GcPtrType.not);
+}
+
+pub export fn hashable_object_p(o: obj.SchemeObject) callconv(.c) bool {
+    return obj.objectType(o) != obj.tc_reference_trap;
+}
+
+pub export fn hash_object(o: obj.SchemeObject) callconv(.c) u32 {
+    return @truncate(o *% 2654435761);
+}
+
+pub export fn combine_hashes(h1: u32, h2: u32) callconv(.c) u32 {
+    return (h1 *% 33) ^ h2;
 }
 
 pub export fn arg_integer(n: c_int) callconv(.c) c_long {

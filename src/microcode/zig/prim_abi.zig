@@ -64,6 +64,13 @@ pub const GcType = enum(c_int) {
     compiled_return = 5,
 };
 
+pub const GcPtrType = enum(c_int) {
+    normal = 0,
+    compiled_entry = 1,
+    compiled_return = 2,
+    not = 3,
+};
+
 pub extern var Registers: [14]obj.SchemeObject;
 pub extern var Free: [*]obj.SchemeObject;
 pub extern var Free_primitive: ?[*]obj.SchemeObject;
@@ -97,6 +104,10 @@ pub extern "c" fn outf_fatal([*:0]const u8, ...) void;
 pub extern "c" fn outf_error([*:0]const u8, ...) void;
 pub extern "c" fn record_primitive_entry(obj.SchemeObject) void;
 pub extern "c" fn gc_type_code(c_uint) c_int;
+pub extern "c" fn gc_ptr_type(obj.SchemeObject) c_int;
+pub extern "c" fn hashable_object_p(obj.SchemeObject) bool;
+pub extern "c" fn hash_object(obj.SchemeObject) u32;
+pub extern "c" fn combine_hashes(u32, u32) u32;
 pub extern "c" fn OS_channel_close_noerror(c_uint) void;
 pub extern "c" fn find_primitive(obj.SchemeObject, bool, bool, c_int) obj.SchemeObject;
 pub extern "c" fn termination_normal(c_int) noreturn;
