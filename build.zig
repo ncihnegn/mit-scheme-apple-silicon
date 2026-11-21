@@ -95,7 +95,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/rgxprim.c",
     "src/microcode/step.c",
     "src/microcode/storage.c",
-    "src/microcode/syntax.c",
     "src/microcode/sysprim.c",
     "src/microcode/term.c",
     "src/microcode/utabmd.c",
@@ -149,6 +148,7 @@ const zig_prim_sources = [_][]const u8{
     "src/microcode/zig/prkeccak.zig",
     "src/microcode/zig/prmd5.zig",
     "src/microcode/zig/string.zig",
+    "src/microcode/zig/syntax.zig",
     "src/microcode/zig/vector.zig",
 };
 

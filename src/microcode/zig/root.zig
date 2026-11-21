@@ -35,6 +35,8 @@ pub const flonum = @import("flonum.zig");
 pub const bitstr = @import("bitstr.zig");
 pub const string = @import("string.zig");
 pub const intern = @import("intern.zig");
+pub const edwin_defs = @import("edwin_defs.zig");
+pub const syntax = @import("syntax.zig");
 
 comptime {
     _ = chacha;
@@ -70,6 +72,8 @@ comptime {
     _ = bitstr;
     _ = string;
     _ = intern;
+    _ = edwin_defs;
+    _ = syntax;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -112,4 +116,6 @@ test "microcode zig scaffold" {
     _ = bitstr;
     _ = string;
     _ = intern;
+    _ = edwin_defs;
+    _ = syntax;
 }
