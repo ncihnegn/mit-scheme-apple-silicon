@@ -36,6 +36,7 @@ pub const tc_constant: c_ulong = 0x08;
 pub const tc_extended_procedure: c_ulong = 0x09;
 pub const tc_vector: c_ulong = 0x0A;
 pub const tc_return_code: c_ulong = 0x0B;
+pub const tc_manifest_closure: c_ulong = 0x0D;
 pub const tc_big_fixnum: c_ulong = 0x0E;
 pub const tc_procedure: c_ulong = 0x0F;
 pub const tc_entity: c_ulong = 0x10;
@@ -65,6 +66,7 @@ pub const tc_cell: c_ulong = 0x36;
 pub const tc_weak_cons: c_ulong = 0x37;
 pub const tc_quad: c_ulong = 0x38;
 pub const tc_ratnum: c_ulong = 0x3A;
+pub const tc_stack_environment: c_ulong = 0x3B;
 pub const tc_complex: c_ulong = 0x3C;
 pub const tc_compiled_code_block: c_ulong = 0x3D;
 pub const tc_record: c_ulong = 0x3E;
@@ -299,6 +301,18 @@ pub inline fn ccReturnP(obj: SchemeObject) bool {
 
 pub inline fn ccEntryP(obj: SchemeObject) bool {
     return objectType(obj) == tc_compiled_entry;
+}
+
+pub inline fn ccStackEnvP(obj: SchemeObject) bool {
+    return objectType(obj) == tc_stack_environment;
+}
+
+pub inline fn nonMarkedVectorP(obj: SchemeObject) bool {
+    return objectType(obj) == tc_non_marked_vector;
+}
+
+pub inline fn makeCcBlock(addr: [*]const SchemeObject) SchemeObject {
+    return makePointerObject(tc_compiled_code_block, addr);
 }
 
 pub inline fn environmentP(obj: SchemeObject) bool {

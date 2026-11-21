@@ -573,3 +573,97 @@ pub export fn OS_announcement() callconv(.c) void {}
 pub export fn Interpret() callconv(.c) void {}
 pub export fn outf_console(_: [*:0]const u8, ...) callconv(.c) void {}
 pub export fn outf_flush_console() callconv(.c) void {}
+
+comptime {
+    if (build_options.cc_support) {
+        @export(&mockCcEntryToBlock, .{ .name = "cc_entry_to_block" });
+        @export(&mockCcReturnToBlock, .{ .name = "cc_return_to_block" });
+        @export(&mockCcEntryToBlockOffset, .{ .name = "cc_entry_to_block_offset" });
+        @export(&mockCcReturnToBlockOffset, .{ .name = "cc_return_to_block_offset" });
+        @export(&mockCcEntryToBlockAddress, .{ .name = "cc_entry_to_block_address" });
+        @export(&mockCoerceToCompiled, .{ .name = "coerce_to_compiled" });
+        @export(&mockCcEntryClosureP, .{ .name = "cc_entry_closure_p" });
+        @export(&mockCcBlockClosureP, .{ .name = "cc_block_closure_p" });
+        @export(&mockCcClosureToEntry, .{ .name = "cc_closure_to_entry" });
+        @export(&mockUtilityIndexToName, .{ .name = "utility_index_to_name" });
+        @export(&mockBuiltinIndexToName, .{ .name = "builtin_index_to_name" });
+        @export(&mockDeclareCompiledCodeBlock, .{ .name = "declare_compiled_code_block" });
+        @export(&mockBkptInstall, .{ .name = "bkpt_install" });
+        @export(&mockBkptClosureInstall, .{ .name = "bkpt_closure_install" });
+        @export(&mockBkptRemove, .{ .name = "bkpt_remove" });
+        @export(&mockBkptP, .{ .name = "bkpt_p" });
+        @export(&mockBkptProceed, .{ .name = "bkpt_proceed" });
+    }
+    if (build_options.cc_is_native) {
+        @export(&mockCcReturnAddressToEntryAddress, .{ .name = "cc_return_address_to_entry_address" });
+    }
+}
+
+fn mockCcEntryToBlock(entry: obj.SchemeObject) callconv(.c) obj.SchemeObject {
+    return entry;
+}
+
+fn mockCcReturnToBlock(ret: obj.SchemeObject) callconv(.c) obj.SchemeObject {
+    return ret;
+}
+
+fn mockCcEntryToBlockOffset(_: obj.SchemeObject) callconv(.c) c_ulong {
+    return 0;
+}
+
+fn mockCcReturnToBlockOffset(_: obj.SchemeObject) callconv(.c) c_ulong {
+    return 0;
+}
+
+fn mockCcEntryToBlockAddress(_: obj.SchemeObject) callconv(.c) [*]obj.SchemeObject {
+    return (&mock_heap).ptr;
+}
+
+fn mockCcReturnAddressToEntryAddress(addr: ?*anyopaque) callconv(.c) ?*anyopaque {
+    return addr;
+}
+
+fn mockCoerceToCompiled(proc: obj.SchemeObject, _: c_uint, out: *obj.SchemeObject) callconv(.c) c_long {
+    out.* = proc;
+    return abi.prim_done;
+}
+
+fn mockCcEntryClosureP(_: obj.SchemeObject) callconv(.c) bool {
+    return false;
+}
+
+fn mockCcBlockClosureP(_: obj.SchemeObject) callconv(.c) bool {
+    return false;
+}
+
+fn mockCcClosureToEntry(entry: obj.SchemeObject) callconv(.c) obj.SchemeObject {
+    return entry;
+}
+
+fn mockUtilityIndexToName(_: c_uint) callconv(.c) ?[*:0]const u8 {
+    return null;
+}
+
+fn mockBuiltinIndexToName(_: c_uint) callconv(.c) ?[*:0]const u8 {
+    return null;
+}
+
+fn mockDeclareCompiledCodeBlock(_: obj.SchemeObject) callconv(.c) void {}
+
+fn mockBkptInstall(_: ?*anyopaque) callconv(.c) obj.SchemeObject {
+    return obj.sharp_f;
+}
+
+fn mockBkptClosureInstall(_: ?*anyopaque) callconv(.c) obj.SchemeObject {
+    return obj.sharp_f;
+}
+
+fn mockBkptRemove(_: ?*anyopaque, _: obj.SchemeObject) callconv(.c) void {}
+
+fn mockBkptP(_: ?*anyopaque) callconv(.c) bool {
+    return false;
+}
+
+fn mockBkptProceed(_: ?*anyopaque, _: obj.SchemeObject, state: obj.SchemeObject) callconv(.c) obj.SchemeObject {
+    return state;
+}

@@ -111,6 +111,7 @@ const zig_prim_sources = [_][]const u8{
     "src/microcode/zig/boot.zig",
     "src/microcode/zig/bytevector.zig",
     "src/microcode/zig/char.zig",
+    "src/microcode/zig/comutl.zig",
     "src/microcode/zig/daemon.zig",
     "src/microcode/zig/dfloat.zig",
     "src/microcode/zig/extern_prim.zig",
@@ -648,7 +649,6 @@ pub fn build(b: *std.Build) void {
         "src/microcode/pruxffi.c",
         "src/microcode/cmpint.c",
         cmpintmd_c,
-        "src/microcode/comutl.c",
     }) catch @panic("OOM");
 
     if (arch.is_svm) {

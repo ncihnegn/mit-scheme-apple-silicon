@@ -250,6 +250,14 @@ pub const CcEntryType = extern struct {
     },
 };
 
+pub const CcEntryTypeGroup = enum(c_ulong) {
+    procedure = 0,
+    continuation = 1,
+    expression = 2,
+    internal_procedure = 3,
+    unknown = 4,
+};
+
 pub extern var Registers: [14]obj.SchemeObject;
 pub extern var Free: [*]obj.SchemeObject;
 pub extern var Free_primitive: ?[*]obj.SchemeObject;
@@ -411,6 +419,25 @@ pub extern "c" fn OS_announcement() void;
 pub extern "c" fn Interpret() void;
 pub extern "c" fn outf_console([*:0]const u8, ...) void;
 pub extern "c" fn outf_flush_console() void;
+
+pub extern "c" fn cc_entry_to_block(obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn cc_return_to_block(obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn cc_entry_to_block_offset(obj.SchemeObject) c_ulong;
+pub extern "c" fn cc_return_to_block_offset(obj.SchemeObject) c_ulong;
+pub extern "c" fn cc_entry_to_block_address(obj.SchemeObject) [*]obj.SchemeObject;
+pub extern "c" fn cc_return_address_to_entry_address(?*anyopaque) ?*anyopaque;
+pub extern "c" fn coerce_to_compiled(obj.SchemeObject, c_uint, *obj.SchemeObject) c_long;
+pub extern "c" fn cc_entry_closure_p(obj.SchemeObject) bool;
+pub extern "c" fn cc_block_closure_p(obj.SchemeObject) bool;
+pub extern "c" fn cc_closure_to_entry(obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn utility_index_to_name(c_uint) ?[*:0]const u8;
+pub extern "c" fn builtin_index_to_name(c_uint) ?[*:0]const u8;
+pub extern "c" fn declare_compiled_code_block(obj.SchemeObject) void;
+pub extern "c" fn bkpt_install(?*anyopaque) obj.SchemeObject;
+pub extern "c" fn bkpt_closure_install(?*anyopaque) obj.SchemeObject;
+pub extern "c" fn bkpt_remove(?*anyopaque, obj.SchemeObject) void;
+pub extern "c" fn bkpt_p(?*anyopaque) bool;
+pub extern "c" fn bkpt_proceed(?*anyopaque, obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
 
 pub extern "c" fn arg_integer(c_int) c_long;
 pub extern "c" fn arg_nonnegative_integer(c_int) c_long;
@@ -844,4 +871,12 @@ pub inline fn initializeInterrupts(mask: c_ulong) void {
     Registers[regblock_int_mask] = mask;
     Registers[regblock_int_code] = 0;
     compilerSetupInterrupt();
+}
+
+pub inline fn addressInStackP(addr: [*]const obj.SchemeObject) bool {
+    return @intFromPtr(addr) >= @intFromPtr(stack_start) and @intFromPtr(addr) < @intFromPtr(stack_end);
+}
+
+pub inline fn spToNPushed(sp: [*]const obj.SchemeObject, _: [*]const obj.SchemeObject, end: [*]const obj.SchemeObject) c_ulong {
+    return @intCast((@intFromPtr(end) - @intFromPtr(sp)) / @sizeOf(obj.SchemeObject));
 }
