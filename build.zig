@@ -445,42 +445,6 @@ fn addMicrocodeConfig(
     return wf.getDirectory();
 }
 
-fn makeM4Assembly(
-    b: *std.Build,
-    resolved: std.Build.ResolvedTarget,
-    cmpauxmd: []const u8,
-    valgrind: bool,
-) std.Build.LazyPath {
-    const t = resolved.result;
-    var defs: std.ArrayList(u8) = .empty;
-    defer defs.deinit(b.allocator);
-
-    if (t.os.tag.isDarwin()) {
-        defs.appendSlice(b.allocator, "define(__APPLE__,1)\n") catch @panic("OOM");
-    } else {
-        if (t.os.tag == .linux) {
-            defs.appendSlice(b.allocator, "define(__linux__,1)\n") catch @panic("OOM");
-        }
-        defs.appendSlice(b.allocator, "define(SUPPRESS_LEADING_UNDERSCORE,1)\n") catch @panic("OOM");
-        if (t.ofmt == .elf) {
-            defs.appendSlice(b.allocator, "define(__ELF__,1)\n") catch @panic("OOM");
-        }
-    }
-    if (valgrind) {
-        defs.appendSlice(b.allocator, "define(VALGRIND_MODE,1)\n") catch @panic("OOM");
-    }
-
-    const m4_run = b.addSystemCommand(&.{
-        "sh",
-        "-c",
-        "defs=$1; shift; { printf '%s' \"$defs\"; sed -e '/^#/D' -e 's/:pg_hi21://g' \"$1\"; } | m4 | tr -d '\\014'",
-        "--",
-        defs.items,
-    });
-    m4_run.addFileArg(b.path(b.fmt("src/microcode/cmpauxmd/{s}.m4", .{cmpauxmd})));
-    return m4_run.captureStdOut(.{ .basename = "cmpauxmd.s" });
-}
-
 fn configureMicrocodeModule(
     b: *std.Build,
     mod: *std.Build.Module,
@@ -649,8 +613,8 @@ pub fn build(b: *std.Build) void {
         fp_run.addFileArg(b.path("src/microcode/zig/tterm.zig"));
     }
 
-    const cmpauxmd_s: ?std.Build.LazyPath = if (arch.cmpauxmd) |m4_arch|
-        makeM4Assembly(b, target, m4_arch, valgrind)
+    const cmpauxmd_s: ?std.Build.LazyPath = if (arch.cmpauxmd) |asm_arch|
+        b.path(b.fmt("src/microcode/cmpauxmd/{s}.S", .{asm_arch}))
     else
         null;
 
@@ -726,7 +690,11 @@ pub fn build(b: *std.Build) void {
         .flags = c_flags,
     });
     if (cmpauxmd_s) |asm_file| {
-        scheme_exe.root_module.addAssemblyFile(asm_file);
+        scheme_exe.root_module.addCSourceFile(.{
+            .file = asm_file,
+            .flags = &.{},
+            .language = .assembly_with_preprocessor,
+        });
     }
 
     b.installArtifact(scheme_exe);
@@ -913,7 +881,11 @@ pub fn build(b: *std.Build) void {
         smoke_exe.root_module.addCSourceFiles(.{ .files = spec.deps, .flags = c_flags });
         if (spec.needs_native) {
             if (cmpauxmd_s) |asm_file| {
-                smoke_exe.root_module.addAssemblyFile(asm_file);
+                smoke_exe.root_module.addCSourceFile(.{
+                    .file = asm_file,
+                    .flags = &.{},
+                    .language = .assembly_with_preprocessor,
+                });
             }
         }
         const run_smoke = b.addRunArtifact(smoke_exe);
