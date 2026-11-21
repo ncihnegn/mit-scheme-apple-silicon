@@ -1695,13 +1695,15 @@ fn mockTputs(str: [*:0]const u8, _: c_int, outc: *const fn (c_int) callconv(.c) 
     }
     return 0;
 }
-fn mockTparam(fmt: [*:0]const u8, outstring: [*]u8, outlen: c_int, ...) callconv(.c) ?[*:0]u8 {
-    var ap = @cVaStart();
-    defer @cVaEnd(&ap);
-    const a1 = @cVaArg(&ap, c_int);
-    const a2 = @cVaArg(&ap, c_int);
-    const a3 = @cVaArg(&ap, c_int);
-    const a4 = @cVaArg(&ap, c_int);
+fn mockTparam(
+    fmt: [*:0]const u8,
+    outstring: [*]u8,
+    outlen: c_int,
+    a1: c_int,
+    a2: c_int,
+    a3: c_int,
+    a4: c_int,
+) callconv(.c) ?[*:0]u8 {
     const limit: usize = @intCast(outlen);
     const s = std.fmt.bufPrint(outstring[0 .. limit - 1], "{s}:{d},{d},{d},{d}", .{ std.mem.span(fmt), a1, a2, a3, a4 }) catch return null;
     outstring[s.len] = 0;

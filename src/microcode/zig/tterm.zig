@@ -20,7 +20,7 @@ extern "c" fn tgetstr([*:0]const u8, *[*]u8) ?[*:0]u8;
 extern "c" fn tgoto([*:0]const u8, c_int, c_int) ?[*:0]u8;
 extern "c" fn tputs([*:0]const u8, c_int, *const fn (c_int) callconv(.c) c_int) c_int;
 extern "c" fn tparm([*:0]const u8, ...) ?[*:0]u8;
-extern "c" fn tparam([*:0]const u8, [*]u8, c_int, ...) ?[*:0]u8;
+extern "c" fn tparam([*:0]const u8, [*]u8, c_int, c_int, c_int, c_int, c_int) ?[*:0]u8;
 
 extern "c" var BC: ?[*:0]u8;
 extern "c" var UP: ?[*:0]u8;

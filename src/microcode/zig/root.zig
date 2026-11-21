@@ -113,6 +113,7 @@ pub const os_backend = if (builtin.os.tag == .windows) struct {
     pub const uxutil = @import("uxutil.zig");
 };
 pub const tterm = if (build_options.use_termcap) @import("tterm.zig") else struct {};
+pub const termcap_emulate = @import("termcap_emulate.zig");
 pub const intext = @import("intext.zig");
 pub const interp = @import("interp.zig");
 pub const term = @import("term.zig");
@@ -210,6 +211,9 @@ comptime {
     _ = term;
     if (build_options.use_termcap) {
         _ = tterm;
+        if (!build_options.use_terminfo) {
+            _ = termcap_emulate;
+        }
     }
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
@@ -310,6 +314,7 @@ test "microcode zig scaffold" {
     _ = intext;
     _ = interp;
     _ = term;
+    _ = termcap_emulate;
     if (build_options.use_termcap) {
         _ = tterm;
     }

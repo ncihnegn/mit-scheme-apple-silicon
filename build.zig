@@ -585,16 +585,6 @@ pub fn build(b: *std.Build) void {
     }
     const c_flags = c_flags_list.items;
 
-    // Assemble optional microcode C source list.
-    var scheme_c_sources: std.ArrayList([]const u8) = .empty;
-    scheme_c_sources.appendSlice(b.allocator, &std_c_sources) catch @panic("OOM");
-
-    switch (termcap_opt) {
-        .ncurses => {},
-        .emulate => scheme_c_sources.append(b.allocator, "src/microcode/tparam.c") catch @panic("OOM"),
-        .none => {},
-    }
-
     // Build host-native Zig findprim and generate usrdef.zig out-of-tree.
     const findprim = b.addExecutable(.{
         .name = "findprim",
@@ -686,26 +676,9 @@ pub fn build(b: *std.Build) void {
     );
     scheme_exe.root_module.addObject(microcode_zig_obj);
     scheme_exe.root_module.addCSourceFiles(.{
-        .files = scheme_c_sources.items,
+        .files = &std_c_sources,
         .flags = c_flags,
     });
-    if (termcap_opt == .emulate) {
-        var termcap_flags: std.ArrayList([]const u8) = .empty;
-        termcap_flags.appendSlice(b.allocator, c_flags) catch @panic("OOM");
-        termcap_flags.appendSlice(b.allocator, &.{
-            "-std=gnu89",
-            "-Wno-deprecated-non-prototype",
-            "-Wno-incompatible-pointer-types-discards-qualifiers",
-            "-Wno-implicit-function-declaration",
-            "-Wno-return-type",
-            "-Wno-pointer-to-int-cast",
-            "-Wno-unused-variable",
-        }) catch @panic("OOM");
-        scheme_exe.root_module.addCSourceFile(.{
-            .file = b.path("src/microcode/termcap.c"),
-            .flags = termcap_flags.items,
-        });
-    }
     scheme_exe.root_module.addObject(usrdef_zig_obj);
     if (cmpauxmd_s) |asm_file| {
         scheme_exe.root_module.addCSourceFile(.{
