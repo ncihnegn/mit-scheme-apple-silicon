@@ -3,6 +3,8 @@
 // Licensed under the GNU General Public License (GPL v2 or later); see src/COPYING.
 
 const std = @import("std");
+const builtin = @import("builtin");
+const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
 const string = @import("string.zig");
@@ -17,6 +19,7 @@ extern "c" fn tgetflag([*:0]const u8) c_int;
 extern "c" fn tgetstr([*:0]const u8, *[*]u8) ?[*:0]u8;
 extern "c" fn tgoto([*:0]const u8, c_int, c_int) ?[*:0]u8;
 extern "c" fn tputs([*:0]const u8, c_int, *const fn (c_int) callconv(.c) c_int) c_int;
+extern "c" fn tparm([*:0]const u8, ...) ?[*:0]u8;
 extern "c" fn tparam([*:0]const u8, [*]u8, c_int, ...) ?[*:0]u8;
 
 extern "c" var BC: ?[*:0]u8;
@@ -84,26 +87,39 @@ fn protectTc(environment: ?*anyopaque) callconv(.c) void {
 // DEFINE_PRIMITIVE ("TERMCAP-PARAM-STRING", Prim_termcap_param_string, 5, 5, 0)
 pub export fn Prim_termcap_param_string() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    var string_buffer: [4096]u8 = undefined;
-    var env = TcEnv{
-        .string_buffer = &string_buffer,
-        .string_pointer = null,
-    };
-    transact.transaction_begin();
-    wind.dstack_protect(&protectTc, @ptrCast(&env));
-    env.string_pointer = tparam(
-        abi.stringArg(1),
-        &string_buffer,
-        string_buffer.len,
-        @as(c_int, @truncate(abi.arg_nonnegative_integer(2))),
-        @as(c_int, @truncate(abi.arg_nonnegative_integer(3))),
-        @as(c_int, @truncate(abi.arg_nonnegative_integer(4))),
-        @as(c_int, @truncate(abi.arg_nonnegative_integer(5))),
-    );
-    const ptr = env.string_pointer orelse abi.error_external_return();
-    const result = string.char_pointer_to_string(ptr);
-    transact.transaction_commit();
-    return result;
+    const fmt = abi.stringArg(1);
+    const a1: c_int = @truncate(abi.arg_nonnegative_integer(2));
+    const a2: c_int = @truncate(abi.arg_nonnegative_integer(3));
+    const a3: c_int = @truncate(abi.arg_nonnegative_integer(4));
+    const a4: c_int = @truncate(abi.arg_nonnegative_integer(5));
+    if (comptime (build_options.use_terminfo and !builtin.is_test)) {
+        const ptr = tparm(
+            fmt,
+            @as(c_long, a1),
+            @as(c_long, a2),
+            @as(c_long, a3),
+            @as(c_long, a4),
+            @as(c_long, 0),
+            @as(c_long, 0),
+            @as(c_long, 0),
+            @as(c_long, 0),
+            @as(c_long, 0),
+        ) orelse abi.error_external_return();
+        return string.char_pointer_to_string(ptr);
+    } else {
+        var string_buffer: [4096]u8 = undefined;
+        var env = TcEnv{
+            .string_buffer = &string_buffer,
+            .string_pointer = null,
+        };
+        transact.transaction_begin();
+        wind.dstack_protect(&protectTc, @ptrCast(&env));
+        env.string_pointer = tparam(fmt, &string_buffer, string_buffer.len, a1, a2, a3, a4);
+        const ptr = env.string_pointer orelse abi.error_external_return();
+        const result = string.char_pointer_to_string(ptr);
+        transact.transaction_commit();
+        return result;
+    }
 }
 
 fn protectFree(environment: ?*anyopaque) callconv(.c) void {

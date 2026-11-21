@@ -584,7 +584,7 @@ pub fn build(b: *std.Build) void {
     scheme_c_sources.appendSlice(b.allocator, &std_c_sources) catch @panic("OOM");
 
     switch (termcap_opt) {
-        .ncurses => scheme_c_sources.append(b.allocator, "src/microcode/terminfo.c") catch @panic("OOM"),
+        .ncurses => {},
         .emulate => scheme_c_sources.append(b.allocator, "src/microcode/tparam.c") catch @panic("OOM"),
         .none => {},
     }
@@ -623,6 +623,7 @@ pub fn build(b: *std.Build) void {
     zig_options.addOption(bool, "cc_support", arch.is_native or arch.is_svm);
     zig_options.addOption(bool, "debugging", debugging);
     zig_options.addOption(bool, "use_termcap", termcap_opt != .none);
+    zig_options.addOption(bool, "use_terminfo", termcap_opt == .ncurses);
     zig_options.addOption([]const u8, "package_version", "13.0.50");
     zig_options.addOption([]const u8, "default_library_path", default_library_path);
     zig_options.addOption(c_uint, "compiler_processor_type", arch.cc_arch_id);
