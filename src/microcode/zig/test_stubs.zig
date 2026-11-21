@@ -39,6 +39,8 @@ var mock_unused_argv = [_]?[*:0]const u8{ "--extra", null };
 var mock_library_path = [_]?[*:0]const u8{ "/mock/lib1", "/mock/lib2", null };
 pub export var compiler_utilities: obj.SchemeObject = obj.sharp_f;
 pub var mock_tospace_ptr: ?[*]obj.SchemeObject = null;
+pub var mock_code_tospace: [512]obj.SchemeObject = @splat(0);
+pub var mock_code_tospace_ptr: [*]obj.SchemeObject = (&mock_code_tospace).ptr;
 pub var mock_gc_drain_calls: usize = 0;
 pub var mock_save_tospace_calls: usize = 0;
 pub var mock_update_weak_calls: usize = 0;
@@ -104,6 +106,8 @@ pub fn resetMockRuntime() void {
     current_gc_table = null;
     compiler_utilities = obj.sharp_f;
     mock_tospace_ptr = null;
+    mock_code_tospace = @splat(0);
+    mock_code_tospace_ptr = (&mock_code_tospace).ptr;
     mock_gc_drain_calls = 0;
     mock_save_tospace_calls = 0;
     mock_update_weak_calls = 0;
@@ -545,6 +549,7 @@ comptime {
         @export(&mockCcEntryToBlockOffset, .{ .name = "cc_entry_to_block_offset" });
         @export(&mockCcReturnToBlockOffset, .{ .name = "cc_return_to_block_offset" });
         @export(&mockCcEntryToBlockAddress, .{ .name = "cc_entry_to_block_address" });
+        @export(&mockCcReturnToBlockAddress, .{ .name = "cc_return_to_block_address" });
         @export(&mockCoerceToCompiled, .{ .name = "coerce_to_compiled" });
         @export(&mockCcEntryClosureP, .{ .name = "cc_entry_closure_p" });
         @export(&mockCcBlockClosureP, .{ .name = "cc_block_closure_p" });
@@ -597,6 +602,10 @@ fn mockCcReturnToBlockOffset(_: obj.SchemeObject) callconv(.c) c_ulong {
 }
 
 fn mockCcEntryToBlockAddress(_: obj.SchemeObject) callconv(.c) [*]obj.SchemeObject {
+    return (&mock_heap).ptr;
+}
+
+fn mockCcReturnToBlockAddress(_: obj.SchemeObject) callconv(.c) [*]obj.SchemeObject {
     return (&mock_heap).ptr;
 }
 
@@ -672,3 +681,100 @@ pub export fn gc_handle_pair(scan: [*]obj.SchemeObject, _: obj.SchemeObject) cal
 pub export fn gc_handle_unaligned_vector(scan: [*]obj.SchemeObject, _: obj.SchemeObject) callconv(.c) [*]obj.SchemeObject {
     return scan + 1;
 }
+
+pub export fn gc_handle_manifest_closure(scan: [*]obj.SchemeObject, _: obj.SchemeObject) callconv(.c) [*]obj.SchemeObject {
+    return scan + 1;
+}
+
+pub export fn gc_handle_linkage_section(scan: [*]obj.SchemeObject, _: obj.SchemeObject) callconv(.c) [*]obj.SchemeObject {
+    return scan + 1;
+}
+
+pub export fn gc_handle_broken_heart(scan: [*]obj.SchemeObject, _: obj.SchemeObject) callconv(.c) [*]obj.SchemeObject {
+    return scan + 1;
+}
+
+pub export fn gc_transport_words(from: [*]obj.SchemeObject, n_words: c_ulong, _: bool) callconv(.c) [*]obj.SchemeObject {
+    const count: usize = @intCast(n_words);
+    const dst = mock_tospace_ptr orelse blk: {
+        const p = abi.Free;
+        abi.Free = p + count;
+        break :blk p;
+    };
+    if (count > 0) {
+        @memcpy(dst[0..count], from[0..count]);
+        from[0] = obj.makeBrokenHeart(dst);
+    }
+    if (mock_tospace_ptr != null) {
+        mock_tospace_ptr = dst + count;
+    }
+    return dst;
+}
+
+pub export fn gc_no_cc_support() callconv(.c) noreturn {
+    @panic("mock gc_no_cc_support");
+}
+
+pub export fn tospace_available_p(n_words: c_ulong) callconv(.c) bool {
+    const p = mock_tospace_ptr orelse return false;
+    const base_end = @intFromPtr((&mock_heap).ptr + mock_heap.len);
+    const cur = @intFromPtr(p);
+    return cur <= base_end and @as(usize, @intCast(n_words)) * @sizeOf(obj.SchemeObject) <= base_end - cur;
+}
+
+pub export fn read_tospace(ptr: [*]obj.SchemeObject) callconv(.c) obj.SchemeObject {
+    return ptr[0];
+}
+
+pub export fn write_tospace(ptr: [*]obj.SchemeObject, value: obj.SchemeObject) callconv(.c) void {
+    ptr[0] = value;
+}
+
+pub export fn newspace_to_tospace(ptr: ?*anyopaque) callconv(.c) ?*anyopaque {
+    return ptr;
+}
+
+pub export fn discard_tospace() callconv(.c) void {
+    mock_tospace_ptr = null;
+}
+
+pub export fn open_code_tospace(n_words: c_ulong) callconv(.c) bool {
+    if (n_words > mock_code_tospace.len) return false;
+    mock_code_tospace_ptr = (&mock_code_tospace).ptr;
+    return true;
+}
+
+pub export fn discard_code_tospace() callconv(.c) void {
+    mock_code_tospace_ptr = (&mock_code_tospace).ptr;
+}
+
+pub export fn get_code_newspace_start() callconv(.c) [*]obj.SchemeObject {
+    return (&mock_code_tospace).ptr;
+}
+
+pub export fn get_code_newspace_ptr() callconv(.c) [*]obj.SchemeObject {
+    return mock_code_tospace_ptr;
+}
+
+pub export fn code_tospace_available_p(n_words: c_ulong) callconv(.c) bool {
+    const used = (@intFromPtr(mock_code_tospace_ptr) - @intFromPtr((&mock_code_tospace).ptr)) / @sizeOf(obj.SchemeObject);
+    return used + @as(usize, @intCast(n_words)) <= mock_code_tospace.len;
+}
+
+pub export fn gc_transport_words_to_code_tospace(from: [*]obj.SchemeObject, n_words: c_ulong, _: bool) callconv(.c) [*]obj.SchemeObject {
+    const count: usize = @intCast(n_words);
+    const dst = mock_code_tospace_ptr;
+    if (count > 0) {
+        @memcpy(dst[0..count], from[0..count]);
+        from[0] = obj.makeBrokenHeart(dst);
+    }
+    mock_code_tospace_ptr = dst + count;
+    return dst;
+}
+
+pub export fn gc_scan_code_tospace(_: [*]obj.SchemeObject, _: [*]obj.SchemeObject) callconv(.c) void {}
+pub export fn open_stage_tospace(_: [*]obj.SchemeObject, _: [*]obj.SchemeObject, _: c_ulong) callconv(.c) void {}
+pub export fn close_stage_tospace() callconv(.c) void {}
+pub export fn gc_scan_stage_tospace() callconv(.c) void {}
+pub export fn OS_file_remove(_: [*:0]const u8) callconv(.c) void {}
+pub export fn OS_file_remove_link(_: [*:0]const u8) callconv(.c) void {}
