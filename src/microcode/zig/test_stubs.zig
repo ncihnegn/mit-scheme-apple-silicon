@@ -41,6 +41,18 @@ var mock_library_path = [_]?[*:0]const u8{ "/mock/lib1", "/mock/lib2", null };
 pub export var compiler_utilities: obj.SchemeObject = obj.sharp_f;
 pub var mock_icache_flush_calls: usize = 0;
 pub var mock_resize_tospace_arg: c_ulong = 0;
+pub export var OS_channel_table_size: abi.Tchannel = 16;
+pub export var OS_have_select_p: c_int = 1;
+pub var mock_channel_buf: [256]u8 = @splat(0);
+var mock_channel_len: usize = 0;
+var mock_channels_open: [16]bool = @splat(false);
+var mock_channels_type: [16]c_uint = @splat(0);
+var mock_channels_nonblock: [16]bool = @splat(false);
+var mock_next_pipe_ch: abi.Tchannel = 6;
+var mock_sel_fds: [8]c_int = @splat(0);
+var mock_sel_modes: [8]c_uint = @splat(0);
+var mock_sel_count: c_uint = 0;
+var mock_sel_sentinel: u8 = 0;
 pub var mock_write_var_cache_calls: usize = 0;
 pub var mock_make_uuo_link_calls: usize = 0;
 pub var mock_apply_compiled_calls: usize = 0;
@@ -104,6 +116,17 @@ pub fn resetMockRuntime() void {
     compiler_utilities = obj.sharp_f;
     mock_icache_flush_calls = 0;
     mock_resize_tospace_arg = 0;
+    OS_channel_table_size = 16;
+    OS_have_select_p = 1;
+    mock_channel_buf = @splat(0);
+    mock_channel_len = 0;
+    mock_channels_open = @splat(false);
+    mock_channels_type = @splat(0);
+    mock_channels_nonblock = @splat(false);
+    mock_next_pipe_ch = 6;
+    mock_sel_fds = @splat(0);
+    mock_sel_modes = @splat(0);
+    mock_sel_count = 0;
     storage.memory_block_end = null;
     storage.heap_reserved = 0;
     storage.ephemeron_array = obj.sharp_f;
@@ -633,3 +656,115 @@ pub export fn abort_to_interpreter_argument() callconv(.c) c_int {
 
 pub export fn OS_file_remove(_: [*:0]const u8) callconv(.c) void {}
 pub export fn OS_file_remove_link(_: [*:0]const u8) callconv(.c) void {}
+
+pub fn setMockChannel(ch: abi.Tchannel, ch_type: c_uint, nonblock: bool) void {
+    mock_channels_open[ch] = true;
+    mock_channels_type[ch] = ch_type;
+    mock_channels_nonblock[ch] = nonblock;
+}
+
+pub export fn OS_channel_open_p(ch: abi.Tchannel) callconv(.c) c_int {
+    return if (ch < mock_channels_open.len and mock_channels_open[ch]) 1 else 0;
+}
+
+pub export fn OS_channel_close(ch: abi.Tchannel) callconv(.c) void {
+    if (ch < mock_channels_open.len) {
+        mock_channels_open[ch] = false;
+        last_closed_channel = ch;
+    }
+}
+
+pub export fn OS_channel_close_on_abort(ch: abi.Tchannel) callconv(.c) void {
+    _ = ch;
+}
+
+pub export fn OS_channel_synchronize(_: abi.Tchannel) callconv(.c) void {}
+
+pub export fn OS_channel_type(ch: abi.Tchannel) callconv(.c) c_uint {
+    return if (ch < mock_channels_type.len) mock_channels_type[ch] else 0;
+}
+
+pub export fn OS_channel_read(_: abi.Tchannel, buf: ?*anyopaque, nbytes: usize) callconv(.c) c_long {
+    const n = @min(nbytes, mock_channel_len);
+    const dst: [*]u8 = @ptrCast(buf.?);
+    @memcpy(dst[0..n], mock_channel_buf[0..n]);
+    return @intCast(n);
+}
+
+pub export fn OS_channel_write(_: abi.Tchannel, buf: ?*const anyopaque, nbytes: usize) callconv(.c) c_long {
+    const n = @min(nbytes, mock_channel_buf.len);
+    const src: [*]const u8 = @ptrCast(buf.?);
+    @memcpy(mock_channel_buf[0..n], src[0..n]);
+    mock_channel_len = n;
+    return @intCast(n);
+}
+
+pub export fn OS_make_pipe(rp: *abi.Tchannel, wp: *abi.Tchannel) callconv(.c) void {
+    rp.* = mock_next_pipe_ch;
+    wp.* = mock_next_pipe_ch + 1;
+    setMockChannel(rp.*, @intFromEnum(abi.ChannelType.unix_pipe), false);
+    setMockChannel(wp.*, @intFromEnum(abi.ChannelType.unix_pipe), false);
+    mock_next_pipe_ch += 2;
+}
+
+pub export fn OS_channel_nonblocking_p(ch: abi.Tchannel) callconv(.c) c_int {
+    return if (ch < mock_channels_nonblock.len and mock_channels_nonblock[ch]) 1 else 0;
+}
+
+pub export fn OS_channel_nonblocking(ch: abi.Tchannel) callconv(.c) void {
+    if (ch < mock_channels_nonblock.len) mock_channels_nonblock[ch] = true;
+}
+
+pub export fn OS_channel_blocking(ch: abi.Tchannel) callconv(.c) void {
+    if (ch < mock_channels_nonblock.len) mock_channels_nonblock[ch] = false;
+}
+
+pub export fn OS_allocate_select_registry() callconv(.c) abi.SelectRegistry {
+    return &mock_sel_sentinel;
+}
+
+pub export fn OS_deallocate_select_registry(_: abi.SelectRegistry) callconv(.c) void {}
+
+pub export fn OS_add_to_select_registry(_: abi.SelectRegistry, fd: c_int, mode: c_uint) callconv(.c) void {
+    if (mock_sel_count < mock_sel_fds.len) {
+        mock_sel_fds[mock_sel_count] = fd;
+        mock_sel_modes[mock_sel_count] = mode;
+        mock_sel_count += 1;
+    }
+}
+
+pub export fn OS_remove_from_select_registry(_: abi.SelectRegistry, fd: c_int, _: c_uint) callconv(.c) void {
+    var i: c_uint = 0;
+    while (i < mock_sel_count) : (i += 1) {
+        if (mock_sel_fds[i] == fd) {
+            var j = i;
+            while (j + 1 < mock_sel_count) : (j += 1) {
+                mock_sel_fds[j] = mock_sel_fds[j + 1];
+                mock_sel_modes[j] = mock_sel_modes[j + 1];
+            }
+            mock_sel_count -= 1;
+            return;
+        }
+    }
+}
+
+pub export fn OS_select_registry_length(_: abi.SelectRegistry) callconv(.c) c_uint {
+    return mock_sel_count;
+}
+
+pub export fn OS_select_registry_result(_: abi.SelectRegistry, idx: c_uint, fd_r: *c_int, mode_r: *c_uint) callconv(.c) void {
+    fd_r.* = mock_sel_fds[idx];
+    mode_r.* = mock_sel_modes[idx];
+}
+
+pub export fn OS_test_select_registry(_: abi.SelectRegistry, _: c_int) callconv(.c) c_int {
+    return @intCast(mock_sel_count);
+}
+
+pub export fn OS_test_select_descriptor(_: c_int, _: c_int, mode: c_uint) callconv(.c) c_int {
+    return @intCast(mode);
+}
+
+pub export fn OS_pause(_: bool, _: bool) callconv(.c) c_int {
+    return 0;
+}

@@ -298,6 +298,31 @@ pub const RelocRef = extern struct {
     new_addr: ?*anyopaque,
 };
 
+pub const Tchannel = c_uint;
+pub const no_channel: Tchannel = std.math.maxInt(Tchannel);
+pub const SelectRegistry = ?*anyopaque;
+
+pub const ChannelType = enum(c_uint) {
+    unknown = 0,
+    file = 1,
+    unix_pipe = 2,
+    unix_fifo = 3,
+    terminal = 4,
+    unix_pty_master = 5,
+    unix_server_socket = 6,
+    unix_stream_socket = 7,
+    tcp_stream_socket = 8,
+    tcp_server_socket = 9,
+    directory = 10,
+    unix_character_device = 11,
+    unix_block_device = 12,
+    unused_1 = 13,
+    unused_2 = 14,
+    unused_3 = 15,
+    win32_anonymous_pipe = 16,
+    win32_named_pipe = 17,
+};
+
 pub extern var ephemeron_array: obj.SchemeObject;
 pub extern var ephemeron_count: c_ulong;
 
@@ -376,6 +401,30 @@ pub extern "c" fn hashable_object_p(obj.SchemeObject) bool;
 pub extern "c" fn hash_object(obj.SchemeObject) u32;
 pub extern "c" fn combine_hashes(u32, u32) u32;
 pub extern "c" fn OS_channel_close_noerror(c_uint) void;
+pub extern var OS_channel_table_size: Tchannel;
+pub extern var OS_have_select_p: c_int;
+pub extern "c" fn OS_channel_open_p(Tchannel) c_int;
+pub extern "c" fn OS_channel_close(Tchannel) void;
+pub extern "c" fn OS_channel_close_on_abort(Tchannel) void;
+pub extern "c" fn OS_channel_synchronize(Tchannel) void;
+pub extern "c" fn OS_channel_type(Tchannel) c_uint;
+pub extern "c" fn OS_channel_read(Tchannel, ?*anyopaque, usize) c_long;
+pub extern "c" fn OS_channel_write(Tchannel, ?*const anyopaque, usize) c_long;
+pub extern "c" fn OS_make_pipe(*Tchannel, *Tchannel) void;
+pub extern "c" fn OS_channel_nonblocking_p(Tchannel) c_int;
+pub extern "c" fn OS_channel_nonblocking(Tchannel) void;
+pub extern "c" fn OS_channel_blocking(Tchannel) void;
+pub extern "c" fn OS_allocate_select_registry() SelectRegistry;
+pub extern "c" fn OS_deallocate_select_registry(SelectRegistry) void;
+pub extern "c" fn OS_add_to_select_registry(SelectRegistry, c_int, c_uint) void;
+pub extern "c" fn OS_remove_from_select_registry(SelectRegistry, c_int, c_uint) void;
+pub extern "c" fn OS_select_registry_length(SelectRegistry) c_uint;
+pub extern "c" fn OS_select_registry_result(SelectRegistry, c_uint, *c_int, *c_uint) void;
+pub extern "c" fn OS_test_select_registry(SelectRegistry, c_int) c_int;
+pub extern "c" fn OS_test_select_descriptor(c_int, c_int, c_uint) c_int;
+pub extern "c" fn OS_pause(bool, bool) c_int;
+pub extern "c" fn arg_to_channel(obj.SchemeObject, c_int) Tchannel;
+pub extern "c" fn arg_channel(c_int) Tchannel;
 pub extern "c" fn find_primitive(obj.SchemeObject, bool, bool, c_int) obj.SchemeObject;
 pub extern "c" fn termination_normal(c_int) noreturn;
 pub extern "c" fn OS_restartable_exit() void;
@@ -764,6 +813,26 @@ pub inline fn checkArg(n: c_int, comptime pred: anytype) void {
     if (!pred(argRef(@intCast(n)))) {
         error_wrong_type_arg(n);
     }
+}
+
+pub inline fn stringArg(n: c_int) [*:0]u8 {
+    const arg = argRef(@intCast(n));
+    if (!obj.legacyStringP(arg)) {
+        error_wrong_type_arg(n);
+    }
+    return @ptrCast(obj.legacyStringData(arg));
+}
+
+pub inline fn vectorArg(n: c_int) obj.SchemeObject {
+    const arg = argRef(@intCast(n));
+    if (!obj.vectorP(arg)) {
+        error_wrong_type_arg(n);
+    }
+    return arg;
+}
+
+pub inline fn booleanArg(n: usize) bool {
+    return argRef(n) != obj.sharp_f;
 }
 
 pub inline fn getLexprActuals() c_ulong {
