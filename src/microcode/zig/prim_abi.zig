@@ -18,9 +18,21 @@ pub const regblock_int_code: usize = 12;
 
 pub const int_stack_overflow: c_ulong = 0x0001;
 pub const int_gc: c_ulong = 0x0004;
+pub const int_character: c_ulong = 0x0010;
+pub const int_timer: c_ulong = 0x0040;
+pub const int_global_3: c_ulong = 0x0080;
+pub const int_suspend: c_ulong = 0x0100;
+pub const int_mask: c_ulong = (@as(c_ulong, 1) << 16) - 1;
 
 pub const term_exit: c_int = 0x0C;
+pub const term_no_space: c_int = 0x15;
+pub const err_undefined_primitive: c_long = 0x09;
 pub const err_wrong_number_of_arguments: c_long = 0x0C;
+pub const err_out_of_file_handles: c_long = 0x20;
+pub const err_floating_overflow: c_long = 0x32;
+pub const err_unimplemented_primitive: c_long = 0x33;
+pub const err_wrong_arity_primitives: c_long = 0x36;
+pub const err_process_terminated: c_long = 0x3F;
 pub const prim_apply: c_long = -3;
 pub const prim_no_trap_eval: c_long = -5;
 pub const prim_no_trap_apply: c_long = -6;
@@ -28,12 +40,14 @@ pub const prim_no_trap_pop_return: c_long = -11;
 pub const max_return_code: c_ulong = 0x5E;
 pub const rc_hardware_trap: c_ulong = 0x5C;
 pub const unknown_primitive_arity: c_int = -2;
-pub const err_unimplemented_primitive: c_long = 0x33;
-pub const err_wrong_arity_primitives: c_long = 0x36;
 pub const syscall_malloc: c_int = 29;
 pub const syserr_not_enough_space: c_int = 33;
 
 pub const PrimitiveProcedure = *const fn () callconv(.c) obj.SchemeObject;
+pub const OutfChannel = extern struct {
+    type: c_int,
+    cookie: ?*anyopaque,
+};
 
 pub const fixobj_obarray: usize = 0x03;
 pub const fixobj_stepper_state: usize = 0x0E;
@@ -111,6 +125,12 @@ pub extern "c" fn error_in_system_call(c_int, c_int) noreturn;
 pub extern "c" fn OS_malloc(usize) ?*anyopaque;
 pub extern "c" fn OS_realloc(?*anyopaque, usize) ?*anyopaque;
 pub extern "c" fn OS_free(?*anyopaque) void;
+pub extern "c" fn get_object_address(obj.SchemeObject) ?[*]obj.SchemeObject;
+pub extern "c" fn OS_tty_map_interrupt_char(u8) u8;
+pub extern "c" fn outf(OutfChannel, [*:0]const u8, ...) void;
+pub extern "c" fn outf_flush(OutfChannel) void;
+pub extern "c" fn debug_stack_trace(OutfChannel) void;
+pub extern "c" fn debug_print_expr(obj.SchemeObject, [*:0]const u8) void;
 pub extern "c" fn outf_fatal([*:0]const u8, ...) void;
 pub extern "c" fn outf_error([*:0]const u8, ...) void;
 pub extern "c" fn record_primitive_entry(obj.SchemeObject) void;
@@ -348,6 +368,24 @@ pub inline fn gcEnabledP() bool {
 
 pub inline fn pendingInterrupts() c_ulong {
     return Registers[regblock_int_mask] & Registers[regblock_int_code];
+}
+
+pub inline fn interruptPendingP(mask: c_ulong) bool {
+    return (pendingInterrupts() & mask) != 0;
+}
+
+pub inline fn addressInConstantP(addr: [*]const obj.SchemeObject) bool {
+    return @intFromPtr(addr) >= @intFromPtr(constant_start) and @intFromPtr(addr) < @intFromPtr(constant_end);
+}
+
+pub inline fn requestInterrupt(code: c_ulong) void {
+    Registers[regblock_int_code] |= code;
+    compilerSetupInterrupt();
+}
+
+pub inline fn setInterruptMask(mask: c_ulong) void {
+    Registers[regblock_int_mask] = mask;
+    compilerSetupInterrupt();
 }
 
 pub inline fn freeOkP(free: [*]const obj.SchemeObject) bool {

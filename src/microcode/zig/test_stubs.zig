@@ -255,9 +255,21 @@ pub export fn arg_index_integer_to_intmax(n: c_int, upper_limit: i64) callconv(.
     return num;
 }
 
-pub export fn error_unimplemented_primitive() callconv(.c) noreturn {
-    @panic("mock error_unimplemented_primitive");
+pub export fn get_object_address(o: obj.SchemeObject) callconv(.c) ?[*]obj.SchemeObject {
+    return if (gc_ptr_type(o) == @intFromEnum(abi.GcPtrType.normal)) obj.objectAddress(o) else null;
 }
+
+pub export fn OS_tty_map_interrupt_char(c: u8) callconv(.c) u8 {
+    return c;
+}
+
+pub export fn outf(_: abi.OutfChannel, _: [*:0]const u8, ...) callconv(.c) void {}
+
+pub export fn outf_flush(_: abi.OutfChannel) callconv(.c) void {}
+
+pub export fn debug_stack_trace(_: abi.OutfChannel) callconv(.c) void {}
+
+pub export fn debug_print_expr(_: obj.SchemeObject, _: [*:0]const u8) callconv(.c) void {}
 
 pub export fn OS_get_entropy(buf: *[32]u8) callconv(.c) void {
     for (buf, 0..) |*slot, idx| {

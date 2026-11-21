@@ -48,6 +48,9 @@ pub const sysprim = @import("sysprim.zig");
 pub const error_cond = @import("error_cond.zig");
 pub const prim = @import("prim.zig");
 pub const primutl = @import("primutl.zig");
+pub const purutl = @import("purutl.zig");
+pub const ostty = @import("ostty.zig");
+pub const osscheme = @import("osscheme.zig");
 
 comptime {
     _ = chacha;
@@ -96,6 +99,9 @@ comptime {
     _ = error_cond;
     _ = prim;
     _ = primutl;
+    _ = purutl;
+    _ = ostty;
+    _ = osscheme;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -151,4 +157,7 @@ test "microcode zig scaffold" {
     _ = error_cond;
     _ = prim;
     _ = primutl;
+    _ = purutl;
+    _ = ostty;
+    _ = osscheme;
 }
