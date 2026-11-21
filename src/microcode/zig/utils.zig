@@ -407,7 +407,7 @@ pub export fn interpreter_applicable_p(object_arg: obj.SchemeObject) callconv(.c
             obj.tc_compiled_entry => {
                 if (build_options.cc_support) {
                     var cet: abi.CcEntryType = undefined;
-                    return if (abi.read_cc_entry_type(&cet, @ptrCast(obj.objectAddress(object))))
+                    return if (abi.read_cc_entry_type(&cet, obj.objectRawAddress(object)))
                         false
                     else
                         (cet.marker == .procedure);

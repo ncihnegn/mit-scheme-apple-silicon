@@ -62,7 +62,7 @@ pub export fn Prim_prim_obj_datum() callconv(.c) obj.SchemeObject {
 // Return the address part of OBJECT as an unsigned integer.")
 pub export fn Prim_prim_obj_address() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    return artutl.ulong_to_integer(@intCast(@intFromPtr(obj.objectAddress(abi.argRef(1)))));
+    return artutl.ulong_to_integer(@intCast(obj.datumToRawAddress(obj.objectDatum(abi.argRef(1)))));
 }
 
 // DEFINE_PRIMITIVE ("PRIMITIVE-DATUM->ADDRESS", Prim_prim_datum_to_addr, 1, 1,
@@ -70,7 +70,7 @@ pub export fn Prim_prim_obj_address() callconv(.c) obj.SchemeObject {
 // Return the memory address corresponding to DATUM.")
 pub export fn Prim_prim_datum_to_addr() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    return artutl.ulong_to_integer(@intCast(@intFromPtr(obj.datumToAddress(argDatum(1)))));
+    return artutl.ulong_to_integer(@intCast(obj.datumToRawAddress(argDatum(1))));
 }
 
 // DEFINE_PRIMITIVE ("PRIMITIVE-ADDRESS->DATUM", Prim_prim_addr_to_datum, 1, 1,
@@ -78,7 +78,7 @@ pub export fn Prim_prim_datum_to_addr() callconv(.c) obj.SchemeObject {
 // Return the object datum corresponding to ADDRESS.")
 pub export fn Prim_prim_addr_to_datum() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    return artutl.ulong_to_integer(obj.addressToDatum(@ptrFromInt(@as(usize, @intCast(abi.arg_ulong_integer(1))))));
+    return artutl.ulong_to_integer(obj.rawAddressToDatum(@intCast(abi.arg_ulong_integer(1))));
 }
 
 // DEFINE_PRIMITIVE ("MAKE-NON-POINTER-OBJECT", Prim_make_non_ptr_object, 1, 1,
@@ -238,7 +238,7 @@ pub export fn Prim_prim_datum_set() callconv(.c) obj.SchemeObject {
 // Fetches the 8-bit unsigned integer at offset INDEX in OBJECT.")
 pub export fn Prim_prim_byte_ref() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    const ptr: [*]const u8 = @ptrCast(obj.objectAddress(abi.argRef(1)));
+    const ptr: [*]const u8 = @ptrCast(obj.objectRawAddress(abi.argRef(1)).?);
     const index: usize = @intCast(abi.arg_ulong_integer(2));
     return artutl.ulong_to_integer(ptr[index]);
 }
@@ -251,7 +251,7 @@ pub export fn Prim_prim_byte_ref() callconv(.c) obj.SchemeObject {
 // Stores VALUE at offset INDEX in OBJECT.")
 pub export fn Prim_prim_byte_set() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    const ptr: [*]u8 = @ptrCast(obj.objectAddress(abi.argRef(1)));
+    const ptr: [*]u8 = @ptrCast(obj.objectRawAddress(abi.argRef(1)).?);
     const index: usize = @intCast(abi.arg_ulong_integer(2));
     ptr[index] = @intCast(abi.arg_ulong_index_integer(3, 0x100));
     return obj.unspecific;
@@ -264,7 +264,7 @@ pub export fn Prim_prim_byte_set() callconv(.c) obj.SchemeObject {
 // Fetches the 16-bit unsigned integer at offset INDEX in OBJECT.")
 pub export fn Prim_prim_u16_ref() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    const ptr: [*]align(1) const u16 = @ptrCast(obj.objectAddress(abi.argRef(1)));
+    const ptr: [*]align(1) const u16 = @ptrCast(obj.objectRawAddress(abi.argRef(1)).?);
     const index: usize = @intCast(abi.arg_ulong_integer(2));
     return artutl.ulong_to_integer(ptr[index]);
 }
@@ -277,7 +277,7 @@ pub export fn Prim_prim_u16_ref() callconv(.c) obj.SchemeObject {
 // Stores VALUE at offset INDEX in OBJECT.")
 pub export fn Prim_prim_u16_set() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    const ptr: [*]align(1) u16 = @ptrCast(obj.objectAddress(abi.argRef(1)));
+    const ptr: [*]align(1) u16 = @ptrCast(obj.objectRawAddress(abi.argRef(1)).?);
     const index: usize = @intCast(abi.arg_ulong_integer(2));
     ptr[index] = @intCast(abi.arg_ulong_index_integer(3, 0x10000));
     return obj.unspecific;

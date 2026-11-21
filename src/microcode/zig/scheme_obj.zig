@@ -136,6 +136,24 @@ pub inline fn makePointerObject(tc: c_ulong, addr: [*]const SchemeObject) Scheme
     return makeObject(tc, addressToDatum(addr));
 }
 
+pub inline fn datumToRawAddress(datum: c_ulong) usize {
+    if (heap_in_low_memory) {
+        return @intCast(datum);
+    }
+    return @intFromPtr(memory_base) + @as(usize, @intCast(datum)) * @sizeOf(SchemeObject);
+}
+
+pub inline fn rawAddressToDatum(addr: usize) c_ulong {
+    if (heap_in_low_memory) {
+        return @intCast(addr);
+    }
+    return @intCast((addr -% @intFromPtr(memory_base)) / @sizeOf(SchemeObject));
+}
+
+pub inline fn objectRawAddress(obj: SchemeObject) ?*anyopaque {
+    return @ptrFromInt(datumToRawAddress(objectDatum(obj)));
+}
+
 pub inline fn booleanToObject(cond: bool) SchemeObject {
     return if (cond) sharp_t else sharp_f;
 }

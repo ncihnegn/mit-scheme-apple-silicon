@@ -355,7 +355,7 @@ pub export fn fasl_cc_address(o: obj.SchemeObject, h: *FaslHeader) callconv(.c) 
     }
     if (h.arch == currentFaslArch()) {
         std.debug.assert(obj.objectType(o) == obj.tc_compiled_entry);
-        return @ptrCast(@alignCast(obj.datumToAddress(datum)));
+        return @ptrFromInt(obj.datumToRawAddress(datum));
     }
     abort();
 }
@@ -368,7 +368,7 @@ pub export fn fasl_cc_return(o: obj.SchemeObject, h: *FaslHeader) callconv(.c) ?
     }
     if (h.arch == currentFaslArch()) {
         std.debug.assert(obj.ccReturnP(o));
-        return @ptrCast(@alignCast(obj.datumToAddress(datum)));
+        return @ptrFromInt(obj.datumToRawAddress(datum));
     }
     abort();
 }
@@ -398,10 +398,7 @@ pub export fn fasl_raw_address_to_cc_entry(address: ?[*]Insn, h: *FaslHeader) ca
         return obj.makeObject(obj.tc_compiled_entry, datum);
     }
     if (h.arch == currentFaslArch()) {
-        const datum: c_ulong = if (obj.heap_in_low_memory)
-            @intCast(@intFromPtr(address))
-        else
-            obj.addressToDatum(@ptrCast(@alignCast(address.?)));
+        const datum: c_ulong = obj.rawAddressToDatum(@intFromPtr(address));
         return obj.makeObject(obj.tc_compiled_entry, datum);
     }
     abort();
@@ -502,4 +499,14 @@ test "fasl header encode/decode roundtrip, version checks, addressing, and utili
     const insn_ptr: [*]Insn = @ptrCast(&arena[8]);
     const cc_obj = fasl_raw_address_to_cc_entry(insn_ptr + 3, &decoded);
     try std.testing.expectEqual(insn_ptr + 3, fasl_cc_address(cc_obj, &decoded).?);
+
+    // 4-byte-aligned compiled entry/return addresses must not enforce 8-byte word alignment
+    if (obj.heap_in_low_memory) {
+        var low_h = std.mem.zeroes(FaslHeader);
+        low_h.arch = currentFaslArch();
+        const unaligned_cc = obj.makeObject(obj.tc_compiled_entry, 0x10004);
+        const unaligned_ret = obj.makeObject(obj.tc_compiled_return, 0x10004);
+        try std.testing.expectEqual(@as(usize, 0x10004), @intFromPtr(fasl_cc_address(unaligned_cc, &low_h).?));
+        try std.testing.expectEqual(@as(usize, 0x10004), @intFromPtr(fasl_cc_return(unaligned_ret, &low_h).?));
+    }
 }
