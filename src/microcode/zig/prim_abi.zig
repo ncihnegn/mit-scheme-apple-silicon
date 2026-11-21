@@ -133,7 +133,11 @@ pub const env_cont_size: usize = cont_size + 1;
 pub const history_cont_size: usize = cont_size + 2;
 pub const lexpr_primitive_arity: c_int = -1;
 pub const unknown_primitive_arity: c_int = -2;
+pub const syscall_chmod: c_int = 3;
+pub const syscall_gethostname: c_int = 18;
 pub const syscall_malloc: c_int = 29;
+pub const syscall_uname: c_int = 65;
+pub const syscall_utime: c_int = 67;
 pub const syserr_not_enough_space: c_int = 33;
 
 pub const PrimitiveProcedure = *const fn () callconv(.c) obj.SchemeObject;
@@ -304,6 +308,82 @@ pub const no_channel: Tchannel = std.math.maxInt(Tchannel);
 pub const SelectRegistry = ?*anyopaque;
 pub const OffT = std.c.off_t;
 pub const off_t_max: i64 = std.math.maxInt(i64);
+
+pub const Stat = if (builtin.os.tag.isDarwin())
+    std.c.Stat
+else if (builtin.os.tag == .linux and builtin.cpu.arch == .aarch64)
+    extern struct {
+        dev: u64,
+        ino: u64,
+        mode: u32,
+        nlink: u32,
+        uid: u32,
+        gid: u32,
+        rdev: u64,
+        __pad1: u64,
+        size: i64,
+        blksize: i32,
+        __pad2: i32,
+        blocks: i64,
+        atim: std.c.timespec,
+        mtim: std.c.timespec,
+        ctim: std.c.timespec,
+        __glibc_reserved: [2]c_int,
+
+        pub fn atime(self: @This()) std.c.timespec {
+            return self.atim;
+        }
+
+        pub fn mtime(self: @This()) std.c.timespec {
+            return self.mtim;
+        }
+
+        pub fn ctime(self: @This()) std.c.timespec {
+            return self.ctim;
+        }
+    }
+else if (builtin.os.tag == .linux and builtin.cpu.arch == .x86_64)
+    extern struct {
+        dev: u64,
+        ino: u64,
+        nlink: u64,
+        mode: u32,
+        uid: u32,
+        gid: u32,
+        __pad0: c_int,
+        rdev: u64,
+        size: i64,
+        blksize: i64,
+        blocks: i64,
+        atim: std.c.timespec,
+        mtim: std.c.timespec,
+        ctim: std.c.timespec,
+        __glibc_reserved: [3]c_long,
+
+        pub fn atime(self: @This()) std.c.timespec {
+            return self.atim;
+        }
+
+        pub fn mtime(self: @This()) std.c.timespec {
+            return self.mtim;
+        }
+
+        pub fn ctime(self: @This()) std.c.timespec {
+            return self.ctim;
+        }
+    }
+else
+    @compileError("unsupported OS/arch for struct stat");
+
+comptime {
+    if (builtin.os.tag.isDarwin()) {
+        std.debug.assert(@sizeOf(Stat) == 144);
+    } else if (builtin.os.tag == .linux and builtin.cpu.arch == .aarch64) {
+        std.debug.assert(@sizeOf(Stat) == 128);
+    } else if (builtin.os.tag == .linux and builtin.cpu.arch == .x86_64) {
+        std.debug.assert(@sizeOf(Stat) == 144);
+    }
+}
 
 pub const FileExistence = enum(c_uint) {
     does_exist = 0,
@@ -646,6 +726,14 @@ pub extern "c" fn OS_create_tcp_server_socket() Tchannel;
 pub extern "c" fn OS_bind_tcp_server_socket(Tchannel, ?*anyopaque, c_uint) void;
 pub extern "c" fn OS_listen_tcp_server_socket(Tchannel) void;
 pub extern "c" fn OS_tcp_server_connection_accept(Tchannel, ?*anyopaque, ?*c_uint) Tchannel;
+pub extern "c" fn UX_prim_check_errno(c_int) void;
+pub extern "c" fn OS_current_user_name() [*:0]const u8;
+pub extern "c" fn OS_current_user_home_directory() [*:0]const u8;
+pub extern "c" fn find_ccblock(c_ulong) obj.SchemeObject;
+pub extern "c" fn UX_read_fd_status(c_int, *Stat) void;
+pub extern "c" fn UX_read_file_status([*:0]const u8, *Stat) c_int;
+pub extern "c" fn UX_read_file_status_indirect([*:0]const u8, *Stat) c_int;
+pub extern "c" fn UX_file_system_type([*:0]const u8) ?[*:0]const u8;
 pub extern "c" fn find_primitive(obj.SchemeObject, bool, bool, c_int) obj.SchemeObject;
 pub extern "c" fn termination_normal(c_int) noreturn;
 pub extern "c" fn OS_restartable_exit() void;

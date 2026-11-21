@@ -24,9 +24,7 @@ inline fn processSignalPrim(comptime signal_fn: *const fn (abi.Tprocess) callcon
     return obj.unspecific;
 }
 
-// DEFINE_PRIMITIVE ("SCHEME-ENVIRONMENT", Prim_scheme_environment, 0, 0, 0)
-pub export fn Prim_scheme_environment() callconv(.c) obj.SchemeObject {
-    abi.primitiveHeader();
+pub fn environVector() obj.SchemeObject {
     var count: usize = 0;
     while (std.c.environ[count] != null) : (count += 1) {}
     const result = abi.allocate_vector(@intCast(count), true);
@@ -34,6 +32,12 @@ pub export fn Prim_scheme_environment() callconv(.c) obj.SchemeObject {
         obj.vectorSet(result, i, string.char_pointer_to_string(std.c.environ[i].?));
     }
     return result;
+}
+
+// DEFINE_PRIMITIVE ("SCHEME-ENVIRONMENT", Prim_scheme_environment, 0, 0, 0)
+pub export fn Prim_scheme_environment() callconv(.c) obj.SchemeObject {
+    abi.primitiveHeader();
+    return environVector();
 }
 
 // DEFINE_PRIMITIVE ("PROCESS-DELETE", Prim_process_delete, 1, 1,

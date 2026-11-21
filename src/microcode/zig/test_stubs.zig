@@ -79,6 +79,10 @@ pub var mock_sock_listen_calls: usize = 0;
 var mock_host_addr_1: [4]u8 = .{ 127, 0, 0, 1 };
 var mock_host_addr_2: [4]u8 = .{ 10, 0, 0, 2 };
 var mock_host_addrs = [_]?[*]u8{ &mock_host_addr_1, &mock_host_addr_2, null };
+pub var mock_stat: abi.Stat = std.mem.zeroes(abi.Stat);
+pub var mock_stat_2: abi.Stat = std.mem.zeroes(abi.Stat);
+pub var mock_stat_ok: c_int = 1;
+pub var mock_fs_type: ?[*:0]const u8 = "apfs";
 pub var mock_write_var_cache_calls: usize = 0;
 pub var mock_make_uuo_link_calls: usize = 0;
 pub var mock_apply_compiled_calls: usize = 0;
@@ -176,6 +180,10 @@ pub fn resetMockRuntime() void {
     mock_sock_accept_none = false;
     mock_last_sock_shutdown = 0;
     mock_sock_listen_calls = 0;
+    mock_stat = std.mem.zeroes(abi.Stat);
+    mock_stat_2 = std.mem.zeroes(abi.Stat);
+    mock_stat_ok = 1;
+    mock_fs_type = "apfs";
     storage.memory_block_end = null;
     storage.heap_reserved = 0;
     storage.ephemeron_array = obj.sharp_f;
@@ -1232,4 +1240,34 @@ pub export fn OS_tcp_server_connection_accept(_: abi.Tchannel, peer_host: ?*anyo
     const ch: abi.Tchannel = 12;
     setMockChannel(ch, @intFromEnum(abi.ChannelType.tcp_stream_socket), false);
     return ch;
+}
+
+pub export fn UX_prim_check_errno(name: c_int) callconv(.c) void {
+    _ = name;
+}
+pub export fn OS_current_user_name() callconv(.c) [*:0]const u8 {
+    return "mock-user";
+}
+pub export fn OS_current_user_home_directory() callconv(.c) [*:0]const u8 {
+    return "/home/mock-user";
+}
+pub export fn find_ccblock(pc: c_ulong) callconv(.c) obj.SchemeObject {
+    return obj.ulongToFixnum(pc & 0xFFFF);
+}
+pub export fn UX_read_fd_status(_: c_int, s: *abi.Stat) callconv(.c) void {
+    s.* = mock_stat;
+}
+pub export fn UX_read_file_status(filename: [*:0]const u8, s: *abi.Stat) callconv(.c) c_int {
+    if (std.mem.eql(u8, std.mem.span(filename), "/same-alias")) {
+        s.* = mock_stat_2;
+        return mock_stat_ok;
+    }
+    s.* = mock_stat;
+    return mock_stat_ok;
+}
+pub export fn UX_read_file_status_indirect(filename: [*:0]const u8, s: *abi.Stat) callconv(.c) c_int {
+    return UX_read_file_status(filename, s);
+}
+pub export fn UX_file_system_type(_: [*:0]const u8) callconv(.c) ?[*:0]const u8 {
+    return mock_fs_type;
 }
