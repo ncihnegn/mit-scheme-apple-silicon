@@ -60,6 +60,7 @@ pub const hooks = @import("hooks.zig");
 pub const fasl = @import("fasl.zig");
 pub const utils = @import("utils.zig");
 pub const memmag = @import("memmag.zig");
+pub const boot = @import("boot.zig");
 
 comptime {
     _ = chacha;
@@ -120,6 +121,7 @@ comptime {
     _ = fasl;
     _ = utils;
     _ = memmag;
+    _ = boot;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -187,4 +189,5 @@ test "microcode zig scaffold" {
     _ = fasl;
     _ = utils;
     _ = memmag;
+    _ = boot;
 }

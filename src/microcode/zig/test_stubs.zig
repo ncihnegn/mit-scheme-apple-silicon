@@ -5,6 +5,7 @@ const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
 const storage = @import("storage.zig");
 const utils = @import("utils.zig");
+const boot = @import("boot.zig");
 
 pub var signal_block_depth: i32 = 0;
 pub var fatal_count: usize = 0;
@@ -29,12 +30,25 @@ comptime {
     }
 }
 
-pub export var OS_Name: [*:0]const u8 = "unix";
-pub export var OS_Variant: [*:0]const u8 = "macOS";
 pub export var compiler_processor_type: c_uint = abi.compiler_aarch64_type;
-pub export var scheme_program_name: [*:0]const u8 = "mit-scheme-unit";
-pub export var critical_section_name: ?[*:0]const u8 = null;
 pub export var current_gc_table: ?*anyopaque = null;
+var mock_saved_argv = [_]?[*:0]const u8{ "scheme", "--batch-mode", null };
+var mock_unused_argv = [_]?[*:0]const u8{ "--extra", null };
+var mock_library_path = [_]?[*:0]const u8{ "/mock/lib1", "/mock/lib2", null };
+pub export var option_saved_argc: c_int = 2;
+pub export var option_saved_argv: [*]?[*:0]const u8 = &mock_saved_argv;
+pub export var option_unused_argc: c_int = 1;
+pub export var option_unused_argv: ?[*]?[*:0]const u8 = &mock_unused_argv;
+pub export var option_batch_mode: bool = false;
+pub export var option_show_help: bool = false;
+pub export var option_show_version: bool = false;
+pub export var option_library_path: [*]?[*:0]const u8 = &mock_library_path;
+pub export var option_band_file: ?[*:0]const u8 = null;
+pub export var option_fasl_file: ?[*:0]const u8 = null;
+pub export var option_heap_size: c_ulong = 1024;
+pub export var option_constant_size: c_ulong = 512;
+pub export var option_stack_size: c_ulong = 64;
+pub export var option_code_size: c_ulong = 64;
 pub export var compiler_utilities: obj.SchemeObject = obj.sharp_f;
 pub var mock_tospace_ptr: ?[*]obj.SchemeObject = null;
 pub var mock_gc_drain_calls: usize = 0;
@@ -76,7 +90,27 @@ pub fn resetMockRuntime() void {
     mock_trap_state = 4;
     mock_under_emacs = 0;
     compiler_processor_type = abi.compiler_aarch64_type;
-    critical_section_name = null;
+    boot.OS_Name = "unix";
+    boot.OS_Variant = "macOS";
+    boot.scheme_program_name = "mit-scheme-unit";
+    boot.critical_section_name = null;
+    boot.critical_section_hook_p = false;
+    boot.critical_section_hook = null;
+    boot.clearReloadSavedString();
+    option_saved_argc = 2;
+    option_saved_argv = &mock_saved_argv;
+    option_unused_argc = 1;
+    option_unused_argv = &mock_unused_argv;
+    option_batch_mode = false;
+    option_show_help = false;
+    option_show_version = false;
+    option_library_path = &mock_library_path;
+    option_band_file = null;
+    option_fasl_file = null;
+    option_heap_size = 1024;
+    option_constant_size = 512;
+    option_stack_size = 64;
+    option_code_size = 64;
     current_gc_table = null;
     compiler_utilities = obj.sharp_f;
     mock_tospace_ptr = null;
@@ -530,3 +564,12 @@ pub export fn unbind_variable(_: obj.SchemeObject, _: obj.SchemeObject, val_out:
     val_out.* = mock_lookup_value;
     return mock_lookup_result;
 }
+
+pub export fn init_exit_scheme() callconv(.c) void {}
+pub export fn read_command_line_options(_: c_int, _: [*]?[*:0]const u8) callconv(.c) void {}
+pub export fn compiler_initialize(_: bool) callconv(.c) void {}
+pub export fn OS_initialize() callconv(.c) void {}
+pub export fn OS_announcement() callconv(.c) void {}
+pub export fn Interpret() callconv(.c) void {}
+pub export fn outf_console(_: [*:0]const u8, ...) callconv(.c) void {}
+pub export fn outf_flush_console() callconv(.c) void {}

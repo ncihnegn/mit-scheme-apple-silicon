@@ -75,6 +75,7 @@ pub const prim_no_trap_apply: c_long = -6;
 pub const prim_pop_return: c_long = -7;
 pub const prim_no_trap_pop_return: c_long = -11;
 pub const max_return_code: c_ulong = 0x5E;
+pub const rc_end_of_computation: c_ulong = 0x00;
 pub const rc_join_stacklets: c_ulong = 0x01;
 pub const rc_internal_apply: c_ulong = 0x03;
 pub const rc_restore_history: c_ulong = 0x05;
@@ -277,6 +278,20 @@ pub extern var compiler_processor_type: c_uint;
 pub extern var OS_Name: [*:0]const u8;
 pub extern var OS_Variant: [*:0]const u8;
 pub extern var scheme_program_name: [*:0]const u8;
+pub extern var option_saved_argc: c_int;
+pub extern var option_saved_argv: [*]?[*:0]const u8;
+pub extern var option_unused_argc: c_int;
+pub extern var option_unused_argv: ?[*]?[*:0]const u8;
+pub extern var option_batch_mode: bool;
+pub extern var option_show_help: bool;
+pub extern var option_show_version: bool;
+pub extern var option_library_path: [*]?[*:0]const u8;
+pub extern var option_band_file: ?[*:0]const u8;
+pub extern var option_fasl_file: ?[*:0]const u8;
+pub extern var option_heap_size: c_ulong;
+pub extern var option_constant_size: c_ulong;
+pub extern var option_stack_size: c_ulong;
+pub extern var option_code_size: c_ulong;
 pub extern var MAX_PRIMITIVE: c_ulong;
 pub extern var Primitive_Arity_Table: ?[*]c_int;
 pub extern var Primitive_Name_Table: ?[*]?[*:0]const u8;
@@ -388,6 +403,14 @@ pub extern "c" fn std_gc_death([*:0]const u8, ...) noreturn;
 pub extern "c" fn initialize_gc_object_references() void;
 pub extern "c" fn finalize_gc_object_references() void;
 pub extern "c" fn collect_gc_object_references(obj.SchemeObject, obj.SchemeObject) void;
+pub extern "c" fn init_exit_scheme() void;
+pub extern "c" fn read_command_line_options(c_int, [*]?[*:0]const u8) void;
+pub extern "c" fn compiler_initialize(bool) void;
+pub extern "c" fn OS_initialize() void;
+pub extern "c" fn OS_announcement() void;
+pub extern "c" fn Interpret() void;
+pub extern "c" fn outf_console([*:0]const u8, ...) void;
+pub extern "c" fn outf_flush_console() void;
 
 pub extern "c" fn arg_integer(c_int) c_long;
 pub extern "c" fn arg_nonnegative_integer(c_int) c_long;
@@ -814,5 +837,11 @@ pub inline fn initializeStack() void {
     stack_pointer = stack_end;
     stack_start[0] = obj.makeBrokenHeart(stack_start);
     stack_guard = stack_start + @as(usize, @intCast(stack_guard_size));
+    compilerSetupInterrupt();
+}
+
+pub inline fn initializeInterrupts(mask: c_ulong) void {
+    Registers[regblock_int_mask] = mask;
+    Registers[regblock_int_code] = 0;
     compilerSetupInterrupt();
 }

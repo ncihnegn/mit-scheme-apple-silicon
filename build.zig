@@ -66,7 +66,6 @@ fn resolveArch(option: ArchOption, cpu: std.Target.Cpu) ArchConfig {
 }
 
 const std_c_sources = [_][]const u8{
-    "src/microcode/boot.c",
     "src/microcode/debug.c",
     "src/microcode/fasdump.c",
     "src/microcode/fasload.c",
@@ -109,6 +108,7 @@ const std_c_sources = [_][]const u8{
 const zig_prim_sources = [_][]const u8{
     "src/microcode/zig/bigprm.zig",
     "src/microcode/zig/bitstr.zig",
+    "src/microcode/zig/boot.zig",
     "src/microcode/zig/bytevector.zig",
     "src/microcode/zig/char.zig",
     "src/microcode/zig/daemon.zig",
