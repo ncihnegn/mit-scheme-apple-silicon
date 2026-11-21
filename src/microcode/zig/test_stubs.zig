@@ -6,6 +6,7 @@ const abi = @import("prim_abi.zig");
 const storage = @import("storage.zig");
 const utils = @import("utils.zig");
 const boot = @import("boot.zig");
+const option = @import("option.zig");
 
 pub var signal_block_depth: i32 = 0;
 pub var fatal_count: usize = 0;
@@ -35,20 +36,6 @@ pub export var current_gc_table: ?*anyopaque = null;
 var mock_saved_argv = [_]?[*:0]const u8{ "scheme", "--batch-mode", null };
 var mock_unused_argv = [_]?[*:0]const u8{ "--extra", null };
 var mock_library_path = [_]?[*:0]const u8{ "/mock/lib1", "/mock/lib2", null };
-pub export var option_saved_argc: c_int = 2;
-pub export var option_saved_argv: [*]?[*:0]const u8 = &mock_saved_argv;
-pub export var option_unused_argc: c_int = 1;
-pub export var option_unused_argv: ?[*]?[*:0]const u8 = &mock_unused_argv;
-pub export var option_batch_mode: bool = false;
-pub export var option_show_help: bool = false;
-pub export var option_show_version: bool = false;
-pub export var option_library_path: [*]?[*:0]const u8 = &mock_library_path;
-pub export var option_band_file: ?[*:0]const u8 = null;
-pub export var option_fasl_file: ?[*:0]const u8 = null;
-pub export var option_heap_size: c_ulong = 1024;
-pub export var option_constant_size: c_ulong = 512;
-pub export var option_stack_size: c_ulong = 64;
-pub export var option_code_size: c_ulong = 64;
 pub export var compiler_utilities: obj.SchemeObject = obj.sharp_f;
 pub var mock_tospace_ptr: ?[*]obj.SchemeObject = null;
 pub var mock_gc_drain_calls: usize = 0;
@@ -97,20 +84,23 @@ pub fn resetMockRuntime() void {
     boot.critical_section_hook_p = false;
     boot.critical_section_hook = null;
     boot.clearReloadSavedString();
-    option_saved_argc = 2;
-    option_saved_argv = &mock_saved_argv;
-    option_unused_argc = 1;
-    option_unused_argv = &mock_unused_argv;
-    option_batch_mode = false;
-    option_show_help = false;
-    option_show_version = false;
-    option_library_path = &mock_library_path;
-    option_band_file = null;
-    option_fasl_file = null;
-    option_heap_size = 1024;
-    option_constant_size = 512;
-    option_stack_size = 64;
-    option_code_size = 64;
+    option.option_saved_argc = 2;
+    option.option_saved_argv = &mock_saved_argv;
+    option.option_unused_argc = 1;
+    option.option_unused_argv = &mock_unused_argv;
+    option.option_batch_mode = false;
+    option.option_show_help = false;
+    option.option_show_version = false;
+    option.option_emacs_subprocess = false;
+    option.option_force_interactive = false;
+    option.option_disable_core_dump = false;
+    option.option_library_path = &mock_library_path;
+    option.option_band_file = null;
+    option.option_fasl_file = null;
+    option.option_heap_size = 1024;
+    option.option_constant_size = 512;
+    option.option_stack_size = 64;
+    option.option_code_size = 64;
     current_gc_table = null;
     compiler_utilities = obj.sharp_f;
     mock_tospace_ptr = null;
@@ -566,7 +556,20 @@ pub export fn unbind_variable(_: obj.SchemeObject, _: obj.SchemeObject, val_out:
 }
 
 pub export fn init_exit_scheme() callconv(.c) void {}
-pub export fn read_command_line_options(_: c_int, _: [*]?[*:0]const u8) callconv(.c) void {}
+pub export fn OS_file_access(_: [*:0]const u8, _: c_uint) callconv(.c) c_int {
+    return 0;
+}
+pub export fn OS_working_dir_pathname() callconv(.c) [*:0]const u8 {
+    return "/mock/wd";
+}
+comptime {
+    if (builtin.os.tag.isDarwin()) {
+        @export(&mockMacosxMainBundleDir, .{ .name = "macosx_main_bundle_dir" });
+    }
+}
+fn mockMacosxMainBundleDir() callconv(.c) ?[*:0]const u8 {
+    return null;
+}
 pub export fn compiler_initialize(_: bool) callconv(.c) void {}
 pub export fn OS_initialize() callconv(.c) void {}
 pub export fn OS_announcement() callconv(.c) void {}

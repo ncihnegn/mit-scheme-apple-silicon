@@ -34,13 +34,33 @@ pub const Obstack = extern struct {
         _obstack_begin(self, size, 0, chunkfun, freefun);
     }
 
-    pub fn alloc(self: *Obstack, len: usize) [*]u8 {
-        const room = @intFromPtr(self.chunk_limit.?) - @intFromPtr(self.next_free.?);
-        if (room < len) {
-            _obstack_newchunk(self, @intCast(len));
-        }
-        self.next_free = self.next_free.? + len;
+    pub fn objectSize(self: *const Obstack) usize {
+        return @intFromPtr(self.next_free.?) - @intFromPtr(self.object_base.?);
+    }
 
+    pub fn grow(self: *Obstack, data: []const u8) void {
+        const room = @intFromPtr(self.chunk_limit.?) - @intFromPtr(self.next_free.?);
+        if (room < data.len) {
+            _obstack_newchunk(self, @intCast(data.len));
+        }
+        @memcpy(self.next_free.?[0..data.len], data);
+        self.next_free = self.next_free.? + data.len;
+    }
+
+    pub fn growByte(self: *Obstack, byte: u8) void {
+        if (@intFromPtr(self.next_free.?) >= @intFromPtr(self.chunk_limit.?)) {
+            _obstack_newchunk(self, 1);
+        }
+        self.next_free.?[0] = byte;
+        self.next_free = self.next_free.? + 1;
+    }
+
+    pub fn growPtr(self: *Obstack, ptr: ?*const anyopaque) void {
+        const p_bytes: *const [@sizeOf(?*const anyopaque)]u8 = @ptrCast(&ptr);
+        self.grow(p_bytes);
+    }
+
+    pub fn finish(self: *Obstack) [*]u8 {
         const value = self.object_base.?;
         const align_mask: usize = @intCast(self.alignment_mask);
         var aligned = (@intFromPtr(self.next_free.?) +% align_mask) & ~align_mask;
@@ -51,6 +71,15 @@ pub const Obstack = extern struct {
         self.next_free = @ptrFromInt(aligned);
         self.object_base = self.next_free;
         return value;
+    }
+
+    pub fn alloc(self: *Obstack, len: usize) [*]u8 {
+        const room = @intFromPtr(self.chunk_limit.?) - @intFromPtr(self.next_free.?);
+        if (room < len) {
+            _obstack_newchunk(self, @intCast(len));
+        }
+        self.next_free = self.next_free.? + len;
+        return self.finish();
     }
 
     pub fn freeObj(self: *Obstack, obj: ?*anyopaque) void {

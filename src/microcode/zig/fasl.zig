@@ -102,7 +102,7 @@ pub const FaslHeader = extern struct {
     ephemeron_count: c_ulong,
 };
 
-fn currentFaslArch() c_uint {
+pub fn currentFaslArch() c_uint {
     if (build_options.cc_is_svm) {
         const endian = builtin.cpu.arch.endian();
         if (@sizeOf(c_ulong) == 8) {
@@ -159,7 +159,7 @@ inline fn ptrToBrokenHeart(ptr: ?[*]const obj.SchemeObject) obj.SchemeObject {
     return obj.makeObject(obj.tc_broken_heart, datum);
 }
 
-inline fn ptrRangeWords(end: ?[*]const obj.SchemeObject, start: ?[*]const obj.SchemeObject) c_ulong {
+pub inline fn ptrRangeWords(end: ?[*]const obj.SchemeObject, start: ?[*]const obj.SchemeObject) c_ulong {
     return @intCast((@intFromPtr(end) -% @intFromPtr(start)) / @sizeOf(obj.SchemeObject));
 }
 

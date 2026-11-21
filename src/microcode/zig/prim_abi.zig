@@ -419,6 +419,9 @@ pub extern "c" fn OS_announcement() void;
 pub extern "c" fn Interpret() void;
 pub extern "c" fn outf_console([*:0]const u8, ...) void;
 pub extern "c" fn outf_flush_console() void;
+pub extern "c" fn OS_file_access([*:0]const u8, c_uint) c_int;
+pub extern "c" fn OS_working_dir_pathname() [*:0]const u8;
+pub extern "c" fn macosx_main_bundle_dir() ?[*:0]const u8;
 
 pub extern "c" fn cc_entry_to_block(obj.SchemeObject) obj.SchemeObject;
 pub extern "c" fn cc_return_to_block(obj.SchemeObject) obj.SchemeObject;

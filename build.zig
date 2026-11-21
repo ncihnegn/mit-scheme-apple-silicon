@@ -20,6 +20,7 @@ const ArchConfig = struct {
     cmpauxmd: ?[]const u8,
     is_native: bool,
     is_svm: bool,
+    cc_arch_id: c_uint,
 };
 
 fn resolveArch(option: ArchOption, cpu: std.Target.Cpu) ArchConfig {
@@ -40,6 +41,7 @@ fn resolveArch(option: ArchOption, cpu: std.Target.Cpu) ArchConfig {
             .cmpauxmd = "aarch64",
             .is_native = true,
             .is_svm = false,
+            .cc_arch_id = 15,
         },
         .x86_64 => .{
             .scheme_arch = "x86-64",
@@ -47,6 +49,7 @@ fn resolveArch(option: ArchOption, cpu: std.Target.Cpu) ArchConfig {
             .cmpauxmd = "x86-64",
             .is_native = true,
             .is_svm = false,
+            .cc_arch_id = 14,
         },
         .svm1_64le => .{
             .scheme_arch = "svm1-64le",
@@ -54,6 +57,7 @@ fn resolveArch(option: ArchOption, cpu: std.Target.Cpu) ArchConfig {
             .cmpauxmd = null,
             .is_native = false,
             .is_svm = true,
+            .cc_arch_id = 13,
         },
         .none => .{
             .scheme_arch = "none",
@@ -61,6 +65,7 @@ fn resolveArch(option: ArchOption, cpu: std.Target.Cpu) ArchConfig {
             .cmpauxmd = null,
             .is_native = false,
             .is_svm = false,
+            .cc_arch_id = 0,
         },
     };
 }
@@ -72,7 +77,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/gcloop.c",
     "src/microcode/interp.c",
     "src/microcode/lookup.c",
-    "src/microcode/option.c",
     "src/microcode/outf.c",
     "src/microcode/term.c",
     "src/microcode/prosenv.c",
@@ -686,6 +690,8 @@ pub fn build(b: *std.Build) void {
     zig_options.addOption(bool, "cc_support", arch.is_native or arch.is_svm);
     zig_options.addOption(bool, "debugging", debugging);
     zig_options.addOption([]const u8, "package_version", "13.0.50");
+    zig_options.addOption([]const u8, "default_library_path", default_library_path);
+    zig_options.addOption(c_uint, "compiler_processor_type", arch.cc_arch_id);
 
     const microcode_zig_mod = b.createModule(.{
         .root_source_file = b.path("src/microcode/zig/root.zig"),
