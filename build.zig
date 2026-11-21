@@ -80,7 +80,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/option.c",
     "src/microcode/outf.c",
     "src/microcode/purify.c",
-    "src/microcode/storage.c",
     "src/microcode/term.c",
     "src/microcode/utabmd.c",
     "src/microcode/utils.c",

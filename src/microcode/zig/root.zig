@@ -52,6 +52,7 @@ pub const purutl = @import("purutl.zig");
 pub const ostty = @import("ostty.zig");
 pub const osscheme = @import("osscheme.zig");
 pub const returns = @import("returns.zig");
+pub const storage = @import("storage.zig");
 
 comptime {
     _ = chacha;
@@ -104,6 +105,7 @@ comptime {
     _ = ostty;
     _ = osscheme;
     _ = returns;
+    _ = storage;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -163,4 +165,5 @@ test "microcode zig scaffold" {
     _ = ostty;
     _ = osscheme;
     _ = returns;
+    _ = storage;
 }

@@ -17,23 +17,14 @@ var mock_heap: [8192]obj.SchemeObject = @splat(0);
 var mock_stack: [128]obj.SchemeObject = @splat(0);
 var mock_const: [64]obj.SchemeObject = @splat(0);
 
-pub export var Registers: [14]obj.SchemeObject = @splat(0);
-pub export var Free: [*]obj.SchemeObject = (&mock_heap).ptr;
-pub export var Free_primitive: ?[*]obj.SchemeObject = (&mock_heap).ptr;
-pub export var heap_alloc_limit: [*]obj.SchemeObject = (&mock_heap).ptr + mock_heap.len - 16;
-pub export var heap_start: [*]obj.SchemeObject = (&mock_heap).ptr;
-pub export var heap_end: [*]obj.SchemeObject = (&mock_heap).ptr + mock_heap.len;
-pub export var stack_pointer: [*]obj.SchemeObject = (&mock_stack).ptr + mock_stack.len;
-pub export var stack_guard: [*]obj.SchemeObject = (&mock_stack).ptr + 8;
-pub export var stack_start: [*]obj.SchemeObject = (&mock_stack).ptr;
-pub export var stack_end: [*]obj.SchemeObject = (&mock_stack).ptr + mock_stack.len;
-pub export var constant_start: [*]obj.SchemeObject = (&mock_const).ptr;
-pub export var constant_alloc_next: [*]obj.SchemeObject = (&mock_const).ptr;
-pub export var constant_end: [*]obj.SchemeObject = (&mock_const).ptr + mock_const.len;
-pub export var memory_block_start: [*]obj.SchemeObject = (&mock_heap).ptr;
-pub export var fixed_objects: obj.SchemeObject = obj.sharp_f;
-pub export var gc_space_needed: c_ulong = 0;
-pub export var trapping: bool = false;
+var mock_Registers: [14]obj.SchemeObject = @splat(0);
+
+comptime {
+    if (@import("build_options").cc_support) {
+        @export(&mock_Registers, .{ .name = "Registers" });
+    }
+}
+
 pub export var scheme_program_name: [*:0]const u8 = "mit-scheme-unit";
 pub export var MAX_STATIC_PRIMITIVE: c_long = 1;
 pub export var Static_Primitive_Procedure_Table = [_]abi.PrimitiveProcedure{ &mockDummyPrim, &mockDummyPrim };
@@ -54,33 +45,33 @@ pub fn resetMockRuntime() void {
     mock_heap = @splat(0);
     mock_stack = @splat(0);
     mock_const = @splat(0);
-    Registers = @splat(0);
-    heap_start = (&mock_heap).ptr;
-    heap_end = (&mock_heap).ptr + mock_heap.len;
-    heap_alloc_limit = (&mock_heap).ptr + mock_heap.len - 16;
-    Free = heap_start;
-    Free_primitive = heap_start;
-    memory_block_start = heap_start;
-    stack_start = (&mock_stack).ptr;
-    stack_end = (&mock_stack).ptr + mock_stack.len;
-    stack_start[0] = obj.makeBrokenHeart(stack_start);
-    stack_guard = stack_start + 8;
-    stack_pointer = stack_end;
-    constant_start = (&mock_const).ptr;
-    constant_alloc_next = (&mock_const).ptr;
-    constant_end = (&mock_const).ptr + mock_const.len;
-    fixed_objects = obj.sharp_f;
-    gc_space_needed = 0;
-    trapping = false;
+    abi.Registers = @splat(0);
+    abi.heap_start = (&mock_heap).ptr;
+    abi.heap_end = (&mock_heap).ptr + mock_heap.len;
+    abi.heap_alloc_limit = (&mock_heap).ptr + mock_heap.len - 16;
+    abi.Free = abi.heap_start;
+    abi.Free_primitive = abi.heap_start;
+    abi.memory_block_start = abi.heap_start;
+    abi.stack_start = (&mock_stack).ptr;
+    abi.stack_end = (&mock_stack).ptr + mock_stack.len;
+    abi.stack_start[0] = obj.makeBrokenHeart(abi.stack_start);
+    abi.stack_guard = abi.stack_start + 8;
+    abi.stack_pointer = abi.stack_end;
+    abi.constant_start = (&mock_const).ptr;
+    abi.constant_alloc_next = (&mock_const).ptr;
+    abi.constant_end = (&mock_const).ptr + mock_const.len;
+    abi.fixed_objects = obj.sharp_f;
+    abi.gc_space_needed = 0;
+    abi.trapping = false;
 }
 
 pub fn setArgs(args: []const obj.SchemeObject) void {
     std.debug.assert(args.len <= mock_stack.len);
-    stack_pointer = stack_end - args.len;
+    abi.stack_pointer = abi.stack_end - args.len;
     for (args, 0..) |arg, idx| {
-        stack_pointer[idx] = arg;
+        abi.stack_pointer[idx] = arg;
     }
-    Registers[abi.regblock_lexpr_actuals] = @intCast(args.len);
+    abi.Registers[abi.regblock_lexpr_actuals] = @intCast(args.len);
 }
 
 pub export fn OS_malloc(size: usize) callconv(.c) ?*anyopaque {
