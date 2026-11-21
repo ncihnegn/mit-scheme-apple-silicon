@@ -72,7 +72,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/bigprm.c",
     "src/microcode/bitstr.c",
     "src/microcode/boot.c",
-    "src/microcode/char.c",
     "src/microcode/daemon.c",
     "src/microcode/debug.c",
     "src/microcode/dfloat.c",
@@ -87,7 +86,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/gcloop.c",
     "src/microcode/generic.c",
     "src/microcode/hooks.c",
-    "src/microcode/hunk.c",
     "src/microcode/intern.c",
     "src/microcode/interp.c",
     "src/microcode/intprm.c",
@@ -147,6 +145,8 @@ const std_c_sources = [_][]const u8{
 
 const zig_prim_sources = [_][]const u8{
     "src/microcode/zig/bytevector.zig",
+    "src/microcode/zig/char.zig",
+    "src/microcode/zig/hunk.zig",
     "src/microcode/zig/prchacha.zig",
     "src/microcode/zig/prentropy.zig",
     "src/microcode/zig/prkeccak.zig",

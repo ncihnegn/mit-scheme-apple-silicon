@@ -18,6 +18,8 @@ pub const prkeccak = @import("prkeccak.zig");
 pub const prmd5 = @import("prmd5.zig");
 pub const prentropy = @import("prentropy.zig");
 pub const bytevector = @import("bytevector.zig");
+pub const char = @import("char.zig");
+pub const hunk = @import("hunk.zig");
 
 comptime {
     _ = chacha;
@@ -36,6 +38,8 @@ comptime {
     _ = prmd5;
     _ = prentropy;
     _ = bytevector;
+    _ = char;
+    _ = hunk;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -61,4 +65,6 @@ test "microcode zig scaffold" {
     _ = prmd5;
     _ = prentropy;
     _ = bytevector;
+    _ = char;
+    _ = hunk;
 }
