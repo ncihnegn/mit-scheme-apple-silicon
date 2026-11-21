@@ -137,9 +137,22 @@ pub const env_cont_size: usize = cont_size + 1;
 pub const history_cont_size: usize = cont_size + 2;
 pub const lexpr_primitive_arity: c_int = -1;
 pub const unknown_primitive_arity: c_int = -2;
+pub const syscall_accept: c_int = 0;
+pub const syscall_bind: c_int = 1;
 pub const syscall_chmod: c_int = 3;
+pub const syscall_connect: c_int = 6;
+pub const syscall_fstat: c_int = 12;
+pub const syscall_ftruncate: c_int = 16;
 pub const syscall_gethostname: c_int = 18;
+pub const syscall_listen: c_int = 25;
+pub const syscall_lseek: c_int = 27;
 pub const syscall_malloc: c_int = 29;
+pub const syscall_open: c_int = 34;
+pub const syscall_read: c_int = 38;
+pub const syscall_select: c_int = 43;
+pub const syscall_setsockopt: c_int = 46;
+pub const syscall_shutdown: c_int = 47;
+pub const syscall_socket: c_int = 52;
 pub const syscall_uname: c_int = 65;
 pub const syscall_utime: c_int = 67;
 pub const syserr_not_enough_space: c_int = 33;
@@ -487,6 +500,55 @@ pub const ChannelType = enum(c_uint) {
     win32_named_pipe = 17,
 };
 
+pub const mode_reg: c_uint = 0o666;
+
+pub const Channel = extern struct {
+    descriptor: c_int,
+    type: ChannelType,
+    flags: packed struct(c_uint) {
+        internal: u1 = 0,
+        nonblocking: u1 = 0,
+        _pad: u30 = 0,
+    },
+};
+
+comptime {
+    std.debug.assert(@sizeOf(Channel) == 12);
+    std.debug.assert(@offsetOf(Channel, "descriptor") == 0);
+    std.debug.assert(@offsetOf(Channel, "type") == 4);
+    std.debug.assert(@offsetOf(Channel, "flags") == 8);
+}
+
+pub inline fn cFstat(fd: std.c.fd_t, buf: *Stat) c_int {
+    if (builtin.os.tag == .linux) {
+        const LinuxLibc = struct {
+            extern "c" fn fstat(fd: c_int, buf: *Stat) callconv(.c) c_int;
+        };
+        return LinuxLibc.fstat(fd, buf);
+    }
+    return std.c.fstat(fd, buf);
+}
+
+pub fn makeChannel(fd: c_int, ch_type: ChannelType) Tchannel {
+    const ch = channel_allocate();
+    channel_table[ch] = .{
+        .descriptor = fd,
+        .type = ch_type,
+        .flags = .{},
+    };
+    return ch;
+}
+
+pub inline fn openFdRetry(path: [*:0]const u8, oflags: std.c.O, mode: c_uint) c_int {
+    var fd = std.c.open(path, oflags, mode);
+    while (fd < 0) {
+        UX_prim_check_fd_errno(syscall_open);
+        fd = std.c.open(path, oflags, mode);
+    }
+    UX_out_of_files_p = false;
+    return fd;
+}
+
 pub extern var ephemeron_array: obj.SchemeObject;
 pub extern var ephemeron_count: c_ulong;
 
@@ -568,7 +630,13 @@ pub extern "c" fn hash_object(obj.SchemeObject) u32;
 pub extern "c" fn combine_hashes(u32, u32) u32;
 pub extern "c" fn OS_channel_close_noerror(c_uint) void;
 pub extern var OS_channel_table_size: Tchannel;
+pub extern var channel_table: [*]Channel;
+pub extern var UX_out_of_files_p: bool;
 pub extern var OS_have_select_p: c_int;
+pub extern "c" fn channel_allocate() Tchannel;
+pub extern "c" fn terminal_open(Tchannel) void;
+pub extern "c" fn UX_prim_check_fd_errno(c_int) void;
+pub extern "c" fn OS_open_fd(c_int) Tchannel;
 pub extern "c" fn OS_channel_open_p(Tchannel) c_int;
 pub extern "c" fn OS_channel_close(Tchannel) void;
 pub extern "c" fn OS_channel_close_on_abort(Tchannel) void;

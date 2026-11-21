@@ -83,6 +83,10 @@ pub var mock_stat: abi.Stat = std.mem.zeroes(abi.Stat);
 pub var mock_stat_2: abi.Stat = std.mem.zeroes(abi.Stat);
 pub var mock_stat_ok: c_int = 1;
 pub var mock_fs_type: ?[*:0]const u8 = "apfs";
+pub var mock_channel_table_entries: [16]abi.Channel = @splat(.{ .descriptor = -1, .type = .unknown, .flags = .{} });
+pub export var channel_table: [*]abi.Channel = &mock_channel_table_entries;
+pub export var UX_out_of_files_p: bool = false;
+pub var mock_terminal_open_calls: usize = 0;
 pub var mock_write_var_cache_calls: usize = 0;
 pub var mock_make_uuo_link_calls: usize = 0;
 pub var mock_apply_compiled_calls: usize = 0;
@@ -184,6 +188,9 @@ pub fn resetMockRuntime() void {
     mock_stat_2 = std.mem.zeroes(abi.Stat);
     mock_stat_ok = 1;
     mock_fs_type = "apfs";
+    mock_channel_table_entries = @splat(.{ .descriptor = -1, .type = .unknown, .flags = .{} });
+    UX_out_of_files_p = false;
+    mock_terminal_open_calls = 0;
     storage.memory_block_end = null;
     storage.heap_reserved = 0;
     storage.ephemeron_array = obj.sharp_f;
@@ -1248,6 +1255,21 @@ pub export fn OS_tcp_server_connection_accept(_: abi.Tchannel, peer_host: ?*anyo
 
 pub export fn UX_prim_check_errno(name: c_int) callconv(.c) void {
     _ = name;
+}
+pub export fn UX_prim_check_fd_errno(name: c_int) callconv(.c) void {
+    _ = name;
+}
+pub export fn channel_allocate() callconv(.c) abi.Tchannel {
+    for (&mock_channel_table_entries, 0..) |entry, idx| {
+        if (entry.descriptor < 0) return @intCast(idx);
+    }
+    return abi.no_channel;
+}
+pub export fn terminal_open(_: abi.Tchannel) callconv(.c) void {
+    mock_terminal_open_calls += 1;
+}
+pub export fn OS_open_fd(_: c_int) callconv(.c) abi.Tchannel {
+    return mockOpenFile();
 }
 pub export fn OS_current_user_name() callconv(.c) [*:0]const u8 {
     return "mock-user";

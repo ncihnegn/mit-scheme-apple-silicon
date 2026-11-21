@@ -83,6 +83,8 @@ pub const pruxffi = @import("pruxffi.zig");
 pub const pruxfs = @import("pruxfs.zig");
 pub const pruxio = @import("pruxio.zig");
 pub const pruxsock = @import("pruxsock.zig");
+pub const uxentropy = @import("uxentropy.zig");
+pub const uxfile = @import("uxfile.zig");
 pub const tterm = if (build_options.use_termcap) @import("tterm.zig") else struct {};
 
 comptime {
@@ -166,6 +168,8 @@ comptime {
     _ = pruxfs;
     _ = pruxio;
     _ = pruxsock;
+    _ = uxentropy;
+    _ = uxfile;
     if (build_options.use_termcap) {
         _ = tterm;
     }
@@ -258,6 +262,8 @@ test "microcode zig scaffold" {
     _ = pruxfs;
     _ = pruxio;
     _ = pruxsock;
+    _ = uxentropy;
+    _ = uxfile;
     if (build_options.use_termcap) {
         _ = tterm;
     }
