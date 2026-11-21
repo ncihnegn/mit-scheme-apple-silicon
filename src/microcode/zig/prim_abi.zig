@@ -28,6 +28,12 @@ pub const prim_no_trap_pop_return: c_long = -11;
 pub const max_return_code: c_ulong = 0x5E;
 pub const rc_hardware_trap: c_ulong = 0x5C;
 pub const unknown_primitive_arity: c_int = -2;
+pub const err_unimplemented_primitive: c_long = 0x33;
+pub const err_wrong_arity_primitives: c_long = 0x36;
+pub const syscall_malloc: c_int = 29;
+pub const syserr_not_enough_space: c_int = 33;
+
+pub const PrimitiveProcedure = *const fn () callconv(.c) obj.SchemeObject;
 
 pub const fixobj_obarray: usize = 0x03;
 pub const fixobj_stepper_state: usize = 0x0E;
@@ -90,9 +96,9 @@ pub extern var constant_alloc_next: [*]obj.SchemeObject;
 pub extern var constant_end: [*]obj.SchemeObject;
 pub extern var scheme_program_name: [*:0]const u8;
 pub extern var MAX_PRIMITIVE: c_ulong;
-pub extern var Primitive_Arity_Table: [*]c_int;
-pub extern var Primitive_Name_Table: [*][*:0]const u8;
-pub extern var Primitive_Documentation_Table: [*]?[*:0]const u8;
+pub extern var Primitive_Arity_Table: ?[*]c_int;
+pub extern var Primitive_Name_Table: ?[*]?[*:0]const u8;
+pub extern var Primitive_Documentation_Table: ?[*]?[*:0]const u8;
 
 pub extern "c" fn error_wrong_type_arg(c_int) noreturn;
 pub extern "c" fn error_bad_range_arg(c_int) noreturn;
@@ -100,6 +106,11 @@ pub extern "c" fn error_external_return() noreturn;
 pub extern "c" fn signal_error_from_primitive(c_long) noreturn;
 pub extern "c" fn signal_interrupt_from_primitive() noreturn;
 pub extern "c" fn Microcode_Termination(c_int) noreturn;
+pub extern "c" fn termination_init_error() noreturn;
+pub extern "c" fn error_in_system_call(c_int, c_int) noreturn;
+pub extern "c" fn OS_malloc(usize) ?*anyopaque;
+pub extern "c" fn OS_realloc(?*anyopaque, usize) ?*anyopaque;
+pub extern "c" fn OS_free(?*anyopaque) void;
 pub extern "c" fn outf_fatal([*:0]const u8, ...) void;
 pub extern "c" fn outf_error([*:0]const u8, ...) void;
 pub extern "c" fn record_primitive_entry(obj.SchemeObject) void;

@@ -64,7 +64,7 @@ pub export fn Prim_primitive_procedure_arity() callconv(.c) obj.SchemeObject {
     const prim = abi.argRef(1);
     const num = obj.primitiveNumber(prim);
     if (num > abi.MAX_PRIMITIVE) abi.error_bad_range_arg(1);
-    return obj.longToFixnum(abi.Primitive_Arity_Table[@intCast(num)]);
+    return obj.longToFixnum(abi.Primitive_Arity_Table.?[@intCast(num)]);
 }
 
 // DEFINE_PRIMITIVE ("PRIMITIVE-PROCEDURE-DOCUMENTATION", Prim_primitive_procedure_doc, 1, 1,
@@ -75,7 +75,7 @@ pub export fn Prim_primitive_procedure_doc() callconv(.c) obj.SchemeObject {
     const prim = abi.argRef(1);
     const num = obj.primitiveNumber(prim);
     if (num > abi.MAX_PRIMITIVE) abi.error_bad_range_arg(1);
-    const answer = abi.Primitive_Documentation_Table[@intCast(num)];
+    const answer = abi.Primitive_Documentation_Table.?[@intCast(num)];
     return if (answer) |doc| str.char_pointer_to_string(doc) else obj.sharp_f;
 }
 
@@ -96,7 +96,7 @@ pub export fn Prim_get_primitive_name() callconv(.c) obj.SchemeObject {
     if (!(obj.primitiveP(prim) or obj.fixnumP(prim))) abi.error_wrong_type_arg(1);
     const number = obj.primitiveNumber(prim);
     if (number > abi.MAX_PRIMITIVE) abi.error_bad_range_arg(1);
-    return str.char_pointer_to_string(abi.Primitive_Name_Table[@intCast(number)]);
+    return str.char_pointer_to_string(abi.Primitive_Name_Table.?[@intCast(number)]);
 }
 
 // DEFINE_PRIMITIVE ("GET-PRIMITIVE-ADDRESS", Prim_get_primitive_address, 2, 2,
@@ -143,7 +143,11 @@ pub export fn Prim_primitive_procedure_open_coded() callconv(.c) obj.SchemeObjec
 
 test "extern primitive address, metadata, counts, and lookup" {
     const stubs = @import("test_stubs.zig");
+    const primutl = @import("primutl.zig");
     stubs.resetMockRuntime();
+    primutl.resetForTesting();
+    defer primutl.resetForTesting();
+    primutl.initialize_primitives();
 
     // Map return code & primitive roundtrip
     stubs.setArgs(&.{ obj.ulongToFixnum(obj.tc_return_code), obj.ulongToFixnum(5) });
@@ -171,7 +175,7 @@ test "extern primitive address, metadata, counts, and lookup" {
 
     stubs.setArgs(&.{});
     const counts = Prim_get_primitive_counts();
-    try std.testing.expectEqual(obj.ulongToFixnum(2), obj.pairCar(counts));
+    try std.testing.expectEqual(obj.ulongToFixnum(abi.MAX_PRIMITIVE), obj.pairCar(counts));
     try std.testing.expectEqual(obj.ulongToFixnum(0), obj.pairCdr(counts));
 
     // GET-PRIMITIVE-ADDRESS

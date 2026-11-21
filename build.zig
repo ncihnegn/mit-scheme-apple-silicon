@@ -81,7 +81,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/osscheme.c",
     "src/microcode/ostty.c",
     "src/microcode/outf.c",
-    "src/microcode/primutl.c",
     "src/microcode/purify.c",
     "src/microcode/purutl.c",
     "src/microcode/returns.c",

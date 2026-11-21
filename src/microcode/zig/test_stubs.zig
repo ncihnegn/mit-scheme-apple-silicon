@@ -9,12 +9,13 @@ pub var printed_continuation_count: usize = 0;
 pub var mock_trap_state: c_int = 4;
 pub var mock_under_emacs: c_int = 0;
 
+fn mockDummyPrim() callconv(.c) obj.SchemeObject {
+    return obj.unspecific;
+}
+
 var mock_heap: [8192]obj.SchemeObject = @splat(0);
 var mock_stack: [128]obj.SchemeObject = @splat(0);
 var mock_const: [64]obj.SchemeObject = @splat(0);
-var mock_prim_arities = [_]c_int{ 1, 2, -1 };
-var mock_prim_names = [_][*:0]const u8{ "CAR", "CDR", "LIST" };
-var mock_prim_docs = [_]?[*:0]const u8{ "Returns car", null, null };
 
 pub export var Registers: [14]obj.SchemeObject = @splat(0);
 pub export var Free: [*]obj.SchemeObject = (&mock_heap).ptr;
@@ -34,10 +35,12 @@ pub export var fixed_objects: obj.SchemeObject = obj.sharp_f;
 pub export var gc_space_needed: c_ulong = 0;
 pub export var trapping: bool = false;
 pub export var scheme_program_name: [*:0]const u8 = "mit-scheme-unit";
-pub export var MAX_PRIMITIVE: c_ulong = 2;
-pub export var Primitive_Arity_Table: [*]c_int = (&mock_prim_arities).ptr;
-pub export var Primitive_Name_Table: [*][*:0]const u8 = (&mock_prim_names).ptr;
-pub export var Primitive_Documentation_Table: [*]?[*:0]const u8 = (&mock_prim_docs).ptr;
+pub export var MAX_STATIC_PRIMITIVE: c_long = 1;
+pub export var Static_Primitive_Procedure_Table = [_]abi.PrimitiveProcedure{ &mockDummyPrim, &mockDummyPrim };
+pub export var Static_Primitive_Arity_Table = [_]c_int{ 1, 2 };
+pub export var Static_Primitive_Count_Table = [_]c_int{ @sizeOf(obj.SchemeObject), 2 * @sizeOf(obj.SchemeObject) };
+pub export var Static_Primitive_Name_Table = [_]?[*:0]const u8{ "CAR", "CDR" };
+pub export var Static_Primitive_Documentation_Table = [_]?[*:0]const u8{ "Returns car", null };
 
 pub fn resetMockRuntime() void {
     signal_block_depth = 0;
@@ -67,10 +70,6 @@ pub fn resetMockRuntime() void {
     fixed_objects = obj.sharp_f;
     gc_space_needed = 0;
     trapping = false;
-    MAX_PRIMITIVE = 2;
-    Primitive_Arity_Table = (&mock_prim_arities).ptr;
-    Primitive_Name_Table = (&mock_prim_names).ptr;
-    Primitive_Documentation_Table = (&mock_prim_docs).ptr;
 }
 
 pub fn setArgs(args: []const obj.SchemeObject) void {
@@ -123,20 +122,6 @@ comptime {
 fn mockPrintOneContinuationFrame(_: obj.SchemeObject) callconv(.c) bool {
     printed_continuation_count += 1;
     return true;
-}
-
-pub export fn strcmp_ci(s1: [*:0]const u8, s2: [*:0]const u8) callconv(.c) c_int {
-    var i: usize = 0;
-    while (true) : (i += 1) {
-        const c1 = s1[i];
-        const c2 = s2[i];
-        if (c1 == 0) return if (c2 == 0) 0 else -1;
-        if (c2 == 0) return 1;
-        const ch1 = std.ascii.toUpper(c1);
-        const ch2 = std.ascii.toUpper(c2);
-        if (ch1 < ch2) return -1;
-        if (ch1 > ch2) return 1;
-    }
 }
 
 pub export fn error_wrong_type_arg(_: c_int) callconv(.c) noreturn {
@@ -290,14 +275,12 @@ pub export fn stack_death(_: [*:0]const u8) callconv(.c) noreturn {
     @panic("mock stack_death");
 }
 
-pub export fn find_primitive(sname: obj.SchemeObject, _: bool, _: bool, _: c_int) callconv(.c) obj.SchemeObject {
-    const ptr: [*:0]const u8 = @ptrCast(obj.legacyStringData(sname));
-    for (0..@as(usize, @intCast(MAX_PRIMITIVE))) |i| {
-        if (strcmp_ci(ptr, Primitive_Name_Table[i]) == 0) {
-            return obj.makePrimitiveObject(@intCast(i));
-        }
-    }
-    return obj.sharp_f;
+pub export fn termination_init_error() callconv(.c) noreturn {
+    @panic("mock termination_init_error");
+}
+
+pub export fn error_in_system_call(_: c_int, _: c_int) callconv(.c) noreturn {
+    @panic("mock error_in_system_call");
 }
 
 pub export fn termination_normal(_: c_int) callconv(.c) noreturn {
