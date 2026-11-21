@@ -71,9 +71,8 @@ fn resolveArch(option: ArchOption, cpu: std.Target.Cpu) ArchConfig {
 }
 
 const std_c_sources = [_][]const u8{
-    "src/microcode/interp.c",
     "src/microcode/outf.c",
-    "src/microcode/term.c",
+    "src/microcode/scm_setjmp.c",
 };
 
 const zig_prim_sources = [_][]const u8{
@@ -916,6 +915,10 @@ pub fn build(b: *std.Build) void {
         }),
     });
     unit_tests.root_module.addOptions("build_options", zig_options);
+    unit_tests.root_module.addCSourceFile(.{
+        .file = b.path("src/microcode/scm_setjmp.c"),
+        .flags = &.{},
+    });
     if (target.result.os.tag.isDarwin()) {
         unit_tests.root_module.linkFramework("CoreFoundation", .{});
     }

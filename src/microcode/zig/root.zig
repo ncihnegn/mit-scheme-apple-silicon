@@ -103,6 +103,8 @@ pub const uxtty = @import("uxtty.zig");
 pub const uxutil = @import("uxutil.zig");
 pub const tterm = if (build_options.use_termcap) @import("tterm.zig") else struct {};
 pub const intext = @import("intext.zig");
+pub const interp = @import("interp.zig");
+pub const term = @import("term.zig");
 
 comptime {
     _ = chacha;
@@ -204,6 +206,8 @@ comptime {
     _ = uxtty;
     _ = uxutil;
     _ = intext;
+    _ = interp;
+    _ = term;
     if (build_options.use_termcap) {
         _ = tterm;
     }
@@ -315,6 +319,8 @@ test "microcode zig scaffold" {
     _ = uxtty;
     _ = uxutil;
     _ = intext;
+    _ = interp;
+    _ = term;
     if (build_options.use_termcap) {
         _ = tterm;
     }
