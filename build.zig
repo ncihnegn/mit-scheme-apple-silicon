@@ -617,7 +617,7 @@ pub fn build(b: *std.Build) void {
     const c_flags = c_flags_list.items;
 
     // Assemble optional microcode C source list.
-    const use_zig_cmpintmd = arch.cc_arch_id == 15;
+    const use_zig_cmpintmd = arch.cc_arch_id == 15 or arch.cc_arch_id == 14;
     const cmpintmd_c = b.fmt("src/microcode/cmpintmd/{s}.c", .{arch.cmpintmd});
     var scheme_c_sources: std.ArrayList([]const u8) = .empty;
     scheme_c_sources.appendSlice(b.allocator, &std_c_sources) catch @panic("OOM");
