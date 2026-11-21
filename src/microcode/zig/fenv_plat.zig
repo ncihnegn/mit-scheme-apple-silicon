@@ -29,6 +29,10 @@ pub const FenvT = switch (builtin.os.tag) {
         },
         else => @compileError("unsupported Linux CPU arch for fenv_t"),
     },
+    .windows => extern struct {
+        fe_ctl: c_ulong,
+        fe_stat: c_ulong,
+    },
     else => @compileError("unsupported OS for fenv_t"),
 };
 
@@ -39,34 +43,35 @@ pub const FexceptT = switch (builtin.os.tag) {
         .x86_64 => u16,
         else => @compileError("unsupported Linux CPU arch for fexcept_t"),
     },
+    .windows => c_ulong,
     else => @compileError("unsupported OS for fexcept_t"),
 };
 
-pub const fe_invalid: c_int = switch (builtin.cpu.arch) {
+pub const fe_invalid: c_int = if (builtin.os.tag == .windows) 0x0010 else switch (builtin.cpu.arch) {
     .aarch64 => 0x01,
     .x86_64 => 0x01,
     else => @compileError("unsupported arch"),
 };
 
-pub const fe_divbyzero: c_int = switch (builtin.cpu.arch) {
+pub const fe_divbyzero: c_int = if (builtin.os.tag == .windows) 0x0008 else switch (builtin.cpu.arch) {
     .aarch64 => 0x02,
     .x86_64 => 0x04,
     else => @compileError("unsupported arch"),
 };
 
-pub const fe_overflow: c_int = switch (builtin.cpu.arch) {
+pub const fe_overflow: c_int = if (builtin.os.tag == .windows) 0x0004 else switch (builtin.cpu.arch) {
     .aarch64 => 0x04,
     .x86_64 => 0x08,
     else => @compileError("unsupported arch"),
 };
 
-pub const fe_underflow: c_int = switch (builtin.cpu.arch) {
+pub const fe_underflow: c_int = if (builtin.os.tag == .windows) 0x0002 else switch (builtin.cpu.arch) {
     .aarch64 => 0x08,
     .x86_64 => 0x10,
     else => @compileError("unsupported arch"),
 };
 
-pub const fe_inexact: c_int = switch (builtin.cpu.arch) {
+pub const fe_inexact: c_int = if (builtin.os.tag == .windows) 0x0001 else switch (builtin.cpu.arch) {
     .aarch64 => 0x10,
     .x86_64 => 0x20,
     else => @compileError("unsupported arch"),
@@ -85,24 +90,25 @@ pub const fe_all_except: c_int = switch (builtin.os.tag) {
         .x86_64 => if (builtin.abi.isGnu()) 0x3d else 0x3f,
         else => @compileError("unsupported arch"),
     },
+    .windows => 0x001f,
     else => @compileError("unsupported OS"),
 };
 
 pub const fe_tonearest: c_int = 0;
 
-pub const fe_upward: c_int = switch (builtin.cpu.arch) {
+pub const fe_upward: c_int = if (builtin.os.tag == .windows) 0x0200 else switch (builtin.cpu.arch) {
     .aarch64 => 0x400000,
     .x86_64 => 0x800,
     else => @compileError("unsupported arch"),
 };
 
-pub const fe_downward: c_int = switch (builtin.cpu.arch) {
+pub const fe_downward: c_int = if (builtin.os.tag == .windows) 0x0100 else switch (builtin.cpu.arch) {
     .aarch64 => 0x800000,
     .x86_64 => 0x400,
     else => @compileError("unsupported arch"),
 };
 
-pub const fe_towardzero: c_int = switch (builtin.cpu.arch) {
+pub const fe_towardzero: c_int = if (builtin.os.tag == .windows) 0x0300 else switch (builtin.cpu.arch) {
     .aarch64 => 0xc00000,
     .x86_64 => 0xc00,
     else => @compileError("unsupported arch"),
@@ -204,6 +210,11 @@ pub fn setDefaultEnv() c_int {
     } else if (comptime builtin.os.tag == .linux) {
         const raw_fn: *const fn (?*const anyopaque) callconv(.c) c_int = @ptrCast(&fesetenv);
         return raw_fn(@ptrFromInt(std.math.maxInt(usize)));
+    } else if (comptime builtin.os.tag == .windows) {
+        const mingw_dfl = struct {
+            extern "c" var __mingw_fe_dfl_env: FenvT;
+        };
+        return fesetenv(&mingw_dfl.__mingw_fe_dfl_env);
     } else {
         @compileError("unsupported OS for FE_DFL_ENV");
     }

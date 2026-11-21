@@ -44,8 +44,12 @@ const default_stack_size: usize = 1024;
 const default_code_size: usize = if (@sizeOf(usize) == 8) 8192 else 4096;
 
 const sub_directory_delimiter: u8 = '/';
-const path_delimiter: u8 = ':';
+const path_delimiter: u8 = if (builtin.os.tag == .windows) ';' else ':';
 const quote_char: u8 = '\\';
+
+inline fn isDirSep(c: u8) bool {
+    return c == '/' or (builtin.os.tag == .windows and c == '\\');
+}
 
 pub export var option_saved_argc: c_int = 0;
 pub export var option_saved_argv: ?[*]?[*:0]const u8 = null;
@@ -91,6 +95,10 @@ const OptionDescriptor = extern struct {
 };
 
 inline fn fileAbsolute(filename: [*:0]const u8) bool {
+    if (comptime builtin.os.tag == .windows) {
+        if (isDirSep(filename[0])) return true;
+        return filename[0] != 0 and std.ascii.isAlphabetic(filename[0]) and filename[1] == ':';
+    }
     return filename[0] == sub_directory_delimiter;
 }
 
@@ -212,6 +220,9 @@ inline fn mustQuoteCharP(c: u8) bool {
 }
 
 fn quoteString(s: [*:0]const u8) [*:0]u8 {
+    if (comptime builtin.os.tag == .windows) {
+        return stringCopy(s);
+    }
     const slice = std.mem.span(s);
     var n_chars: usize = 0;
     for (slice) |c| {
@@ -233,6 +244,9 @@ fn quoteString(s: [*:0]const u8) [*:0]u8 {
 }
 
 fn unquoteString(s: [*:0]const u8) [*:0]u8 {
+    if (comptime builtin.os.tag == .windows) {
+        return stringCopy(s);
+    }
     var scan: [*:0]const u8 = s;
     var n_chars: usize = 0;
     while (true) {
@@ -433,10 +447,20 @@ fn standardNumericOption(
     return defval;
 }
 
+inline fn shouldStripTrailingSep(slice: []const u8) bool {
+    if (slice.len == 0) return false;
+    if (!isDirSep(slice[slice.len - 1])) return false;
+    if (slice.len == 1) return false;
+    if (comptime builtin.os.tag == .windows) {
+        if (slice.len == 3 and std.ascii.isAlphabetic(slice[0]) and slice[1] == ':') return false;
+    }
+    return true;
+}
+
 fn getWd() [*:0]u8 {
     const wd = abi.OS_working_dir_pathname();
     var len = std.mem.len(wd);
-    if (len > 0 and wd[len - 1] == sub_directory_delimiter) {
+    if (shouldStripTrailingSep(wd[0..len])) {
         len -= 1;
     }
     const result: [*]u8 = @ptrCast(abi.OS_malloc(len + 1).?);
@@ -452,10 +476,12 @@ fn findPathDelimiter(s: [*:0]const u8) ?[*]const u8 {
         var c = scan[0];
         scan += 1;
         if (c == path_delimiter) return cur;
-        if (c == quote_char) {
-            c = scan[0];
-            if (c == 0) return null;
-            scan += 1;
+        if (comptime builtin.os.tag != .windows) {
+            if (c == quote_char) {
+                c = scan[0];
+                if (c == 0) return null;
+                scan += 1;
+            }
         }
         if (c == 0) return null;
     }
@@ -479,7 +505,7 @@ fn parsePathString(path: [*:0]const u8) [*]?[*:0]const u8 {
         }
 
         var unq_len = std.mem.len(unquoted);
-        if (unq_len > 0 and unquoted[unq_len - 1] == sub_directory_delimiter) {
+        if (shouldStripTrailingSep(unquoted[0..unq_len])) {
             unq_len -= 1;
             unquoted[unq_len] = 0;
         }
@@ -883,7 +909,14 @@ test "option quoting, parsePathString, parseStandardOptions, and readBandSizes" 
     try std.testing.expect(fasl.open_fasl_output_file(tmp_path, &wf));
     try std.testing.expect(fasl.write_fasl_header(&hdr, wf));
     try std.testing.expect(fasl.close_fasl_output_file(wf));
-    defer _ = std.c.unlink(tmp_path);
+    defer if (comptime builtin.os.tag == .windows) {
+        const WinUnlink = struct {
+            extern "c" fn _unlink([*:0]const u8) c_int;
+        };
+        _ = WinUnlink._unlink(tmp_path);
+    } else {
+        _ = std.c.unlink(tmp_path);
+    };
 
     var cs: usize = 0;
     var hs: usize = 0;

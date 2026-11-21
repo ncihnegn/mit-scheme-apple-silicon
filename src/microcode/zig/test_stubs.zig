@@ -1598,7 +1598,7 @@ pub export fn termination_signal(_: [*:0]const u8) callconv(.c) noreturn {
 }
 pub export fn hard_reset(_: ?*anyopaque) callconv(.c) void {}
 pub export fn soft_reset() callconv(.c) void {}
-pub export fn trap_handler(_: [*:0]const u8, _: c_int, _: ?*std.c.siginfo_t, _: ?*anyopaque) callconv(.c) void {}
+pub export fn trap_handler(_: [*:0]const u8, _: c_int, _: ?*abi.SiginfoT, _: ?*anyopaque) callconv(.c) void {}
 pub export fn userio_buffered_input() callconv(.c) void {}
 pub export fn userio_read_char() callconv(.c) u8 {
     return '\n';

@@ -461,6 +461,10 @@ fn configureMicrocodeModule(
     } else if (t.os.tag == .linux) {
         mod.linkSystemLibrary("m", .{});
         mod.linkSystemLibrary("dl", .{});
+    } else if (t.os.tag == .windows) {
+        mod.linkSystemLibrary("ws2_32", .{});
+        mod.linkSystemLibrary("bcrypt", .{});
+        mod.linkSystemLibrary("advapi32", .{});
     }
 
     if (termcap == .ncurses) {
@@ -481,8 +485,8 @@ pub fn build(b: *std.Build) void {
     const termcap_opt = b.option(
         TermcapOption,
         "termcap",
-        "Terminal capability provider: ncurses (default), emulate, or none",
-    ) orelse .ncurses;
+        "Terminal capability provider: ncurses (default on POSIX), emulate, or none (default on Windows)",
+    ) orelse @as(TermcapOption, if (target.result.os.tag == .windows) .none else .ncurses);
 
     const debugging = b.option(
         bool,
@@ -520,7 +524,10 @@ pub fn build(b: *std.Build) void {
         []const u8,
         "library-path",
         "Compile-time DEFAULT_LIBRARY_PATH baked into scheme",
-    ) orelse b.fmt("/usr/local/lib/{s}", .{auxdir_name});
+    ) orelse if (target.result.os.tag == .windows)
+        b.fmt("C:/Program Files/MIT-GNU-Scheme/lib/{s}", .{auxdir_name})
+    else
+        b.fmt("/usr/local/lib/{s}", .{auxdir_name});
 
     const target_config_dir = addMicrocodeConfig(b, target, termcap_opt);
 
@@ -709,8 +716,9 @@ pub fn build(b: *std.Build) void {
     }
 
     b.installArtifact(scheme_exe);
-    b.getInstallStep().dependOn(&b.addInstallBinFile(scheme_exe.getEmittedBin(), "mit-scheme").step);
-    b.getInstallStep().dependOn(&b.addInstallBinFile(scheme_exe.getEmittedBin(), "scheme").step);
+    const exe_ext = if (target.result.os.tag == .windows) ".exe" else "";
+    b.getInstallStep().dependOn(&b.addInstallBinFile(scheme_exe.getEmittedBin(), b.fmt("mit-scheme{s}", .{exe_ext})).step);
+    b.getInstallStep().dependOn(&b.addInstallBinFile(scheme_exe.getEmittedBin(), b.fmt("scheme{s}", .{exe_ext})).step);
     b.getInstallStep().dependOn(&b.addInstallFileWithDir(
         b.path("src/microcode/pruxffi.h"),
         .prefix,
@@ -921,6 +929,10 @@ pub fn build(b: *std.Build) void {
     });
     if (target.result.os.tag.isDarwin()) {
         unit_tests.root_module.linkFramework("CoreFoundation", .{});
+    } else if (target.result.os.tag == .windows) {
+        unit_tests.root_module.linkSystemLibrary("ws2_32", .{});
+        unit_tests.root_module.linkSystemLibrary("bcrypt", .{});
+        unit_tests.root_module.linkSystemLibrary("advapi32", .{});
     }
     unit_test_step.dependOn(&b.addRunArtifact(unit_tests).step);
 

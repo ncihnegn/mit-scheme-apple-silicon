@@ -3,14 +3,18 @@
 // Licensed under the GNU General Public License (GPL v2 or later); see src/COPYING.
 
 const std = @import("std");
+const builtin = @import("builtin");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
 const string = @import("string.zig");
 const utils = @import("utils.zig");
 const fasload = @import("fasload.zig");
 const artutl = @import("artutl.zig");
+const win = @import("win_api.zig");
 
-extern "c" fn dlclose(?*anyopaque) c_int;
+const PosixDl = struct {
+    extern "c" fn dlclose(?*anyopaque) c_int;
+};
 
 var cleanup_registered_p: bool = false;
 var loaded_handles_size: usize = 0;
@@ -29,13 +33,25 @@ fn signalDlError(op_name: [*:0]const u8, err_msg: ?[*:0]const u8) noreturn {
     utils.error_with_argument(v);
 }
 
+fn signalWinDlError(op_name: [*:0]const u8) noreturn {
+    var msg_buf: [64]u8 = undefined;
+    const msg_z = std.fmt.bufPrintZ(&msg_buf, "Win32 error {d}", .{win.kernel32.GetLastError()}) catch "Win32 error";
+    signalDlError(op_name, msg_z.ptr);
+}
+
 fn dldLoad(path: ?[*:0]const u8) *anyopaque {
     if (!cleanup_registered_p) {
         fasload.add_reload_cleanup(&dldUnloadAll);
         cleanup_registered_p = true;
     }
 
-    const handle = std.c.dlopen(path, .{ .NOW = true, .GLOBAL = true }) orelse
+    const handle: *anyopaque = if (comptime builtin.os.tag == .windows) blk: {
+        const mod: ?win.HMODULE = if (path) |p|
+            win.kernel32.LoadLibraryA(p)
+        else
+            win.kernel32.GetModuleHandleA(null);
+        break :blk @ptrCast(mod orelse signalWinDlError("LoadLibraryA"));
+    } else std.c.dlopen(path, .{ .NOW = true, .GLOBAL = true }) orelse
         signalDlError("dlopen", std.c.dlerror());
 
     if (n_loaded_handles == loaded_handles_size) {
@@ -53,7 +69,12 @@ fn dldLoad(path: ?[*:0]const u8) *anyopaque {
 }
 
 fn dldFinalize(handle: ?*anyopaque) void {
-    if (std.c.dlsym(handle, "dload_finalize_file")) |address| {
+    const addr: ?*anyopaque = if (comptime builtin.os.tag == .windows) blk: {
+        const h = handle orelse break :blk null;
+        break :blk win.kernel32.GetProcAddress(@ptrCast(h), "dload_finalize_file");
+    } else std.c.dlsym(handle, "dload_finalize_file");
+
+    if (addr) |address| {
         const finalize: *const fn () callconv(.c) void = @ptrCast(@alignCast(address));
         finalize();
     }
@@ -61,8 +82,19 @@ fn dldFinalize(handle: ?*anyopaque) void {
 
 fn dldUnload(handle: ?*anyopaque) void {
     dldFinalize(handle);
-    if (dlclose(handle) != 0) {
-        signalDlError("dlclose", std.c.dlerror());
+    if (comptime builtin.os.tag == .windows) {
+        if (handle) |h| {
+            const self_mod = win.kernel32.GetModuleHandleA(null);
+            if (@as(?win.HMODULE, @ptrCast(h)) != self_mod) {
+                if (win.kernel32.FreeLibrary(@ptrCast(h)) == 0) {
+                    signalWinDlError("FreeLibrary");
+                }
+            }
+        }
+    } else {
+        if (PosixDl.dlclose(handle) != 0) {
+            signalDlError("dlclose", std.c.dlerror());
+        }
     }
     if (loaded_handles) |handles| {
         for (0..n_loaded_handles) |i| {
@@ -78,10 +110,17 @@ fn dldUnload(handle: ?*anyopaque) void {
 fn dldUnloadAll() callconv(.c) void {
     if (loaded_handles_size > 0) {
         const handles = loaded_handles.?;
+        const self_mod = if (comptime builtin.os.tag == .windows) win.kernel32.GetModuleHandleA(null) else null;
         for (0..n_loaded_handles) |i| {
             const handle = handles[i];
             dldFinalize(handle);
-            _ = dlclose(handle);
+            if (comptime builtin.os.tag == .windows) {
+                if (@as(?win.HMODULE, @ptrCast(handle)) != self_mod) {
+                    _ = win.kernel32.FreeLibrary(@ptrCast(handle));
+                }
+            } else {
+                _ = PosixDl.dlclose(handle);
+            }
         }
         abi.OS_free(@ptrCast(handles));
         loaded_handles_size = 0;
@@ -91,12 +130,21 @@ fn dldUnloadAll() callconv(.c) void {
 }
 
 fn dldLookup(handle: ?*anyopaque, symbol: [*:0]const u8) ?*anyopaque {
-    _ = std.c.dlerror(); // discard any outstanding errors
-    const address = std.c.dlsym(handle, symbol);
-    if (std.c.dlerror()) |error_string| {
-        signalDlError("dlsym", error_string);
+    if (comptime builtin.os.tag == .windows) {
+        const h: win.HMODULE = @ptrCast(handle orelse signalWinDlError("GetProcAddress"));
+        const addr = win.kernel32.GetProcAddress(h, symbol);
+        if (addr == null) {
+            signalWinDlError("GetProcAddress");
+        }
+        return addr;
+    } else {
+        _ = std.c.dlerror(); // discard any outstanding errors
+        const address = std.c.dlsym(handle, symbol);
+        if (std.c.dlerror()) |error_string| {
+            signalDlError("dlsym", error_string);
+        }
+        return address;
     }
-    return address;
 }
 
 // DEFINE_PRIMITIVE ("DLD-LOAD-FILE", Prim_dld_load_file, 2, 2,

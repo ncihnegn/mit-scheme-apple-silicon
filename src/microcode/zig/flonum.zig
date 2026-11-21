@@ -50,8 +50,38 @@ extern "c" fn sqrt(f64) f64;
 extern "c" fn cbrt(f64) f64;
 extern "c" fn hypot(f64, f64) f64;
 extern "c" fn pow(f64, f64) f64;
-extern "c" fn lgamma_r(f64, *c_int) f64;
 extern "c" fn tgamma(f64) f64;
+
+fn lgammaWithSign(x: f64, signp: *c_int) f64 {
+    if (comptime builtin.os.tag == .windows) {
+        const WinLgamma = struct {
+            extern "c" fn lgamma(f64) f64;
+        };
+        const res = WinLgamma.lgamma(x);
+        const bits: u64 = @bitCast(x);
+        if (std.math.isNan(x) or !std.math.isFinite(x)) {
+            signp.* = 1;
+        } else if (x > 0.0 or bits == 0) {
+            signp.* = 1;
+        } else if (bits == sign_bit) {
+            signp.* = -1;
+        } else {
+            const ax = -x;
+            const fl = @floor(ax);
+            if (ax == fl) {
+                signp.* = 1;
+            } else {
+                signp.* = if (@mod(fl, 2.0) == 0.0) -1 else 1;
+            }
+        }
+        return res;
+    } else {
+        const PosixLgamma = struct {
+            extern "c" fn lgamma_r(f64, *c_int) f64;
+        };
+        return PosixLgamma.lgamma_r(x, signp);
+    }
+}
 extern "c" fn erf(f64) f64;
 extern "c" fn erfc(f64) f64;
 extern "c" fn j0(f64) f64;
@@ -392,14 +422,14 @@ pub export fn Prim_flonum_expt() callconv(.c) obj.SchemeObject {
 pub export fn Prim_flonum_lgamma() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     var sign: c_int = undefined;
-    return double_to_flonum(lgamma_r(arg_flonum(1), &sign));
+    return double_to_flonum(lgammaWithSign(arg_flonum(1), &sign));
 }
 
 // DEFINE_PRIMITIVE ("FLONUM-SIGNED-LGAMMA", Prim_flonum_signed_lgamma, 1, 1, 0)
 pub export fn Prim_flonum_signed_lgamma() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     var sign: c_int = undefined;
-    const result = lgamma_r(arg_flonum(1), &sign);
+    const result = lgammaWithSign(arg_flonum(1), &sign);
     std.debug.assert(obj.longToFixnumP(@as(isize, sign)));
     return abi.cons(double_to_flonum(result), obj.longToFixnum(@as(isize, sign)));
 }

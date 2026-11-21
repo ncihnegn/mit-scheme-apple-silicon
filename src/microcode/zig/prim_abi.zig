@@ -431,11 +431,44 @@ pub const select_mode_error: c_uint = 4;
 pub const select_mode_hup: c_uint = 8;
 pub const select_interrupt: c_int = -1;
 pub const select_process_status_change: c_int = -2;
-pub const OffT = std.c.off_t;
+pub const OffT = if (builtin.os.tag == .windows) i64 else std.c.off_t;
 pub const off_t_max: i64 = std.math.maxInt(i64);
+pub const FdT = if (builtin.os.tag == .windows) c_int else std.c.fd_t;
+pub const SiginfoT = if (builtin.os.tag == .windows) anyopaque else std.c.siginfo_t;
+pub const OpenFlags = if (builtin.os.tag == .windows) c_int else std.c.O;
+
+pub const WinTimespec = extern struct {
+    sec: i64,
+    nsec: i64,
+};
 
 pub const Stat = if (builtin.os.tag.isDarwin())
     std.c.Stat
+else if (builtin.os.tag == .windows)
+    extern struct {
+        dev: u64,
+        ino: u64,
+        mode: u32,
+        nlink: u32,
+        uid: u32,
+        gid: u32,
+        size: i64,
+        atim: WinTimespec,
+        mtim: WinTimespec,
+        ctim: WinTimespec,
+
+        pub fn atime(self: @This()) WinTimespec {
+            return self.atim;
+        }
+
+        pub fn mtime(self: @This()) WinTimespec {
+            return self.mtim;
+        }
+
+        pub fn ctime(self: @This()) WinTimespec {
+            return self.ctim;
+        }
+    }
 else if (builtin.os.tag == .linux and builtin.cpu.arch == .aarch64)
     extern struct {
         dev: u64,
@@ -516,9 +549,9 @@ pub const FileExistence = enum(c_uint) {
     is_link = 2,
 };
 
-pub const TimeT = c_long;
+pub const TimeT = if (builtin.os.tag == .windows) i64 else c_long;
 pub const time_t_max: i64 = std.math.maxInt(i64);
-pub const ClockT = if (builtin.os.tag.isDarwin()) c_ulong else c_long;
+pub const ClockT = if (builtin.os.tag == .windows) i64 else if (builtin.os.tag.isDarwin()) c_ulong else c_long;
 pub const TinterruptEnables = c_uint;
 pub const CcT = u8;
 
@@ -541,7 +574,7 @@ pub const TimeStructure = extern struct {
 
 pub const Tprocess = c_uint;
 pub const no_process: Tprocess = std.math.maxInt(Tprocess);
-pub const PidT = std.c.pid_t;
+pub const PidT = if (builtin.os.tag == .windows) u32 else std.c.pid_t;
 
 pub const Process = extern struct {
     id: PidT,
@@ -635,9 +668,14 @@ pub const ChannelType = enum(c_uint) {
 pub const mode_reg: c_uint = 0o666;
 pub const mode_dir: c_uint = 0o777;
 
-pub const TttyState = extern struct {
-    tio: std.c.termios,
-};
+pub const TttyState = if (builtin.os.tag == .windows)
+    extern struct {
+        mode: u32,
+    }
+else
+    extern struct {
+        tio: std.c.termios,
+    };
 
 pub const Channel = extern struct {
     descriptor: c_int,
@@ -656,7 +694,10 @@ comptime {
     std.debug.assert(@offsetOf(Channel, "flags") == 8);
 }
 
-pub inline fn cFstat(fd: std.c.fd_t, buf: *Stat) c_int {
+pub inline fn cFstat(fd: FdT, buf: *Stat) c_int {
+    if (comptime builtin.os.tag == .windows) {
+        @compileError("POSIX-only cFstat called on Windows");
+    }
     if (builtin.os.tag == .linux) {
         const LinuxLibc = struct {
             extern "c" fn fstat(fd: c_int, buf: *Stat) callconv(.c) c_int;
@@ -667,6 +708,9 @@ pub inline fn cFstat(fd: std.c.fd_t, buf: *Stat) c_int {
 }
 
 pub inline fn cStat(path: [*:0]const u8, buf: *Stat) c_int {
+    if (comptime builtin.os.tag == .windows) {
+        @compileError("POSIX-only cStat called on Windows");
+    }
     if (builtin.os.tag == .linux) {
         const LinuxLibc = struct {
             extern "c" fn stat(path: [*:0]const u8, buf: *Stat) callconv(.c) c_int;
@@ -677,6 +721,9 @@ pub inline fn cStat(path: [*:0]const u8, buf: *Stat) c_int {
 }
 
 pub inline fn cLstat(path: [*:0]const u8, buf: *Stat) c_int {
+    if (comptime builtin.os.tag == .windows) {
+        @compileError("POSIX-only cLstat called on Windows");
+    }
     if (builtin.os.tag.isDarwin() and builtin.cpu.arch == .x86_64) {
         const DarwinLibc = struct {
             extern "c" fn @"lstat$INODE64"(path: [*:0]const u8, buf: *Stat) callconv(.c) c_int;
@@ -699,7 +746,10 @@ pub fn makeChannel(fd: c_int, ch_type: ChannelType) Tchannel {
     return ch;
 }
 
-pub inline fn openFdRetry(path: [*:0]const u8, oflags: std.c.O, mode: c_uint) c_int {
+pub inline fn openFdRetry(path: [*:0]const u8, oflags: OpenFlags, mode: c_uint) c_int {
+    if (comptime builtin.os.tag == .windows) {
+        @compileError("POSIX-only openFdRetry called on Windows");
+    }
     var fd = std.c.open(path, oflags, mode);
     while (fd < 0) {
         UX_prim_check_fd_errno(syscall_open);
@@ -770,6 +820,11 @@ pub inline fn cStdout() *std.c.FILE {
         return (struct {
             extern "c" var __stdoutp: *std.c.FILE;
         }).__stdoutp;
+    } else if (builtin.os.tag == .windows) {
+        const WinIo = struct {
+            extern "c" fn __acrt_iob_func(index: c_uint) *std.c.FILE;
+        };
+        return WinIo.__acrt_iob_func(1);
     }
     return (struct {
         extern "c" var stdout: *std.c.FILE;
@@ -781,6 +836,11 @@ pub inline fn cStderr() *std.c.FILE {
         return (struct {
             extern "c" var __stderrp: *std.c.FILE;
         }).__stderrp;
+    } else if (builtin.os.tag == .windows) {
+        const WinIo = struct {
+            extern "c" fn __acrt_iob_func(index: c_uint) *std.c.FILE;
+        };
+        return WinIo.__acrt_iob_func(2);
     }
     return (struct {
         extern "c" var stderr: *std.c.FILE;
@@ -1237,7 +1297,7 @@ pub extern "c" fn UX_reinitialize_tty() void;
 pub extern "c" fn termination_signal([*:0]const u8) noreturn;
 pub extern "c" fn hard_reset(?*anyopaque) void;
 pub extern "c" fn soft_reset() void;
-pub extern "c" fn trap_handler([*:0]const u8, c_int, ?*std.c.siginfo_t, ?*anyopaque) void;
+pub extern "c" fn trap_handler([*:0]const u8, c_int, ?*SiginfoT, ?*anyopaque) void;
 pub extern "c" fn userio_buffered_input() void;
 pub extern "c" fn userio_read_char() u8;
 pub extern "c" fn userio_read_char_raw() u8;

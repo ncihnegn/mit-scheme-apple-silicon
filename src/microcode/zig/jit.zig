@@ -6,6 +6,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const build_options = @import("build_options");
 pub const wind = @import("wind.zig");
+const win = @import("win_api.zig");
 
 // Ensure wind + obstack exports are emitted when jit.zig is built standalone.
 comptime {
@@ -16,6 +17,7 @@ const cc_is_native: bool = build_options.cc_is_native;
 const is_apple_jit: bool = builtin.os.tag.isDarwin() and builtin.cpu.arch == .aarch64;
 const use_apple_jit_wx: bool = is_apple_jit and cc_is_native;
 const has_mmap: bool = builtin.os.tag.isDarwin() or builtin.os.tag == .linux;
+const is_windows: bool = builtin.os.tag == .windows;
 
 extern "c" fn munmap(addr: *anyopaque, len: usize) c_int;
 extern "c" fn abort() noreturn;
@@ -38,14 +40,20 @@ fn fatalError(message: [*:0]const u8) noreturn {
 }
 
 pub export fn jit_available_p() callconv(.c) bool {
-    return use_apple_jit_wx or has_mmap;
+    return use_apple_jit_wx or has_mmap or is_windows;
 }
 
 pub export fn jit_page_size() callconv(.c) usize {
     if (cached_page_size == 0) {
-        const ps = std.c.sysconf(@intFromEnum(std.c._SC.PAGESIZE));
-        const fallback: usize = if (is_apple_jit) 0x4000 else 0x1000;
-        cached_page_size = if (ps > 0) @intCast(ps) else fallback;
+        if (comptime is_windows) {
+            var si: win.SYSTEM_INFO = std.mem.zeroes(win.SYSTEM_INFO);
+            win.kernel32.GetSystemInfo(&si);
+            cached_page_size = if (si.dwPageSize > 0) @intCast(si.dwPageSize) else 0x1000;
+        } else {
+            const ps = std.c.sysconf(@intFromEnum(std.c._SC.PAGESIZE));
+            const fallback: usize = if (is_apple_jit) 0x4000 else 0x1000;
+            cached_page_size = if (ps > 0) @intCast(ps) else fallback;
+        }
     }
     return cached_page_size;
 }
@@ -61,7 +69,14 @@ pub export fn jit_map_code_space(byte_length: usize) callconv(.c) ?*anyopaque {
     const size = roundUpPages(byte_length);
     if (size == 0) return null;
 
-    if (comptime use_apple_jit_wx) {
+    if (comptime is_windows) {
+        return win.kernel32.VirtualAlloc(
+            null,
+            size,
+            win.MEM_COMMIT | win.MEM_RESERVE,
+            if (cc_is_native) win.PAGE_EXECUTE_READWRITE else win.PAGE_READWRITE,
+        );
+    } else if (comptime use_apple_jit_wx) {
         const addr = std.c.mmap(
             null,
             size,
@@ -92,7 +107,9 @@ pub export fn jit_map_code_space(byte_length: usize) callconv(.c) ?*anyopaque {
 
 pub export fn jit_unmap_code_space(addr: ?*anyopaque, byte_length: usize) callconv(.c) void {
     const ptr = addr orelse return;
-    if (comptime use_apple_jit_wx or has_mmap) {
+    if (comptime is_windows) {
+        _ = win.kernel32.VirtualFree(ptr, 0, win.MEM_RELEASE);
+    } else if (comptime use_apple_jit_wx or has_mmap) {
         const size = roundUpPages(byte_length);
         if (size != 0) {
             _ = munmap(ptr, size);
@@ -160,6 +177,8 @@ pub export fn jit_flush_icache(addr: ?*anyopaque, byte_length: usize) callconv(.
 
     if (comptime builtin.os.tag.isDarwin()) {
         darwin_ext.sys_icache_invalidate(ptr, byte_length);
+    } else if (comptime is_windows) {
+        _ = win.kernel32.FlushInstructionCache(win.kernel32.GetCurrentProcess(), ptr, byte_length);
     } else if (comptime builtin.cpu.arch == .aarch64) {
         const ctr_el0 = asm volatile ("mrs %[ret], ctr_el0"
             : [ret] "=r" (-> u64),

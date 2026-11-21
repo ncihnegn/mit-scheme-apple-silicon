@@ -3,11 +3,13 @@
 // Licensed under the GNU General Public License (GPL v2 or later); see src/COPYING.
 
 const std = @import("std");
+const builtin = @import("builtin");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
 const boot = @import("boot.zig");
 const wind = @import("wind.zig");
 const string = @import("string.zig");
+const win = @import("win_api.zig");
 
 fn argProcess(argument_number: c_int) abi.Tprocess {
     const process = abi.arg_ulong_integer(argument_number);
@@ -25,13 +27,40 @@ inline fn processSignalPrim(comptime signal_fn: *const fn (abi.Tprocess) callcon
 }
 
 pub fn environVector() obj.SchemeObject {
-    var count: usize = 0;
-    while (std.c.environ[count] != null) : (count += 1) {}
-    const result = abi.allocate_vector(@intCast(count), true);
-    for (0..count) |i| {
-        obj.vectorSet(result, i, string.char_pointer_to_string(std.c.environ[i].?));
+    if (comptime builtin.os.tag == .windows) {
+        const block = win.kernel32.GetEnvironmentStringsA() orelse return abi.allocate_vector(0, true);
+        defer _ = win.kernel32.FreeEnvironmentStringsA(block);
+
+        var count: usize = 0;
+        var p: [*]const u8 = block;
+        while (p[0] != 0) {
+            const s: [*:0]const u8 = @ptrCast(p);
+            const len = std.mem.len(s);
+            if (p[0] != '=') count += 1;
+            p += len + 1;
+        }
+        const result = abi.allocate_vector(@intCast(count), true);
+        var idx: usize = 0;
+        p = block;
+        while (p[0] != 0) {
+            const s: [*:0]const u8 = @ptrCast(p);
+            const len = std.mem.len(s);
+            if (p[0] != '=') {
+                obj.vectorSet(result, idx, string.char_pointer_to_string(s));
+                idx += 1;
+            }
+            p += len + 1;
+        }
+        return result;
+    } else {
+        var count: usize = 0;
+        while (std.c.environ[count] != null) : (count += 1) {}
+        const result = abi.allocate_vector(@intCast(count), true);
+        for (0..count) |i| {
+            obj.vectorSet(result, i, string.char_pointer_to_string(std.c.environ[i].?));
+        }
+        return result;
     }
-    return result;
 }
 
 // DEFINE_PRIMITIVE ("SCHEME-ENVIRONMENT", Prim_scheme_environment, 0, 0, 0)

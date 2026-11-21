@@ -3,6 +3,7 @@
 // Licensed under the GNU General Public License (GPL v2 or later); see src/COPYING.
 
 const std = @import("std");
+const builtin = @import("builtin");
 const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
@@ -17,7 +18,19 @@ const list = @import("list.zig");
 
 const max_list_print: usize = 10;
 
-extern "c" fn read(fd: c_int, buf: [*]u8, count: usize) isize;
+inline fn readStdinByte(ch: *u8) isize {
+    if (builtin.os.tag == .windows) {
+        const WinRead = struct {
+            extern "c" fn _read(fd: c_int, buf: [*]u8, count: c_uint) c_int;
+        };
+        return @intCast(WinRead._read(0, @ptrCast(ch), 1));
+    } else {
+        const PosixRead = struct {
+            extern "c" fn read(fd: c_int, buf: [*]u8, count: usize) isize;
+        };
+        return PosixRead.read(0, @ptrCast(ch), 1);
+    }
+}
 
 inline fn ptrAddr(p: anytype) usize {
     return if (@typeInfo(@TypeOf(p)) == .optional)
@@ -1199,7 +1212,7 @@ fn readInteractiveLine(buf: *[256]u8) ?[]const u8 {
     var len: usize = 0;
     while (len + 1 < buf.len) {
         var ch: u8 = 0;
-        const n = read(0, @ptrCast(&ch), 1);
+        const n = readStdinByte(&ch);
         if (n <= 0) {
             if (len == 0) return null;
             break;

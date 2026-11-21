@@ -9,13 +9,22 @@ const abi = @import("prim_abi.zig");
 const string = @import("string.zig");
 const utils = @import("utils.zig");
 const artutl = @import("artutl.zig");
+const win = @import("win_api.zig");
 
-const Utimbuf = extern struct {
-    actime: abi.TimeT,
-    modtime: abi.TimeT,
-};
-
-extern "c" fn utime([*:0]const u8, ?*const Utimbuf) c_int;
+const s_ifmt: u32 = 0o170000;
+const s_ififo: u32 = 0o010000;
+const s_ifchr: u32 = 0o020000;
+const s_ifdir: u32 = 0o040000;
+const s_ifblk: u32 = 0o060000;
+const s_ifreg: u32 = 0o100000;
+const s_iflnk: u32 = 0o120000;
+const s_ifsock: u32 = 0o140000;
+const s_isuid: u32 = 0o4000;
+const s_isgid: u32 = 0o2000;
+const s_isvtx: u32 = 0o1000;
+const s_irusr: u32 = 0o400;
+const s_iwusr: u32 = 0o200;
+const s_ixusr: u32 = 0o100;
 
 inline fn fileStatTimePrim(
     comptime stat_fn: *const fn ([*:0]const u8, *abi.Stat) callconv(.c) c_int,
@@ -48,10 +57,10 @@ fn fileAttributesInternal(s: *const abi.Stat) obj.SchemeObject {
     const result = abi.allocate_vector(10, true);
     const modes = abi.allocate_string(10);
     const mode: u32 = s.mode;
-    const fmt = mode & std.c.S.IFMT;
-    if (fmt == std.c.S.IFDIR) {
+    const fmt = mode & s_ifmt;
+    if (fmt == s_ifdir) {
         obj.vectorSet(result, 0, obj.sharp_t);
-    } else if (fmt == std.c.S.IFLNK) {
+    } else if (fmt == s_iflnk) {
         obj.vectorSet(result, 0, string.char_pointer_to_string(abi.OS_file_soft_link_p(@ptrCast(obj.legacyStringData(abi.argRef(1))))));
     } else {
         obj.vectorSet(result, 0, obj.sharp_f);
@@ -75,33 +84,33 @@ fn fileModeString(s: *const abi.Stat, a: [*]u8) void {
     rwx((mode & 0o700) << 0, a + 1);
     rwx((mode & 0o070) << 3, a + 4);
     rwx((mode & 0o007) << 6, a + 7);
-    if ((mode & std.c.S.ISUID) != 0) {
+    if ((mode & s_isuid) != 0) {
         a[3] = if (a[3] == 'x') 's' else 'S';
     }
-    if ((mode & std.c.S.ISGID) != 0) {
+    if ((mode & s_isgid) != 0) {
         a[6] = if (a[6] == 'x') 's' else 'S';
     }
-    if ((mode & std.c.S.ISVTX) != 0) {
+    if ((mode & s_isvtx) != 0) {
         a[9] = if (a[9] == 'x') 't' else 'T';
     }
 }
 
 fn fileTypeLetter(mode: u32) u8 {
-    return switch (mode & std.c.S.IFMT) {
-        std.c.S.IFDIR => 'd',
-        std.c.S.IFCHR => 'c',
-        std.c.S.IFBLK => 'b',
-        std.c.S.IFLNK => 'l',
-        std.c.S.IFSOCK => 's',
-        std.c.S.IFIFO => 'p',
+    return switch (mode & s_ifmt) {
+        s_ifdir => 'd',
+        s_ifchr => 'c',
+        s_ifblk => 'b',
+        s_iflnk => 'l',
+        s_ifsock => 's',
+        s_ififo => 'p',
         else => '-',
     };
 }
 
 fn rwx(bits: u32, chars: [*]u8) void {
-    chars[0] = if ((bits & std.c.S.IRUSR) != 0) 'r' else '-';
-    chars[1] = if ((bits & std.c.S.IWUSR) != 0) 'w' else '-';
-    chars[2] = if ((bits & std.c.S.IXUSR) != 0) 'x' else '-';
+    chars[0] = if ((bits & s_irusr) != 0) 'r' else '-';
+    chars[1] = if ((bits & s_iwusr) != 0) 'w' else '-';
+    chars[2] = if ((bits & s_ixusr) != 0) 'x' else '-';
 }
 
 // DEFINE_PRIMITIVE ("FILE-MODES", Prim_file_modes, 1, 1,
@@ -120,9 +129,24 @@ pub export fn Prim_file_modes() callconv(.c) obj.SchemeObject {
 pub export fn Prim_set_file_modes() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     const path = abi.stringArg(1);
-    const mode: std.c.mode_t = @intCast(abi.arg_index_integer(2, 0o10000));
-    if (std.c.chmod(path, mode) < 0) {
-        utils.error_system_call(std.c._errno().*, abi.syscall_chmod);
+    const mode: u32 = @intCast(abi.arg_index_integer(2, 0o10000));
+    if (comptime builtin.os.tag == .windows) {
+        const attrs = win.kernel32.GetFileAttributesA(path);
+        if (attrs == win.INVALID_FILE_ATTRIBUTES) {
+            utils.error_system_call(win.win32ErrorToErrno(win.kernel32.GetLastError()), abi.syscall_chmod);
+        }
+        const next_attrs: win.DWORD = if ((mode & 0o200) == 0)
+            attrs | win.FILE_ATTRIBUTE_READONLY
+        else
+            attrs & ~win.FILE_ATTRIBUTE_READONLY;
+        if (win.kernel32.SetFileAttributesA(path, next_attrs) == 0) {
+            utils.error_system_call(win.win32ErrorToErrno(win.kernel32.GetLastError()), abi.syscall_chmod);
+        }
+    } else {
+        const mode_c: std.c.mode_t = @intCast(mode);
+        if (std.c.chmod(path, mode_c) < 0) {
+            utils.error_system_call(std.c._errno().*, abi.syscall_chmod);
+        }
     }
     return obj.sharp_f;
 }
@@ -153,13 +177,43 @@ pub export fn Prim_file_acc_time_indirect() callconv(.c) obj.SchemeObject {
 // The file must exist and you must be the owner (or superuser).")
 pub export fn Prim_set_file_times() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    var times = Utimbuf{
-        .actime = @intCast(abi.arg_index_integer_to_intmax(2, abi.time_t_max)),
-        .modtime = @intCast(abi.arg_index_integer_to_intmax(3, abi.time_t_max)),
-    };
+    const actime_sec = abi.arg_index_integer_to_intmax(2, abi.time_t_max);
+    const modtime_sec = abi.arg_index_integer_to_intmax(3, abi.time_t_max);
     const path = abi.stringArg(1);
-    while (utime(path, &times) < 0) {
-        abi.UX_prim_check_errno(abi.syscall_utime);
+    if (comptime builtin.os.tag == .windows) {
+        const h = win.kernel32.CreateFileA(
+            path,
+            win.FILE_WRITE_ATTRIBUTES,
+            win.FILE_SHARE_READ | win.FILE_SHARE_WRITE | win.FILE_SHARE_DELETE,
+            null,
+            win.OPEN_EXISTING,
+            win.FILE_FLAG_BACKUP_SEMANTICS,
+            null,
+        );
+        if (h == win.INVALID_HANDLE_VALUE) {
+            utils.error_system_call(win.win32ErrorToErrno(win.kernel32.GetLastError()), abi.syscall_utime);
+        }
+        defer _ = win.kernel32.CloseHandle(h);
+        const atime_ft = win.unixSecToFiletime(@intCast(actime_sec));
+        const mtime_ft = win.unixSecToFiletime(@intCast(modtime_sec));
+        if (win.kernel32.SetFileTime(h, null, &atime_ft, &mtime_ft) == 0) {
+            utils.error_system_call(win.win32ErrorToErrno(win.kernel32.GetLastError()), abi.syscall_utime);
+        }
+    } else {
+        const PosixUtime = struct {
+            const Utimbuf = extern struct {
+                actime: abi.TimeT,
+                modtime: abi.TimeT,
+            };
+            extern "c" fn utime([*:0]const u8, ?*const Utimbuf) c_int;
+        };
+        var times = PosixUtime.Utimbuf{
+            .actime = @intCast(actime_sec),
+            .modtime = @intCast(modtime_sec),
+        };
+        while (PosixUtime.utime(path, &times) < 0) {
+            abi.UX_prim_check_errno(abi.syscall_utime);
+        }
     }
     return obj.unspecific;
 }
@@ -227,7 +281,7 @@ test "pruxfs modes, times, attributes, mode string, file-eq?, and filesystem typ
 
     stubs.mock_stat.dev = 7;
     stubs.mock_stat.ino = 12345;
-    stubs.mock_stat.mode = std.c.S.IFREG | std.c.S.ISUID | 0o751;
+    stubs.mock_stat.mode = s_ifreg | s_isuid | 0o751;
     stubs.mock_stat.nlink = 2;
     stubs.mock_stat.uid = 501;
     stubs.mock_stat.gid = 20;
@@ -238,7 +292,7 @@ test "pruxfs modes, times, attributes, mode string, file-eq?, and filesystem typ
 
     const fname = string.char_pointer_to_string("/mock/file");
     stubs.setArgs(&.{fname});
-    try std.testing.expectEqual(obj.ulongToFixnum(std.c.S.ISUID | 0o751), Prim_file_modes());
+    try std.testing.expectEqual(obj.ulongToFixnum(s_isuid | 0o751), Prim_file_modes());
     try std.testing.expectEqual(obj.ulongToFixnum(1002), Prim_file_mod_time());
     try std.testing.expectEqual(obj.ulongToFixnum(1002), Prim_file_mod_time_indirect());
     try std.testing.expectEqual(obj.ulongToFixnum(1001), Prim_file_acc_time());
@@ -258,7 +312,7 @@ test "pruxfs modes, times, attributes, mode string, file-eq?, and filesystem typ
     try std.testing.expectEqual(obj.ulongToFixnum(12345), obj.vectorRef(attrs, 9));
 
     // Directory + setgid (no group x) + sticky (with other x)
-    stubs.mock_stat.mode = std.c.S.IFDIR | std.c.S.ISGID | std.c.S.ISVTX | 0o741;
+    stubs.mock_stat.mode = s_ifdir | s_isgid | s_isvtx | 0o741;
     stubs.setMockChannel(4, @intFromEnum(abi.ChannelType.directory), false);
     stubs.setArgs(&.{obj.ulongToFixnum(4)});
     const dir_attrs = Prim_channel_file_attributes();
@@ -266,7 +320,7 @@ test "pruxfs modes, times, attributes, mode string, file-eq?, and filesystem typ
     try std.testing.expectEqualStrings("drwxr-S--t", obj.legacyStringData(obj.vectorRef(dir_attrs, 8))[0..10]);
 
     // Symlink attributes resolve target name via OS_file_soft_link_p
-    stubs.mock_stat.mode = std.c.S.IFLNK | 0o777;
+    stubs.mock_stat.mode = s_iflnk | 0o777;
     stubs.mock_soft_link = "/target/path";
     stubs.setArgs(&.{fname});
     const lnk_attrs = Prim_file_attributes_indirect();
