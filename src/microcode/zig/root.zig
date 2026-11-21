@@ -33,6 +33,8 @@ pub const fenv_plat = @import("fenv_plat.zig");
 pub const floenv = @import("floenv.zig");
 pub const flonum = @import("flonum.zig");
 pub const bitstr = @import("bitstr.zig");
+pub const string = @import("string.zig");
+pub const intern = @import("intern.zig");
 
 comptime {
     _ = chacha;
@@ -66,6 +68,8 @@ comptime {
     _ = floenv;
     _ = flonum;
     _ = bitstr;
+    _ = string;
+    _ = intern;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -106,4 +110,6 @@ test "microcode zig scaffold" {
     _ = floenv;
     _ = flonum;
     _ = bitstr;
+    _ = string;
+    _ = intern;
 }

@@ -29,6 +29,7 @@ pub const tc_false: c_ulong = 0x00;
 pub const tc_pair: c_ulong = 0x01;
 pub const tc_list: c_ulong = tc_pair;
 pub const tc_character: c_ulong = 0x02;
+pub const tc_uninterned_symbol: c_ulong = 0x05;
 pub const tc_big_flonum: c_ulong = 0x06;
 pub const tc_constant: c_ulong = 0x08;
 pub const tc_vector: c_ulong = 0x0A;
@@ -48,6 +49,7 @@ pub const tc_tagged_object: c_ulong = 0x25;
 pub const tc_manifest_nm_vector: c_ulong = 0x27;
 pub const tc_vector_1b: c_ulong = 0x2F;
 pub const tc_bit_string: c_ulong = tc_vector_1b;
+pub const tc_reference_trap: c_ulong = 0x32;
 pub const tc_bytevector: c_ulong = 0x33;
 pub const tc_cell: c_ulong = 0x36;
 pub const tc_weak_cons: c_ulong = 0x37;
@@ -75,11 +77,16 @@ pub inline fn objectNewDatum(type_obj: SchemeObject, datum: c_ulong) SchemeObjec
     return makeObject(objectType(type_obj), datum);
 }
 
+pub inline fn objectNewType(tc: c_ulong, o: SchemeObject) SchemeObject {
+    return makeObject(tc, objectDatum(o));
+}
+
 // Constant objects (`src/microcode/object.h`)
 pub const sharp_f: SchemeObject = makeObject(tc_false, 0);
 pub const sharp_t: SchemeObject = makeObject(tc_constant, 0);
 pub const unspecific: SchemeObject = makeObject(tc_constant, 1);
 pub const empty_list: SchemeObject = makeObject(tc_constant, 9);
+pub const unbound_object: SchemeObject = makeObject(tc_reference_trap, 2);
 
 pub const fasdump_record_marker_start: c_ulong = 0x100;
 pub const fasdump_record_marker_end: c_ulong = 0x200;
@@ -185,6 +192,30 @@ pub inline fn emptyListP(obj: SchemeObject) bool {
     return obj == empty_list;
 }
 
+pub inline fn internedSymbolP(obj: SchemeObject) bool {
+    return objectType(obj) == tc_interned_symbol;
+}
+
+pub inline fn uninternedSymbolP(obj: SchemeObject) bool {
+    return objectType(obj) == tc_uninterned_symbol;
+}
+
+pub inline fn symbolP(obj: SchemeObject) bool {
+    return internedSymbolP(obj) or uninternedSymbolP(obj);
+}
+
+pub inline fn legacyStringP(obj: SchemeObject) bool {
+    return objectType(obj) == tc_character_string;
+}
+
+pub inline fn unicodeStringP(obj: SchemeObject) bool {
+    return objectType(obj) == tc_unicode_string;
+}
+
+pub inline fn ustringBytesPerCp(obj: SchemeObject) c_ulong {
+    return objectType(nmVectorSubheader(obj)) & 0x3;
+}
+
 // Memory operations
 pub inline fn memoryRef(obj: SchemeObject, index: usize) SchemeObject {
     return objectAddress(obj)[index];
@@ -207,12 +238,28 @@ pub inline fn pairCdr(pair: SchemeObject) SchemeObject {
     return memoryRef(pair, 1);
 }
 
+pub inline fn pairCarLoc(pair: SchemeObject) [*]SchemeObject {
+    return memoryLoc(pair, 0);
+}
+
+pub inline fn pairCdrLoc(pair: SchemeObject) [*]SchemeObject {
+    return memoryLoc(pair, 1);
+}
+
 pub inline fn setPairCar(pair: SchemeObject, val: SchemeObject) void {
     memorySet(pair, 0, val);
 }
 
 pub inline fn setPairCdr(pair: SchemeObject, val: SchemeObject) void {
     memorySet(pair, 1, val);
+}
+
+pub inline fn symbolName(sym: SchemeObject) SchemeObject {
+    return memoryRef(sym, 0);
+}
+
+pub inline fn setSymbolName(sym: SchemeObject, name: SchemeObject) void {
+    memorySet(sym, 0, name);
 }
 
 // Character operations
@@ -424,6 +471,34 @@ pub inline fn legacyStringLength(s: SchemeObject) c_ulong {
 
 pub inline fn legacyStringData(s: SchemeObject) [*]u8 {
     return bytevectorData(s);
+}
+
+pub inline fn legacyStringLoc(s: SchemeObject, index: usize) [*]u8 {
+    return legacyStringData(s) + index;
+}
+
+pub inline fn legacyStringRef(s: SchemeObject, index: usize) u8 {
+    return legacyStringLoc(s, index)[0];
+}
+
+pub inline fn legacyStringSet(s: SchemeObject, index: usize, c: u8) void {
+    legacyStringLoc(s, index)[0] = c;
+}
+
+pub inline fn setLegacyStringLength(s: SchemeObject, nbytes: c_ulong) void {
+    setBytevectorLength(s, nbytes);
+}
+
+pub inline fn legacyStringMaxLength(s: SchemeObject) c_ulong {
+    return (vectorLength(s) - 1) * @sizeOf(SchemeObject) - 1;
+}
+
+pub inline fn setLegacyStringMaxLength(s: SchemeObject, nbytes: c_ulong) void {
+    setVectorHeader(s, makeNmvHeader(bytevectorLengthToGcLength(nbytes)));
+}
+
+pub inline fn hashToFixnum(h: u32) SchemeObject {
+    return ulongToFixnum(@as(c_ulong, h));
 }
 
 pub const flonum_size: c_ulong = bytesToWords(@sizeOf(f64));

@@ -118,7 +118,7 @@ pub export fn record_primitive_entry(_: obj.SchemeObject) callconv(.c) void {}
 
 pub export fn gc_type_code(tc: c_uint) callconv(.c) c_int {
     return switch (@as(c_ulong, tc)) {
-        obj.tc_pair, obj.tc_weak_cons, obj.tc_tagged_object => @intFromEnum(abi.GcType.pair),
+        obj.tc_pair, obj.tc_weak_cons, obj.tc_tagged_object, obj.tc_interned_symbol, obj.tc_uninterned_symbol => @intFromEnum(abi.GcType.pair),
         obj.tc_hunk3_a, obj.tc_hunk3_b => @intFromEnum(abi.GcType.triple),
         obj.tc_vector,
         obj.tc_record,
@@ -171,19 +171,16 @@ pub export fn arg_ulong_index_integer(n: c_int, upper_limit: c_ulong) callconv(.
     return val;
 }
 
-pub export fn string_p(o: obj.SchemeObject) callconv(.c) bool {
-    const t = obj.objectType(o);
-    return t == obj.tc_character_string or t == obj.tc_bytevector;
-}
-
-pub export fn allocate_string(nbytes: c_ulong) callconv(.c) obj.SchemeObject {
-    const res = abi.allocate_non_marked_vector(
-        @intCast(obj.tc_character_string),
-        obj.bytevectorLengthToGcLength(nbytes),
-        true,
-    );
-    obj.setBytevectorLength(res, nbytes);
-    return res;
+pub export fn memory_hash(length: c_ulong, vp: ?*const anyopaque) callconv(.c) u32 {
+    var result: u32 = 2166136261;
+    if (length == 0) return result;
+    const bytes: [*]const u8 = @ptrCast(vp.?);
+    var i: usize = 0;
+    while (i < @as(usize, @intCast(length))) : (i += 1) {
+        result ^= @as(u32, bytes[i]);
+        result *%= 16777619;
+    }
+    return result;
 }
 
 pub export fn arg_integer_in_range(n: c_int, lower_limit: c_long, upper_limit: c_long) callconv(.c) c_long {

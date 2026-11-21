@@ -23,6 +23,7 @@ pub const term_exit: c_int = 0x0C;
 pub const err_wrong_number_of_arguments: c_long = 0x0C;
 pub const prim_apply: c_long = -3;
 
+pub const fixobj_obarray: usize = 0x03;
 pub const fixobj_record_tag: usize = 0x11;
 pub const fixobj_record_app_index: usize = 0x12;
 pub const fixobj_proxied_record_types: usize = 0x15;
@@ -112,6 +113,14 @@ pub extern "c" fn error_unimplemented_primitive() noreturn;
 pub extern "c" fn Mul(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
 pub extern "c" fn string_p(obj.SchemeObject) bool;
 pub extern "c" fn allocate_string(c_ulong) obj.SchemeObject;
+pub extern "c" fn system_pair_cons(c_long, obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn memory_hash(c_ulong, ?*const anyopaque) u32;
+pub extern "c" fn arg_ascii_char(c_int) c_long;
+pub extern "c" fn arg_ascii_integer(c_int) c_long;
+pub extern "c" fn char_upcase(c_long) c_long;
+pub extern "c" fn char_downcase(c_long) c_long;
+pub extern "c" fn string_to_char_pointer(obj.SchemeObject, ?*c_ulong) [*]u8;
+pub extern "c" fn arg_extended_string(c_uint, ?*c_ulong) [*]u8;
 
 pub const BignumComparison = enum(c_int) {
     equal = 0,
