@@ -849,6 +849,10 @@ pub export fn OS_pause(_: bool, _: bool) callconv(.c) c_int {
     return 0;
 }
 
+pub export fn OS_process_any_status_change() callconv(.c) c_int {
+    return 0;
+}
+
 pub fn setMockFileMetrics(ch: abi.Tchannel, len: abi.OffT, pos: abi.OffT) void {
     mock_file_lengths[ch] = len;
     mock_file_positions[ch] = pos;
