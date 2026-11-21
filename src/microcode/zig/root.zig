@@ -71,6 +71,10 @@ pub const gcloop = @import("gcloop.zig");
 pub const prosio = @import("prosio.zig");
 pub const prosfile = @import("prosfile.zig");
 pub const prosfs = @import("prosfs.zig");
+pub const prosenv = @import("prosenv.zig");
+pub const prostty = @import("prostty.zig");
+pub const prosterm = @import("prosterm.zig");
+pub const prospty = @import("prospty.zig");
 
 comptime {
     _ = chacha;
@@ -142,6 +146,10 @@ comptime {
     _ = prosio;
     _ = prosfile;
     _ = prosfs;
+    _ = prosenv;
+    _ = prostty;
+    _ = prosterm;
+    _ = prospty;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -220,4 +228,8 @@ test "microcode zig scaffold" {
     _ = prosio;
     _ = prosfile;
     _ = prosfs;
+    _ = prosenv;
+    _ = prostty;
+    _ = prosterm;
+    _ = prospty;
 }

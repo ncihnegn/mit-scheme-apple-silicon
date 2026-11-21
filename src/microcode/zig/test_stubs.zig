@@ -59,6 +59,17 @@ pub var mock_file_existence: c_uint = 0;
 pub var mock_file_type: c_int = 0;
 pub var mock_soft_link: ?[*:0]const u8 = null;
 var mock_dir_open: bool = false;
+pub var mock_jiffy: abi.ClockT = @bitCast(@as(isize, -1));
+var mock_int_enables: abi.TinterruptEnables = 0;
+var mock_int_chars: [2]abi.CcT = .{ 3, 7 };
+var mock_int_handlers: [2]abi.CcT = .{ 'i', 'q' };
+var mock_ispeed: c_uint = 0;
+var mock_ospeed: c_uint = 0;
+var mock_term_cooked: c_int = 1;
+var mock_term_buffered: c_int = 1;
+var mock_term_state: [4]u8 = .{ 1, 2, 3, 4 };
+pub var mock_last_pty_sig: c_int = 0;
+pub var mock_pty_ops: usize = 0;
 pub var mock_write_var_cache_calls: usize = 0;
 pub var mock_make_uuo_link_calls: usize = 0;
 pub var mock_apply_compiled_calls: usize = 0;
@@ -139,6 +150,17 @@ pub fn resetMockRuntime() void {
     mock_file_type = 0;
     mock_soft_link = null;
     mock_dir_open = false;
+    mock_jiffy = @bitCast(@as(isize, -1));
+    mock_int_enables = 0;
+    mock_int_chars = .{ 3, 7 };
+    mock_int_handlers = .{ 'i', 'q' };
+    mock_ispeed = 0;
+    mock_ospeed = 0;
+    mock_term_cooked = 1;
+    mock_term_buffered = 1;
+    mock_term_state = .{ 1, 2, 3, 4 };
+    mock_last_pty_sig = 0;
+    mock_pty_ops = 0;
     storage.memory_block_end = null;
     storage.heap_reserved = 0;
     storage.ephemeron_array = obj.sharp_f;
@@ -862,3 +884,183 @@ pub export fn OS_directory_read_matching(_: c_uint, _: [*:0]const u8) callconv(.
     return "match.scm";
 }
 pub export fn OS_file_copy(_: [*:0]const u8, _: [*:0]const u8) callconv(.c) void {}
+
+pub export fn OS_nanotime_since_utc_epoch(t: *abi.SchemeNanotime) callconv(.c) void {
+    t.* = .{ .seconds = 123, .nanoseconds = 456 };
+}
+pub export fn OS_monotonic_nanotime(t: *abi.SchemeNanotime) callconv(.c) void {
+    t.* = .{ .seconds = 789, .nanoseconds = 10 };
+}
+pub export fn OS_encoded_time() callconv(.c) abi.TimeT {
+    return 1700000000;
+}
+pub export fn OS_decode_time(_: abi.TimeT, ts: *abi.TimeStructure) callconv(.c) void {
+    ts.* = .{
+        .year = 2024,
+        .month = 11,
+        .day = 20,
+        .hour = 12,
+        .minute = 30,
+        .second = 45,
+        .day_of_week = 3,
+        .daylight_savings_time = -1,
+        .time_zone = std.math.maxInt(c_int),
+    };
+}
+pub export fn OS_decode_utc(t: abi.TimeT, ts: *abi.TimeStructure) callconv(.c) void {
+    OS_decode_time(t, ts);
+}
+pub export fn OS_encode_time(_: *abi.TimeStructure) callconv(.c) abi.TimeT {
+    return 1700000000;
+}
+pub export fn OS_process_clock() callconv(.c) f64 {
+    return 100.0;
+}
+pub export fn OS_real_time_clock() callconv(.c) f64 {
+    return 200.0;
+}
+pub export fn OS_process_timer_set(_: abi.ClockT, _: abi.ClockT) callconv(.c) void {}
+pub export fn OS_process_timer_clear() callconv(.c) void {}
+pub export fn OS_profile_timer_set(_: abi.ClockT, _: abi.ClockT) callconv(.c) void {}
+pub export fn OS_profile_timer_clear() callconv(.c) void {}
+pub export fn OS_real_timer_set(_: abi.ClockT, _: abi.ClockT) callconv(.c) void {}
+pub export fn OS_real_timer_clear() callconv(.c) void {}
+pub export fn OS_set_working_dir_pathname(_: [*:0]const u8) callconv(.c) void {}
+pub export fn OS_current_jiffy() callconv(.c) abi.ClockT {
+    return mock_jiffy;
+}
+pub export fn OS_jiffies_per_second() callconv(.c) abi.ClockT {
+    return 1000;
+}
+pub export fn OS_error_code_to_message(code: c_uint) callconv(.c) ?[*:0]const u8 {
+    return if (code == 1) "mock-err" else null;
+}
+
+pub export fn OS_tty_input_channel() callconv(.c) abi.Tchannel {
+    return 0;
+}
+pub export fn OS_tty_output_channel() callconv(.c) abi.Tchannel {
+    return 1;
+}
+pub export fn OS_tty_error_channel() callconv(.c) abi.Tchannel {
+    return 2;
+}
+pub export fn OS_tty_command_beep() callconv(.c) [*:0]const u8 {
+    return "\x07";
+}
+pub export fn OS_tty_command_clear() callconv(.c) [*:0]const u8 {
+    return "\x1b[2J";
+}
+pub export fn OS_ctty_get_interrupt_enables(mask: *abi.TinterruptEnables) callconv(.c) void {
+    mask.* = mock_int_enables;
+}
+pub export fn OS_ctty_set_interrupt_enables(mask: *abi.TinterruptEnables) callconv(.c) void {
+    mock_int_enables = mask.*;
+}
+pub export fn OS_ctty_num_int_chars() callconv(.c) c_uint {
+    return mock_int_chars.len;
+}
+pub export fn OS_ctty_get_int_chars() callconv(.c) [*]abi.CcT {
+    return &mock_int_chars;
+}
+pub export fn OS_ctty_get_int_char_handlers() callconv(.c) [*]abi.CcT {
+    return &mock_int_handlers;
+}
+pub export fn OS_ctty_set_int_chars(chars: [*]abi.CcT) callconv(.c) void {
+    if (chars != @as([*]abi.CcT, &mock_int_chars)) {
+        @memcpy(&mock_int_chars, chars[0..mock_int_chars.len]);
+    }
+}
+pub export fn OS_ctty_set_int_char_handlers(handlers: [*]abi.CcT) callconv(.c) void {
+    if (handlers != @as([*]abi.CcT, &mock_int_handlers)) {
+        @memcpy(&mock_int_handlers, handlers[0..mock_int_handlers.len]);
+    }
+}
+
+pub export fn OS_terminal_get_ispeed(_: abi.Tchannel) callconv(.c) c_uint {
+    return mock_ispeed;
+}
+pub export fn OS_terminal_get_ospeed(_: abi.Tchannel) callconv(.c) c_uint {
+    return mock_ospeed;
+}
+pub export fn OS_terminal_set_ispeed(_: abi.Tchannel, baud: c_uint) callconv(.c) void {
+    mock_ispeed = baud;
+}
+pub export fn OS_terminal_set_ospeed(_: abi.Tchannel, baud: c_uint) callconv(.c) void {
+    mock_ospeed = baud;
+}
+pub export fn arg_baud_index(n: c_uint) callconv(.c) c_uint {
+    return @intCast(abi.arg_ulong_integer(@intCast(n)));
+}
+pub export fn OS_baud_index_to_rate(idx: c_uint) callconv(.c) c_uint {
+    return if (idx == 3) 9600 else 0;
+}
+pub export fn OS_baud_rate_to_index(rate: c_uint) callconv(.c) c_int {
+    return if (rate == 9600) 3 else -1;
+}
+pub export fn OS_terminal_state_size() callconv(.c) c_uint {
+    return mock_term_state.len;
+}
+pub export fn OS_terminal_get_state(_: abi.Tchannel, statep: ?*anyopaque) callconv(.c) void {
+    const dst: [*]u8 = @ptrCast(statep.?);
+    @memcpy(dst[0..mock_term_state.len], &mock_term_state);
+}
+pub export fn OS_terminal_set_state(_: abi.Tchannel, statep: ?*anyopaque) callconv(.c) void {
+    const src: [*]const u8 = @ptrCast(statep.?);
+    @memcpy(&mock_term_state, src[0..mock_term_state.len]);
+}
+pub export fn OS_terminal_cooked_output_p(_: abi.Tchannel) callconv(.c) c_int {
+    return mock_term_cooked;
+}
+pub export fn OS_terminal_raw_output(_: abi.Tchannel) callconv(.c) void {
+    mock_term_cooked = 0;
+}
+pub export fn OS_terminal_cooked_output(_: abi.Tchannel) callconv(.c) void {
+    mock_term_cooked = 1;
+}
+pub export fn OS_terminal_buffered_p(_: abi.Tchannel) callconv(.c) c_int {
+    return mock_term_buffered;
+}
+pub export fn OS_terminal_buffered(_: abi.Tchannel) callconv(.c) void {
+    mock_term_buffered = 1;
+}
+pub export fn OS_terminal_nonbuffered(_: abi.Tchannel) callconv(.c) void {
+    mock_term_buffered = 0;
+}
+pub export fn OS_terminal_flush_input(_: abi.Tchannel) callconv(.c) void {}
+pub export fn OS_terminal_flush_output(_: abi.Tchannel) callconv(.c) void {}
+pub export fn OS_terminal_drain_output(_: abi.Tchannel) callconv(.c) void {}
+pub export fn OS_job_control_p() callconv(.c) c_int {
+    return 1;
+}
+pub export fn OS_have_ptys_p() callconv(.c) c_int {
+    return 1;
+}
+
+pub export fn OS_open_pty_master(ch_out: *abi.Tchannel, master_name: *[*:0]const u8) callconv(.c) [*:0]const u8 {
+    ch_out.* = 5;
+    setMockChannel(5, @intFromEnum(abi.ChannelType.unix_pty_master), false);
+    master_name.* = "/dev/ptym0";
+    return "/dev/ptys0";
+}
+pub export fn OS_pty_master_send_signal(_: abi.Tchannel, sig: c_int) callconv(.c) void {
+    mock_last_pty_sig = sig;
+}
+pub export fn OS_pty_master_kill(_: abi.Tchannel) callconv(.c) void {
+    mock_pty_ops += 1;
+}
+pub export fn OS_pty_master_stop(_: abi.Tchannel) callconv(.c) void {
+    mock_pty_ops += 1;
+}
+pub export fn OS_pty_master_continue(_: abi.Tchannel) callconv(.c) void {
+    mock_pty_ops += 1;
+}
+pub export fn OS_pty_master_interrupt(_: abi.Tchannel) callconv(.c) void {
+    mock_pty_ops += 1;
+}
+pub export fn OS_pty_master_quit(_: abi.Tchannel) callconv(.c) void {
+    mock_pty_ops += 1;
+}
+pub export fn OS_pty_master_hangup(_: abi.Tchannel) callconv(.c) void {
+    mock_pty_ops += 1;
+}

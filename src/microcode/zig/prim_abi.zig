@@ -3,6 +3,7 @@
 // Licensed under the GNU General Public License (GPL v2 or later); see src/COPYING.
 
 const std = @import("std");
+const builtin = @import("builtin");
 const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 
@@ -310,6 +311,29 @@ pub const FileExistence = enum(c_uint) {
     is_link = 2,
 };
 
+pub const TimeT = c_long;
+pub const time_t_max: i64 = std.math.maxInt(i64);
+pub const ClockT = if (builtin.os.tag.isDarwin()) c_ulong else c_long;
+pub const TinterruptEnables = c_uint;
+pub const CcT = u8;
+
+pub const SchemeNanotime = extern struct {
+    seconds: i64,
+    nanoseconds: u32,
+};
+
+pub const TimeStructure = extern struct {
+    year: c_uint,
+    month: c_uint,
+    day: c_uint,
+    hour: c_uint,
+    minute: c_uint,
+    second: c_uint,
+    day_of_week: c_uint,
+    daylight_savings_time: c_int,
+    time_zone: c_int,
+};
+
 pub const FileType = enum(c_int) {
     nonexistent = -1,
     regular = 0,
@@ -475,6 +499,67 @@ pub extern "c" fn OS_directory_read(c_uint) ?[*:0]const u8;
 pub extern "c" fn OS_directory_read_matching(c_uint, [*:0]const u8) ?[*:0]const u8;
 pub extern "c" fn OS_channel_copy(OffT, Tchannel, Tchannel) c_int;
 pub extern "c" fn OS_file_copy([*:0]const u8, [*:0]const u8) void;
+pub extern "c" fn OS_nanotime_since_utc_epoch(*SchemeNanotime) void;
+pub extern "c" fn OS_monotonic_nanotime(*SchemeNanotime) void;
+pub extern "c" fn OS_encoded_time() TimeT;
+pub extern "c" fn OS_decode_time(TimeT, *TimeStructure) void;
+pub extern "c" fn OS_decode_utc(TimeT, *TimeStructure) void;
+pub extern "c" fn OS_encode_time(*TimeStructure) TimeT;
+pub extern "c" fn OS_process_clock() f64;
+pub extern "c" fn OS_real_time_clock() f64;
+pub extern "c" fn OS_process_timer_set(ClockT, ClockT) void;
+pub extern "c" fn OS_process_timer_clear() void;
+pub extern "c" fn OS_profile_timer_set(ClockT, ClockT) void;
+pub extern "c" fn OS_profile_timer_clear() void;
+pub extern "c" fn OS_real_timer_set(ClockT, ClockT) void;
+pub extern "c" fn OS_real_timer_clear() void;
+pub extern "c" fn OS_set_working_dir_pathname([*:0]const u8) void;
+pub extern "c" fn OS_current_jiffy() ClockT;
+pub extern "c" fn OS_jiffies_per_second() ClockT;
+pub extern "c" fn OS_error_code_to_message(c_uint) ?[*:0]const u8;
+pub extern "c" fn OS_tty_input_channel() Tchannel;
+pub extern "c" fn OS_tty_output_channel() Tchannel;
+pub extern "c" fn OS_tty_error_channel() Tchannel;
+pub extern "c" fn OS_tty_command_beep() [*:0]const u8;
+pub extern "c" fn OS_tty_command_clear() [*:0]const u8;
+pub extern "c" fn OS_tty_next_interrupt_char() CcT;
+pub extern "c" fn OS_ctty_get_interrupt_enables(*TinterruptEnables) void;
+pub extern "c" fn OS_ctty_set_interrupt_enables(*TinterruptEnables) void;
+pub extern "c" fn OS_ctty_num_int_chars() c_uint;
+pub extern "c" fn OS_ctty_get_int_chars() [*]CcT;
+pub extern "c" fn OS_ctty_get_int_char_handlers() [*]CcT;
+pub extern "c" fn OS_ctty_set_int_chars([*]CcT) void;
+pub extern "c" fn OS_ctty_set_int_char_handlers([*]CcT) void;
+pub extern "c" fn arg_terminal(c_int) Tchannel;
+pub extern "c" fn OS_terminal_get_ispeed(Tchannel) c_uint;
+pub extern "c" fn OS_terminal_get_ospeed(Tchannel) c_uint;
+pub extern "c" fn OS_terminal_set_ispeed(Tchannel, c_uint) void;
+pub extern "c" fn OS_terminal_set_ospeed(Tchannel, c_uint) void;
+pub extern "c" fn arg_baud_index(c_uint) c_uint;
+pub extern "c" fn OS_baud_index_to_rate(c_uint) c_uint;
+pub extern "c" fn OS_baud_rate_to_index(c_uint) c_int;
+pub extern "c" fn OS_terminal_state_size() c_uint;
+pub extern "c" fn OS_terminal_get_state(Tchannel, ?*anyopaque) void;
+pub extern "c" fn OS_terminal_set_state(Tchannel, ?*anyopaque) void;
+pub extern "c" fn OS_terminal_cooked_output_p(Tchannel) c_int;
+pub extern "c" fn OS_terminal_raw_output(Tchannel) void;
+pub extern "c" fn OS_terminal_cooked_output(Tchannel) void;
+pub extern "c" fn OS_terminal_buffered_p(Tchannel) c_int;
+pub extern "c" fn OS_terminal_buffered(Tchannel) void;
+pub extern "c" fn OS_terminal_nonbuffered(Tchannel) void;
+pub extern "c" fn OS_terminal_flush_input(Tchannel) void;
+pub extern "c" fn OS_terminal_flush_output(Tchannel) void;
+pub extern "c" fn OS_terminal_drain_output(Tchannel) void;
+pub extern "c" fn OS_job_control_p() c_int;
+pub extern "c" fn OS_have_ptys_p() c_int;
+pub extern "c" fn OS_open_pty_master(*Tchannel, *[*:0]const u8) [*:0]const u8;
+pub extern "c" fn OS_pty_master_send_signal(Tchannel, c_int) void;
+pub extern "c" fn OS_pty_master_kill(Tchannel) void;
+pub extern "c" fn OS_pty_master_stop(Tchannel) void;
+pub extern "c" fn OS_pty_master_continue(Tchannel) void;
+pub extern "c" fn OS_pty_master_interrupt(Tchannel) void;
+pub extern "c" fn OS_pty_master_quit(Tchannel) void;
+pub extern "c" fn OS_pty_master_hangup(Tchannel) void;
 pub extern "c" fn find_primitive(obj.SchemeObject, bool, bool, c_int) obj.SchemeObject;
 pub extern "c" fn termination_normal(c_int) noreturn;
 pub extern "c" fn OS_restartable_exit() void;
