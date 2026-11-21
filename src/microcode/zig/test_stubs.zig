@@ -1275,3 +1275,67 @@ pub export fn UX_read_file_status_indirect(filename: [*:0]const u8, s: *abi.Stat
 pub export fn UX_file_system_type(_: [*:0]const u8) callconv(.c) ?[*:0]const u8 {
     return mock_fs_type;
 }
+
+var mock_bc: ?[*:0]u8 = null;
+var mock_up: ?[*:0]u8 = null;
+var mock_pc: u8 = 0;
+var mock_termcap_ospeed: c_short = 0;
+
+comptime {
+    if (build_options.use_termcap) {
+        @export(&mock_bc, .{ .name = "BC" });
+        @export(&mock_up, .{ .name = "UP" });
+        @export(&mock_pc, .{ .name = "PC" });
+        @export(&mock_termcap_ospeed, .{ .name = "ospeed" });
+        @export(&mockTgetent, .{ .name = "tgetent" });
+        @export(&mockTgetnum, .{ .name = "tgetnum" });
+        @export(&mockTgetflag, .{ .name = "tgetflag" });
+        @export(&mockTgetstr, .{ .name = "tgetstr" });
+        @export(&mockTgoto, .{ .name = "tgoto" });
+        @export(&mockTputs, .{ .name = "tputs" });
+        @export(&mockTparam, .{ .name = "tparam" });
+    }
+}
+
+fn mockTgetent(_: [*]u8, name: [*:0]const u8) callconv(.c) c_int {
+    return if (std.mem.eql(u8, std.mem.span(name), "xterm")) 1 else 0;
+}
+fn mockTgetnum(id: [*:0]const u8) callconv(.c) c_int {
+    return if (std.mem.eql(u8, std.mem.span(id), "co")) 80 else -1;
+}
+fn mockTgetflag(id: [*:0]const u8) callconv(.c) c_int {
+    return if (std.mem.eql(u8, std.mem.span(id), "am")) 1 else 0;
+}
+fn mockTgetstr(id: [*:0]const u8, area: *[*]u8) callconv(.c) ?[*:0]u8 {
+    if (!std.mem.eql(u8, std.mem.span(id), "cl")) return null;
+    const seq = "\x1b[H\x1b[2J";
+    const start = area.*;
+    @memcpy(start[0..seq.len], seq);
+    start[seq.len] = 0;
+    area.* = start + seq.len + 1;
+    return @ptrCast(start);
+}
+fn mockTgoto(_: [*:0]const u8, col: c_int, line: c_int) callconv(.c) ?[*:0]u8 {
+    var tmp: [64]u8 = undefined;
+    const s = std.fmt.bufPrint(tmp[0 .. tmp.len - 1], "\x1b[{d};{d}H", .{ line + 1, col + 1 }) catch return null;
+    tmp[s.len] = 0;
+    return @constCast(mockDupCString(s));
+}
+fn mockTputs(str: [*:0]const u8, _: c_int, outc: *const fn (c_int) callconv(.c) c_int) callconv(.c) c_int {
+    for (std.mem.span(str)) |ch| {
+        _ = outc(@intCast(ch));
+    }
+    return 0;
+}
+fn mockTparam(fmt: [*:0]const u8, outstring: [*]u8, outlen: c_int, ...) callconv(.c) ?[*:0]u8 {
+    var ap = @cVaStart();
+    defer @cVaEnd(&ap);
+    const a1 = @cVaArg(&ap, c_int);
+    const a2 = @cVaArg(&ap, c_int);
+    const a3 = @cVaArg(&ap, c_int);
+    const a4 = @cVaArg(&ap, c_int);
+    const limit: usize = @intCast(outlen);
+    const s = std.fmt.bufPrint(outstring[0 .. limit - 1], "{s}:{d},{d},{d},{d}", .{ std.mem.span(fmt), a1, a2, a3, a4 }) catch return null;
+    outstring[s.len] = 0;
+    return @ptrCast(outstring);
+}

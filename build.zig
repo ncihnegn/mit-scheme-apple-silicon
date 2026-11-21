@@ -637,14 +637,8 @@ pub fn build(b: *std.Build) void {
     scheme_c_sources.appendSlice(b.allocator, &std_c_sources) catch @panic("OOM");
 
     switch (termcap_opt) {
-        .ncurses => scheme_c_sources.appendSlice(b.allocator, &.{
-            "src/microcode/terminfo.c",
-            "src/microcode/tterm.c",
-        }) catch @panic("OOM"),
-        .emulate => scheme_c_sources.appendSlice(b.allocator, &.{
-            "src/microcode/tparam.c",
-            "src/microcode/tterm.c",
-        }) catch @panic("OOM"),
+        .ncurses => scheme_c_sources.append(b.allocator, "src/microcode/terminfo.c") catch @panic("OOM"),
+        .emulate => scheme_c_sources.append(b.allocator, "src/microcode/tparam.c") catch @panic("OOM"),
         .none => {},
     }
 
@@ -676,6 +670,9 @@ pub fn build(b: *std.Build) void {
     for (zig_prim_sources) |src_rel| {
         fp_run.addFileArg(b.path(src_rel));
     }
+    if (termcap_opt != .none) {
+        fp_run.addFileArg(b.path("src/microcode/zig/tterm.zig"));
+    }
 
     const cmpauxmd_s: ?std.Build.LazyPath = if (arch.cmpauxmd) |m4_arch|
         makeM4Assembly(b, target, m4_arch, valgrind)
@@ -687,6 +684,7 @@ pub fn build(b: *std.Build) void {
     zig_options.addOption(bool, "cc_is_svm", arch.is_svm);
     zig_options.addOption(bool, "cc_support", arch.is_native or arch.is_svm);
     zig_options.addOption(bool, "debugging", debugging);
+    zig_options.addOption(bool, "use_termcap", termcap_opt != .none);
     zig_options.addOption([]const u8, "package_version", "13.0.50");
     zig_options.addOption([]const u8, "default_library_path", default_library_path);
     zig_options.addOption(c_uint, "compiler_processor_type", arch.cc_arch_id);

@@ -1,5 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const build_options = @import("build_options");
 
 pub const chacha = @import("chacha.zig");
 pub const keccak = @import("keccak.zig");
@@ -82,6 +83,7 @@ pub const pruxffi = @import("pruxffi.zig");
 pub const pruxfs = @import("pruxfs.zig");
 pub const pruxio = @import("pruxio.zig");
 pub const pruxsock = @import("pruxsock.zig");
+pub const tterm = if (build_options.use_termcap) @import("tterm.zig") else struct {};
 
 comptime {
     _ = chacha;
@@ -164,6 +166,9 @@ comptime {
     _ = pruxfs;
     _ = pruxio;
     _ = pruxsock;
+    if (build_options.use_termcap) {
+        _ = tterm;
+    }
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -253,4 +258,7 @@ test "microcode zig scaffold" {
     _ = pruxfs;
     _ = pruxio;
     _ = pruxsock;
+    if (build_options.use_termcap) {
+        _ = tterm;
+    }
 }
