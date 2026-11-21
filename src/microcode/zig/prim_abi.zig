@@ -334,6 +334,39 @@ pub const TimeStructure = extern struct {
     time_zone: c_int,
 };
 
+pub const Tprocess = c_uint;
+pub const PidT = std.c.pid_t;
+
+pub const ProcessStatus = enum(c_uint) {
+    free = 0,
+    allocated = 1,
+    running = 2,
+    stopped = 3,
+    exited = 4,
+    signalled = 5,
+};
+
+pub const ProcessJcStatus = enum(c_uint) {
+    no_ctty = 0,
+    unrelated = 1,
+    no_jc = 2,
+    jc = 3,
+};
+
+pub const ProcessCttyType = enum(c_uint) {
+    none = 0,
+    inherit_bg = 1,
+    inherit_fg = 2,
+    explicit = 3,
+};
+
+pub const ProcessChannelType = enum(c_uint) {
+    none = 0,
+    inherit = 1,
+    ctty = 2,
+    explicit = 3,
+};
+
 pub const FileType = enum(c_int) {
     nonexistent = -1,
     regular = 0,
@@ -560,6 +593,40 @@ pub extern "c" fn OS_pty_master_continue(Tchannel) void;
 pub extern "c" fn OS_pty_master_interrupt(Tchannel) void;
 pub extern "c" fn OS_pty_master_quit(Tchannel) void;
 pub extern "c" fn OS_pty_master_hangup(Tchannel) void;
+pub extern var OS_process_table_size: Tprocess;
+pub extern "c" fn OS_make_subprocess(
+    [*:0]const u8,
+    [*]const ?[*:0]const u8,
+    ?[*]const ?[*:0]const u8,
+    ?[*:0]const u8,
+    ProcessCttyType,
+    ?[*:0]u8,
+    ProcessChannelType,
+    Tchannel,
+    ProcessChannelType,
+    Tchannel,
+    ProcessChannelType,
+    Tchannel,
+) Tprocess;
+pub extern "c" fn OS_process_deallocate(Tprocess) void;
+pub extern "c" fn OS_process_valid_p(Tprocess) c_int;
+pub extern "c" fn OS_process_continuable_p(Tprocess) c_int;
+pub extern "c" fn OS_process_foregroundable_p(Tprocess) c_int;
+pub extern "c" fn OS_process_id(Tprocess) PidT;
+pub extern "c" fn OS_process_jc_status(Tprocess) c_uint;
+pub extern "c" fn OS_process_status_sync(Tprocess) c_int;
+pub extern "c" fn OS_process_status_sync_all() c_int;
+pub extern "c" fn OS_process_status(Tprocess) c_uint;
+pub extern "c" fn OS_process_reason(Tprocess) c_ushort;
+pub extern "c" fn OS_process_send_signal(Tprocess, c_int) void;
+pub extern "c" fn OS_process_kill(Tprocess) void;
+pub extern "c" fn OS_process_stop(Tprocess) void;
+pub extern "c" fn OS_process_interrupt(Tprocess) void;
+pub extern "c" fn OS_process_quit(Tprocess) void;
+pub extern "c" fn OS_process_hangup(Tprocess) void;
+pub extern "c" fn OS_process_continue_background(Tprocess) void;
+pub extern "c" fn OS_process_continue_foreground(Tprocess) void;
+pub extern "c" fn OS_process_wait(Tprocess) void;
 pub extern "c" fn find_primitive(obj.SchemeObject, bool, bool, c_int) obj.SchemeObject;
 pub extern "c" fn termination_normal(c_int) noreturn;
 pub extern "c" fn OS_restartable_exit() void;

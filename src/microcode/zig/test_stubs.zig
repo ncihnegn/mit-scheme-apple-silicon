@@ -70,6 +70,9 @@ var mock_term_buffered: c_int = 1;
 var mock_term_state: [4]u8 = .{ 1, 2, 3, 4 };
 pub var mock_last_pty_sig: c_int = 0;
 pub var mock_pty_ops: usize = 0;
+pub export var OS_process_table_size: abi.Tprocess = 4;
+var mock_proc_valid: [4]bool = @splat(false);
+pub var mock_last_proc_sig: c_int = 0;
 pub var mock_write_var_cache_calls: usize = 0;
 pub var mock_make_uuo_link_calls: usize = 0;
 pub var mock_apply_compiled_calls: usize = 0;
@@ -161,6 +164,9 @@ pub fn resetMockRuntime() void {
     mock_term_state = .{ 1, 2, 3, 4 };
     mock_last_pty_sig = 0;
     mock_pty_ops = 0;
+    OS_process_table_size = 4;
+    mock_proc_valid = @splat(false);
+    mock_last_proc_sig = 0;
     storage.memory_block_end = null;
     storage.heap_reserved = 0;
     storage.ephemeron_array = obj.sharp_f;
@@ -1064,3 +1070,62 @@ pub export fn OS_pty_master_quit(_: abi.Tchannel) callconv(.c) void {
 pub export fn OS_pty_master_hangup(_: abi.Tchannel) callconv(.c) void {
     mock_pty_ops += 1;
 }
+
+pub export fn OS_make_subprocess(
+    _: [*:0]const u8,
+    _: [*]const ?[*:0]const u8,
+    _: ?[*]const ?[*:0]const u8,
+    _: ?[*:0]const u8,
+    _: abi.ProcessCttyType,
+    _: ?[*:0]u8,
+    _: abi.ProcessChannelType,
+    _: abi.Tchannel,
+    _: abi.ProcessChannelType,
+    _: abi.Tchannel,
+    _: abi.ProcessChannelType,
+    _: abi.Tchannel,
+) callconv(.c) abi.Tprocess {
+    mock_proc_valid[0] = true;
+    return 0;
+}
+pub export fn OS_process_deallocate(p: abi.Tprocess) callconv(.c) void {
+    if (p < mock_proc_valid.len) mock_proc_valid[p] = false;
+}
+pub export fn OS_process_valid_p(p: abi.Tprocess) callconv(.c) c_int {
+    return if (p < mock_proc_valid.len and mock_proc_valid[p]) 1 else 0;
+}
+pub export fn OS_process_continuable_p(_: abi.Tprocess) callconv(.c) c_int {
+    return 1;
+}
+pub export fn OS_process_foregroundable_p(_: abi.Tprocess) callconv(.c) c_int {
+    return 1;
+}
+pub export fn OS_process_id(_: abi.Tprocess) callconv(.c) abi.PidT {
+    return 4321;
+}
+pub export fn OS_process_jc_status(_: abi.Tprocess) callconv(.c) c_uint {
+    return @intFromEnum(abi.ProcessJcStatus.jc);
+}
+pub export fn OS_process_status_sync(_: abi.Tprocess) callconv(.c) c_int {
+    return 1;
+}
+pub export fn OS_process_status_sync_all() callconv(.c) c_int {
+    return 1;
+}
+pub export fn OS_process_status(_: abi.Tprocess) callconv(.c) c_uint {
+    return @intFromEnum(abi.ProcessStatus.running);
+}
+pub export fn OS_process_reason(_: abi.Tprocess) callconv(.c) c_ushort {
+    return 0;
+}
+pub export fn OS_process_send_signal(_: abi.Tprocess, sig: c_int) callconv(.c) void {
+    mock_last_proc_sig = sig;
+}
+pub export fn OS_process_kill(_: abi.Tprocess) callconv(.c) void {}
+pub export fn OS_process_stop(_: abi.Tprocess) callconv(.c) void {}
+pub export fn OS_process_interrupt(_: abi.Tprocess) callconv(.c) void {}
+pub export fn OS_process_quit(_: abi.Tprocess) callconv(.c) void {}
+pub export fn OS_process_hangup(_: abi.Tprocess) callconv(.c) void {}
+pub export fn OS_process_continue_background(_: abi.Tprocess) callconv(.c) void {}
+pub export fn OS_process_continue_foreground(_: abi.Tprocess) callconv(.c) void {}
+pub export fn OS_process_wait(_: abi.Tprocess) callconv(.c) void {}
