@@ -589,7 +589,7 @@ pub fn build(b: *std.Build) void {
         .none => {},
     }
 
-    // Build host-native Zig findprim and generate usrdef.c out-of-tree.
+    // Build host-native Zig findprim and generate usrdef.zig out-of-tree.
     const findprim = b.addExecutable(.{
         .name = "findprim",
         .root_module = b.createModule(.{
@@ -600,11 +600,8 @@ pub fn build(b: *std.Build) void {
     });
 
     const fp_run = b.addRunArtifact(findprim);
-    fp_run.addArg("-o");
-    const usrdef_c = fp_run.addOutputFileArg("usrdef.c");
-    for (scheme_c_sources.items) |src_rel| {
-        fp_run.addFileArg(b.path(src_rel));
-    }
+    fp_run.addArgs(&.{ "--zig", "-o" });
+    const usrdef_zig = fp_run.addOutputFileArg("usrdef.zig");
     for (zig_prim_sources) |src_rel| {
         fp_run.addFileArg(b.path(src_rel));
     }
@@ -638,6 +635,24 @@ pub fn build(b: *std.Build) void {
     const microcode_zig_obj = b.addObject(.{
         .name = "microcode_zig",
         .root_module = microcode_zig_mod,
+    });
+
+    const scheme_obj_mod = b.createModule(.{
+        .root_source_file = b.path("src/microcode/zig/scheme_obj.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const usrdef_zig_mod = b.createModule(.{
+        .root_source_file = usrdef_zig,
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    usrdef_zig_mod.addOptions("build_options", zig_options);
+    usrdef_zig_mod.addImport("scheme_obj", scheme_obj_mod);
+    const usrdef_zig_obj = b.addObject(.{
+        .name = "usrdef_zig",
+        .root_module = usrdef_zig_mod,
     });
 
     // Build the microcode `scheme` binary.
@@ -685,10 +700,7 @@ pub fn build(b: *std.Build) void {
             .flags = termcap_flags.items,
         });
     }
-    scheme_exe.root_module.addCSourceFile(.{
-        .file = usrdef_c,
-        .flags = c_flags,
-    });
+    scheme_exe.root_module.addObject(usrdef_zig_obj);
     if (cmpauxmd_s) |asm_file| {
         scheme_exe.root_module.addCSourceFile(.{
             .file = asm_file,
