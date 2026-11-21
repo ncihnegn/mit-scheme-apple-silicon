@@ -23,6 +23,9 @@ pub const hunk = @import("hunk.zig");
 pub const dfloat = @import("dfloat.zig");
 pub const list = @import("list.zig");
 pub const vector = @import("vector.zig");
+pub const bits = @import("bits.zig");
+pub const fixnum = @import("fixnum.zig");
+pub const generic = @import("generic.zig");
 
 comptime {
     _ = chacha;
@@ -46,6 +49,9 @@ comptime {
     _ = dfloat;
     _ = list;
     _ = vector;
+    _ = bits;
+    _ = fixnum;
+    _ = generic;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -76,4 +82,7 @@ test "microcode zig scaffold" {
     _ = dfloat;
     _ = list;
     _ = vector;
+    _ = bits;
+    _ = fixnum;
+    _ = generic;
 }

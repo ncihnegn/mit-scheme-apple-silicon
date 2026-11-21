@@ -34,6 +34,7 @@ pub fn resetMockRuntime() void {
     memory_block_start = heap_start;
     stack_start = (&mock_stack).ptr;
     stack_end = (&mock_stack).ptr + mock_stack.len;
+    stack_start[0] = obj.makeBrokenHeart(stack_start);
     stack_guard = stack_start + 8;
     stack_pointer = stack_end;
     fixed_objects = obj.sharp_f;
@@ -202,4 +203,14 @@ pub export fn OS_get_entropy(buf: *[32]u8) callconv(.c) void {
     for (buf, 0..) |*slot, idx| {
         slot.* = @intCast(idx + 0xA0);
     }
+}
+
+pub export fn canonicalize_primitive_context() callconv(.c) void {}
+
+pub export fn abort_to_interpreter(_: c_long) callconv(.c) noreturn {
+    @panic("mock abort_to_interpreter");
+}
+
+pub export fn stack_death(_: [*:0]const u8) callconv(.c) noreturn {
+    @panic("mock stack_death");
 }

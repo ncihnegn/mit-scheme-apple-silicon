@@ -135,6 +135,27 @@ pub inline fn flonumP(obj: SchemeObject) bool {
     return objectType(obj) == tc_big_flonum;
 }
 
+pub inline fn realP(obj: SchemeObject) bool {
+    return integerP(obj) or flonumP(obj);
+}
+
+pub inline fn integerP(obj: SchemeObject) bool {
+    return fixnumP(obj) or bignumP(obj);
+}
+
+pub inline fn bitStringP(obj: SchemeObject) bool {
+    return objectType(obj) == tc_bit_string;
+}
+
+pub inline fn flonumToDouble(obj: SchemeObject) f64 {
+    const ptr: *const f64 = @ptrCast(@alignCast(memoryLoc(obj, 1)));
+    return ptr.*;
+}
+
+pub inline fn makeBrokenHeart(addr: [*]const SchemeObject) SchemeObject {
+    return makePointerObject(tc_broken_heart, addr);
+}
+
 pub inline fn pairP(obj: SchemeObject) bool {
     return objectType(obj) == tc_list;
 }
@@ -235,8 +256,40 @@ pub inline fn charCode(c: SchemeObject) c_ulong {
 }
 
 // Fixnum operations
+pub const fixnum_zero: SchemeObject = makeObject(tc_fixnum, 0);
+
+pub inline fn fixnumZeroP(fixnum: SchemeObject) bool {
+    return objectDatum(fixnum) == 0;
+}
+
 pub inline fn fixnumNegativeP(fixnum: SchemeObject) bool {
     return (fixnum & fixnum_sign_bit) != 0;
+}
+
+pub inline fn fixnumPositiveP(fixnum: SchemeObject) bool {
+    return !(fixnumZeroP(fixnum) or fixnumNegativeP(fixnum));
+}
+
+pub inline fn fixnumEqualP(x: SchemeObject, y: SchemeObject) bool {
+    return objectDatum(x) == objectDatum(y);
+}
+
+pub inline fn fixnumLessP(x: SchemeObject, y: SchemeObject) bool {
+    return fixnumToLong(x) < fixnumToLong(y);
+}
+
+pub inline fn fixnumToDouble(fixnum: SchemeObject) f64 {
+    return @floatFromInt(fixnumToLong(fixnum));
+}
+
+pub inline fn doubleToFixnumP(number: f64) bool {
+    const lo: f64 = @floatFromInt(smallest_fixnum - 1);
+    const hi: f64 = @floatFromInt(biggest_fixnum + 1);
+    return number > lo and number < hi;
+}
+
+pub inline fn doubleToFixnum(number: f64) SchemeObject {
+    return longToFixnum(@intFromFloat(number));
 }
 
 pub inline fn unsignedFixnumP(obj: SchemeObject) bool {

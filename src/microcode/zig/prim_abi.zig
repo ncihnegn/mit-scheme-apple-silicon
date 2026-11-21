@@ -21,10 +21,27 @@ pub const int_gc: c_ulong = 0x0004;
 
 pub const term_exit: c_int = 0x0C;
 pub const err_wrong_number_of_arguments: c_long = 0x0C;
+pub const prim_apply: c_long = -3;
 
 pub const fixobj_record_tag: usize = 0x11;
 pub const fixobj_record_app_index: usize = 0x12;
 pub const fixobj_proxied_record_types: usize = 0x15;
+
+pub const fixobj_generic_trampoline_zero_p: usize = 0x24;
+pub const fixobj_generic_trampoline_positive_p: usize = 0x25;
+pub const fixobj_generic_trampoline_negative_p: usize = 0x26;
+pub const fixobj_generic_trampoline_successor: usize = 0x27;
+pub const fixobj_generic_trampoline_predecessor: usize = 0x28;
+pub const fixobj_generic_trampoline_equal_p: usize = 0x29;
+pub const fixobj_generic_trampoline_less_p: usize = 0x2A;
+pub const fixobj_generic_trampoline_greater_p: usize = 0x2B;
+pub const fixobj_generic_trampoline_add: usize = 0x2C;
+pub const fixobj_generic_trampoline_subtract: usize = 0x2D;
+pub const fixobj_generic_trampoline_multiply: usize = 0x2E;
+pub const fixobj_generic_trampoline_divide: usize = 0x2F;
+pub const fixobj_generic_trampoline_quotient: usize = 0x30;
+pub const fixobj_generic_trampoline_remainder: usize = 0x31;
+pub const fixobj_generic_trampoline_modulo: usize = 0x32;
 
 pub const GcType = enum(c_int) {
     compiled_entry = -4,
@@ -83,6 +100,11 @@ pub extern "c" fn arg_bytevector(c_int, *c_ulong) [*]u8;
 pub extern "c" fn allocate_bytevector(c_ulong) obj.SchemeObject;
 pub extern "c" fn memory_to_bytevector(c_ulong, ?*const anyopaque) obj.SchemeObject;
 pub extern "c" fn OS_get_entropy(*[32]u8) void;
+
+pub extern "c" fn canonicalize_primitive_context() void;
+pub extern "c" fn abort_to_interpreter(c_long) noreturn;
+pub extern "c" fn stack_death([*:0]const u8) noreturn;
+pub extern "c" fn cons(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
 
 pub inline fn primitiveHeader() void {
     if (build_options.debugging) {
@@ -193,5 +215,26 @@ pub fn primitiveGc(amount: c_ulong) noreturn {
 pub inline fn primitiveGcIfNeeded(amount: c_ulong) void {
     if (gcNeededP(amount)) {
         primitiveGc(amount);
+    }
+}
+
+pub inline fn stackPush(object: obj.SchemeObject) void {
+    stack_pointer -= 1;
+    stack_pointer[0] = object;
+}
+
+pub inline fn stackCanPushP(n: usize) bool {
+    return @intFromPtr(stack_pointer) >= @intFromPtr(stack_guard) + n * @sizeOf(obj.SchemeObject);
+}
+
+pub inline fn stackOverflowedP() bool {
+    return stack_start[0] != obj.makeBrokenHeart(stack_start);
+}
+
+pub inline fn stackCheck(n: usize) void {
+    if (!stackCanPushP(n)) {
+        if (stackOverflowedP()) stack_death("stack_check");
+        Registers[regblock_int_code] |= int_stack_overflow;
+        compilerSetupInterrupt();
     }
 }
