@@ -121,7 +121,12 @@ pub const constant_space_fudge: c_ulong = 128;
 pub const default_heap_reserved: c_ulong = 4500;
 pub const stack_guard_size: c_ulong = 4096;
 pub const ephemeron_size: c_ulong = 5;
+pub const ephemeron_key: usize = 1;
+pub const ephemeron_datum: usize = 2;
+pub const ephemeron_list: usize = 3;
+pub const ephemeron_next: usize = 4;
 pub const marked_ephemeron_manifest: obj.SchemeObject = obj.makeVectorHeader(ephemeron_size - 1);
+pub const unmarked_ephemeron_manifest: obj.SchemeObject = obj.makeObject(obj.tc_manifest_nm_vector, ephemeron_size - 1);
 pub const cont_size: usize = 2;
 pub const env_cont_size: usize = cont_size + 1;
 pub const history_cont_size: usize = cont_size + 2;
@@ -287,6 +292,14 @@ pub const CacheRefKind = enum(c_int) {
     assignment_cache = 1,
     operator_cache = 2,
 };
+
+pub const RelocRef = extern struct {
+    old_addr: ?*anyopaque,
+    new_addr: ?*anyopaque,
+};
+
+pub extern var ephemeron_array: obj.SchemeObject;
+pub extern var ephemeron_count: c_ulong;
 
 pub extern var Registers: [14]obj.SchemeObject;
 pub extern var Free: [*]obj.SchemeObject;
@@ -471,10 +484,34 @@ pub extern "c" fn gc_drain_tospace_and_code_arena([*]obj.SchemeObject) void;
 pub extern "c" fn aarch64_flush_i_cache() void;
 pub extern "c" fn aarch64_flush_i_cache_region([*]obj.SchemeObject, usize) void;
 pub extern "c" fn debug_verify_heap() bool;
-pub extern "c" fn std_gc_death([*:0]const u8, ...) noreturn;
+pub extern "c" fn std_gc_death([*:0]const u8) noreturn;
 pub extern "c" fn initialize_gc_object_references() void;
 pub extern "c" fn finalize_gc_object_references() void;
 pub extern "c" fn collect_gc_object_references(obj.SchemeObject, obj.SchemeObject) void;
+pub extern "c" fn OS_free_pages(?*anyopaque, ?*anyopaque) void;
+pub extern "c" fn OS_expect_sequential_access(?*const anyopaque, ?*const anyopaque) void;
+pub extern "c" fn OS_expect_normal_access(?*const anyopaque, ?*const anyopaque) void;
+pub extern "c" fn code_arena_max_end() ?[*]obj.SchemeObject;
+pub extern "c" fn code_arena_mark_begin() void;
+pub extern "c" fn code_arena_mark_block(?[*]obj.SchemeObject) bool;
+pub extern "c" fn code_arena_marked_p(?[*]const obj.SchemeObject) bool;
+pub extern "c" fn code_arena_mark_stack_empty_p() bool;
+pub extern "c" fn code_arena_pop_mark_stack() ?[*]obj.SchemeObject;
+pub extern "c" fn code_arena_write_begin() void;
+pub extern "c" fn code_arena_write_end() void;
+pub extern "c" fn cc_entry_address_to_block_address(?*anyopaque) [*]obj.SchemeObject;
+pub extern "c" fn cc_return_address_to_block_address(?*anyopaque) [*]obj.SchemeObject;
+pub extern "c" fn linkage_section_type(obj.SchemeObject) c_uint;
+pub extern "c" fn linkage_section_count(obj.SchemeObject) c_ulong;
+pub extern "c" fn read_uuo_target([*]obj.SchemeObject) ?*anyopaque;
+pub extern "c" fn write_uuo_target(?*anyopaque, [*]obj.SchemeObject) void;
+pub extern "c" fn start_closure_relocation([*]obj.SchemeObject, *RelocRef) void;
+pub extern "c" fn compiled_closure_start([*]obj.SchemeObject) ?*anyopaque;
+pub extern "c" fn compiled_closure_count([*]obj.SchemeObject) c_ulong;
+pub extern "c" fn compiled_closure_next(?*anyopaque) ?*anyopaque;
+pub extern "c" fn read_compiled_closure_target(?*anyopaque, *RelocRef) ?*anyopaque;
+pub extern "c" fn write_compiled_closure_target(?*anyopaque, ?*anyopaque) void;
+pub extern "c" fn skip_compiled_closure_padding(?*anyopaque) [*]obj.SchemeObject;
 pub extern "c" fn init_exit_scheme() void;
 pub extern "c" fn read_command_line_options(c_int, [*]?[*:0]const u8) void;
 pub extern "c" fn compiler_initialize(bool) void;

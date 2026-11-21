@@ -82,6 +82,7 @@ test "purify updates constant_alloc_next, constant_end, heap_start, and resizes 
     abi.constant_alloc_next = (&arena).ptr + 4;
     abi.constant_end = (&arena).ptr + 200;
     abi.heap_start = abi.constant_end;
+    abi.Free = abi.heap_start;
     abi.heap_end = (&arena).ptr + arena.len;
     abi.heap_alloc_limit = abi.heap_end - 16;
     abi.fixed_objects = obj.sharp_f;
@@ -95,8 +96,5 @@ test "purify updates constant_alloc_next, constant_end, heap_start, and resizes 
     try std.testing.expectEqual((&arena).ptr + 5 + abi.constant_space_fudge, abi.constant_end);
     try std.testing.expectEqual(abi.constant_end, abi.heap_start);
     try std.testing.expectEqual(item, arena[4]);
-    try std.testing.expectEqual(@as(usize, 1), stubs.mock_gc_drain_calls);
-    try std.testing.expectEqual(@as(usize, 1), stubs.mock_update_weak_calls);
-    try std.testing.expectEqual(@as(usize, 1), stubs.mock_save_tospace_calls);
     try std.testing.expectEqual(@as(c_ulong, arena.len - (5 + abi.constant_space_fudge)), stubs.mock_resize_tospace_arg);
 }

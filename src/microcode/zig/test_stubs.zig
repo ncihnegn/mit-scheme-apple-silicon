@@ -7,6 +7,7 @@ const storage = @import("storage.zig");
 const utils = @import("utils.zig");
 const boot = @import("boot.zig");
 const option = @import("option.zig");
+const gcloop = @import("gcloop.zig");
 
 pub var signal_block_depth: i32 = 0;
 pub var fatal_count: usize = 0;
@@ -20,6 +21,7 @@ fn mockDummyPrim() callconv(.c) obj.SchemeObject {
 }
 
 var mock_heap: [8192]obj.SchemeObject = @splat(0);
+var mock_tospace: [8192]obj.SchemeObject = @splat(0);
 var mock_stack: [128]obj.SchemeObject = @splat(0);
 var mock_const: [64]obj.SchemeObject = @splat(0);
 
@@ -33,17 +35,10 @@ comptime {
 
 pub export var compiler_processor_type: c_uint = abi.compiler_aarch64_type;
 pub export var compiler_interface_version: c_uint = 4;
-pub export var current_gc_table: ?*anyopaque = null;
 var mock_saved_argv = [_]?[*:0]const u8{ "scheme", "--batch-mode", null };
 var mock_unused_argv = [_]?[*:0]const u8{ "--extra", null };
 var mock_library_path = [_]?[*:0]const u8{ "/mock/lib1", "/mock/lib2", null };
 pub export var compiler_utilities: obj.SchemeObject = obj.sharp_f;
-pub var mock_tospace_ptr: ?[*]obj.SchemeObject = null;
-pub var mock_code_tospace: [512]obj.SchemeObject = @splat(0);
-pub var mock_code_tospace_ptr: [*]obj.SchemeObject = (&mock_code_tospace).ptr;
-pub var mock_gc_drain_calls: usize = 0;
-pub var mock_save_tospace_calls: usize = 0;
-pub var mock_update_weak_calls: usize = 0;
 pub var mock_icache_flush_calls: usize = 0;
 pub var mock_resize_tospace_arg: c_ulong = 0;
 pub var mock_write_var_cache_calls: usize = 0;
@@ -103,14 +98,10 @@ pub fn resetMockRuntime() void {
     option.option_constant_size = 512;
     option.option_stack_size = 64;
     option.option_code_size = 64;
-    current_gc_table = null;
+    mock_tospace = @splat(0);
+    gcloop.resetForTesting();
+    gcloop.initialize_gc(mock_tospace.len, &storage.heap_start, &storage.Free, &mockTospaceAllocator, &mockAbortGc);
     compiler_utilities = obj.sharp_f;
-    mock_tospace_ptr = null;
-    mock_code_tospace = @splat(0);
-    mock_code_tospace_ptr = (&mock_code_tospace).ptr;
-    mock_gc_drain_calls = 0;
-    mock_save_tospace_calls = 0;
-    mock_update_weak_calls = 0;
     mock_icache_flush_calls = 0;
     mock_resize_tospace_arg = 0;
     storage.memory_block_end = null;
@@ -231,45 +222,6 @@ fn mockReadCcEntryType(cet: *abi.CcEntryType, _: ?*anyopaque) callconv(.c) bool 
     if (mock_cc_entry_bad) return true;
     cet.* = mock_cc_entry_type;
     return false;
-}
-
-pub export fn gc_type_code(tc: c_uint) callconv(.c) c_int {
-    return switch (@as(c_ulong, tc)) {
-        obj.tc_pair, obj.tc_weak_cons, obj.tc_tagged_object, obj.tc_interned_symbol, obj.tc_uninterned_symbol, obj.tc_lambda, obj.tc_procedure, obj.tc_extended_procedure => @intFromEnum(abi.GcType.pair),
-        obj.tc_hunk3_a, obj.tc_hunk3_b, obj.tc_extended_lambda => @intFromEnum(abi.GcType.triple),
-        obj.tc_vector,
-        obj.tc_record,
-        obj.tc_ephemeron,
-        obj.tc_big_fixnum,
-        obj.tc_bytevector,
-        obj.tc_big_flonum,
-        obj.tc_non_marked_vector,
-        obj.tc_vector_1b,
-        obj.tc_unicode_string,
-        obj.tc_character_string,
-        => @intFromEnum(abi.GcType.vector),
-        obj.tc_false,
-        obj.tc_constant,
-        obj.tc_fixnum,
-        obj.tc_character,
-        obj.tc_primitive,
-        obj.tc_return_code,
-        => @intFromEnum(abi.GcType.non_pointer),
-        obj.tc_cell => @intFromEnum(abi.GcType.cell),
-        obj.tc_reference_trap, obj.tc_broken_heart, obj.tc_manifest_nm_vector => @intFromEnum(abi.GcType.special),
-        else => @intFromEnum(abi.GcType.undefined),
-    };
-}
-
-pub export fn gc_ptr_type(o: obj.SchemeObject) callconv(.c) c_int {
-    if (obj.objectType(o) == obj.tc_compiled_return) return @intFromEnum(abi.GcPtrType.compiled_return);
-    const gt = gc_type_code(@intCast(obj.objectType(o)));
-    if (gt > 0 or gt == @intFromEnum(abi.GcType.vector)) return @intFromEnum(abi.GcPtrType.normal);
-    return @intFromEnum(abi.GcPtrType.not);
-}
-
-pub export fn get_object_address(o: obj.SchemeObject) callconv(.c) ?[*]obj.SchemeObject {
-    return if (gc_ptr_type(o) == @intFromEnum(abi.GcPtrType.normal)) obj.objectAddress(o) else null;
 }
 
 pub export fn OS_tty_map_interrupt_char(c: u8) callconv(.c) u8 {
@@ -396,8 +348,6 @@ pub export fn OS_syserr_names(len_out: *c_ulong, names_out: *[*]?[*:0]const u8) 
     names_out.* = &mock_syserr_names_arr;
 }
 
-var mock_std_gc_table_sentinel: u8 = 0;
-
 comptime {
     if (@import("build_options").cc_support) {
         @export(&mockApplyCompiledFromPrimitive, .{ .name = "apply_compiled_from_primitive" });
@@ -423,68 +373,30 @@ fn mockCompiledWithInterruptMask(old_mask: c_ulong, _: obj.SchemeObject, new_mas
     mock_last_compiled_new_mask = new_mask;
 }
 
-pub export fn open_tospace(start: [*]obj.SchemeObject) callconv(.c) void {
-    mock_tospace_ptr = start;
+fn mockTospaceAllocator(n_words: c_ulong, start_out: *?[*]obj.SchemeObject, end_out: *?[*]obj.SchemeObject) callconv(.c) void {
+    mock_resize_tospace_arg = n_words;
+    if (n_words == 0) {
+        start_out.* = null;
+        end_out.* = null;
+        return;
+    }
+    std.debug.assert(n_words <= mock_tospace.len);
+    start_out.* = (&mock_tospace).ptr;
+    end_out.* = (&mock_tospace).ptr + @as(usize, @intCast(n_words));
 }
 
-pub export fn initialize_weak_chain() callconv(.c) void {}
-
-pub export fn get_newspace_ptr() callconv(.c) [*]obj.SchemeObject {
-    return mock_tospace_ptr.?;
+fn mockAbortGc() callconv(.c) noreturn {
+    @panic("mock abort_gc");
 }
 
-pub export fn add_to_tospace(o: obj.SchemeObject) callconv(.c) void {
-    mock_tospace_ptr.?[0] = o;
-    mock_tospace_ptr = mock_tospace_ptr.? + 1;
-}
-
-pub export fn std_gc_table() callconv(.c) ?*anyopaque {
-    return &mock_std_gc_table_sentinel;
-}
-
-pub export fn gc_scan_tospace(_: [*]obj.SchemeObject, _: ?[*]obj.SchemeObject) callconv(.c) void {}
-
-pub export fn increment_tospace_ptr(n: c_ulong) callconv(.c) void {
-    mock_tospace_ptr = mock_tospace_ptr.? + @as(usize, @intCast(n));
-}
-
-pub export fn initialize_gc(
-    _: c_ulong,
-    _: *?[*]obj.SchemeObject,
-    _: *?[*]obj.SchemeObject,
-    _: abi.GcTospaceAllocator,
-    _: abi.GcAbortHandler,
-) callconv(.c) void {}
-
-pub export fn save_tospace(_: abi.GcWalkProc, _: ?*anyopaque) callconv(.c) bool {
-    mock_save_tospace_calls += 1;
-    return true;
-}
-
-pub export fn tospace_to_newspace(ptr: ?*anyopaque) callconv(.c) ?*anyopaque {
-    return ptr;
-}
-
-pub export fn gc_scan_oldspace(_: [*]obj.SchemeObject, _: [*]obj.SchemeObject) callconv(.c) void {}
-
-pub export fn gc_drain_tospace_and_code_arena(_: [*]obj.SchemeObject) callconv(.c) void {
-    mock_gc_drain_calls += 1;
-}
-
-pub export fn update_weak_pointers() callconv(.c) void {
-    mock_update_weak_calls += 1;
-}
+pub export fn OS_free_pages(_: ?*anyopaque, _: ?*anyopaque) callconv(.c) void {}
+pub export fn OS_expect_sequential_access(_: ?*const anyopaque, _: ?*const anyopaque) callconv(.c) void {}
+pub export fn OS_expect_normal_access(_: ?*const anyopaque, _: ?*const anyopaque) callconv(.c) void {}
 
 comptime {
     if (build_options.cc_is_native and builtin.cpu.arch == .aarch64) {
         @export(&mockAarch64FlushICache, .{ .name = "aarch64_flush_i_cache" });
         @export(&mockAarch64FlushICacheRegion, .{ .name = "aarch64_flush_i_cache_region" });
-    }
-    if (build_options.debugging) {
-        @export(&mockStdGcDeath, .{ .name = "std_gc_death" });
-        @export(&mockInitGcObjRefs, .{ .name = "initialize_gc_object_references" });
-        @export(&mockFinalizeGcObjRefs, .{ .name = "finalize_gc_object_references" });
-        @export(&mockCollectGcObjRefs, .{ .name = "collect_gc_object_references" });
     }
 }
 
@@ -494,18 +406,6 @@ fn mockAarch64FlushICache() callconv(.c) void {
 
 fn mockAarch64FlushICacheRegion(_: [*]obj.SchemeObject, _: usize) callconv(.c) void {
     mock_icache_flush_calls += 1;
-}
-
-fn mockStdGcDeath(_: [*:0]const u8, ...) callconv(.c) noreturn {
-    @panic("mock std_gc_death");
-}
-
-fn mockInitGcObjRefs() callconv(.c) void {}
-fn mockFinalizeGcObjRefs() callconv(.c) void {}
-fn mockCollectGcObjRefs(_: obj.SchemeObject, _: obj.SchemeObject) callconv(.c) void {}
-
-pub export fn resize_tospace(size: c_ulong) callconv(.c) void {
-    mock_resize_tospace_arg = size;
 }
 
 pub export fn init_exit_scheme() callconv(.c) void {}
@@ -556,9 +456,22 @@ comptime {
         @export(&mockCcBlockDebuggingInfo, .{ .name = "cc_block_debugging_info" });
         @export(&mockReadCcEntryOffset, .{ .name = "read_cc_entry_offset" });
         @export(&mockCompiledClosureObjects, .{ .name = "compiled_closure_objects" });
+        @export(&mockCcEntryAddressToBlockAddress, .{ .name = "cc_entry_address_to_block_address" });
+        @export(&mockCcReturnAddressToBlockAddress, .{ .name = "cc_return_address_to_block_address" });
+        @export(&mockLinkageSectionType, .{ .name = "linkage_section_type" });
+        @export(&mockLinkageSectionCount, .{ .name = "linkage_section_count" });
+        @export(&mockReadUuoTarget, .{ .name = "read_uuo_target" });
+        @export(&mockWriteUuoTarget, .{ .name = "write_uuo_target" });
     }
     if (build_options.cc_is_native) {
         @export(&mockCcReturnAddressToEntryAddress, .{ .name = "cc_return_address_to_entry_address" });
+        @export(&mockStartClosureRelocation, .{ .name = "start_closure_relocation" });
+        @export(&mockCompiledClosureStart, .{ .name = "compiled_closure_start" });
+        @export(&mockCompiledClosureCount, .{ .name = "compiled_closure_count" });
+        @export(&mockCompiledClosureNext, .{ .name = "compiled_closure_next" });
+        @export(&mockReadCompiledClosureTarget, .{ .name = "read_compiled_closure_target" });
+        @export(&mockWriteCompiledClosureTarget, .{ .name = "write_compiled_closure_target" });
+        @export(&mockSkipCompiledClosurePadding, .{ .name = "skip_compiled_closure_padding" });
     }
 }
 
@@ -662,6 +575,54 @@ fn mockCompiledClosureObjects(ptr: [*]obj.SchemeObject) callconv(.c) [*]obj.Sche
     return ptr;
 }
 
+fn mockCcEntryAddressToBlockAddress(_: ?*anyopaque) callconv(.c) [*]obj.SchemeObject {
+    return (&mock_heap).ptr;
+}
+
+fn mockCcReturnAddressToBlockAddress(_: ?*anyopaque) callconv(.c) [*]obj.SchemeObject {
+    return (&mock_heap).ptr;
+}
+
+fn mockLinkageSectionType(marker: obj.SchemeObject) callconv(.c) c_uint {
+    return @intCast(obj.objectDatum(marker) >> 16);
+}
+
+fn mockLinkageSectionCount(marker: obj.SchemeObject) callconv(.c) c_ulong {
+    return obj.objectDatum(marker) & 0xFFFF;
+}
+
+fn mockReadUuoTarget(_: [*]obj.SchemeObject) callconv(.c) ?*anyopaque {
+    return null;
+}
+
+fn mockWriteUuoTarget(_: ?*anyopaque, _: [*]obj.SchemeObject) callconv(.c) void {}
+
+fn mockStartClosureRelocation(_: [*]obj.SchemeObject, ref: *abi.RelocRef) callconv(.c) void {
+    ref.* = .{ .old_addr = null, .new_addr = null };
+}
+
+fn mockCompiledClosureStart(ptr: [*]obj.SchemeObject) callconv(.c) ?*anyopaque {
+    return @ptrCast(ptr);
+}
+
+fn mockCompiledClosureCount(_: [*]obj.SchemeObject) callconv(.c) c_ulong {
+    return 0;
+}
+
+fn mockCompiledClosureNext(ptr: ?*anyopaque) callconv(.c) ?*anyopaque {
+    return ptr;
+}
+
+fn mockReadCompiledClosureTarget(_: ?*anyopaque, _: *abi.RelocRef) callconv(.c) ?*anyopaque {
+    return null;
+}
+
+fn mockWriteCompiledClosureTarget(_: ?*anyopaque, _: ?*anyopaque) callconv(.c) void {}
+
+fn mockSkipCompiledClosurePadding(ptr: ?*anyopaque) callconv(.c) [*]obj.SchemeObject {
+    return @ptrCast(@alignCast(ptr.?));
+}
+
 pub export fn compiler_reset(utilities: obj.SchemeObject) callconv(.c) void {
     _ = utilities;
 }
@@ -670,115 +631,5 @@ pub export fn abort_to_interpreter_argument() callconv(.c) c_int {
     return @intCast(abi.err_fasl_file_bad_data);
 }
 
-pub export fn initialize_gc_table(table: *abi.GcTable, _: bool) callconv(.c) void {
-    table.* = std.mem.zeroes(abi.GcTable);
-}
-
-pub export fn gc_handle_non_pointer(scan: [*]obj.SchemeObject, _: obj.SchemeObject) callconv(.c) [*]obj.SchemeObject {
-    return scan + 1;
-}
-
-pub export fn gc_handle_pair(scan: [*]obj.SchemeObject, _: obj.SchemeObject) callconv(.c) [*]obj.SchemeObject {
-    return scan + 1;
-}
-
-pub export fn gc_handle_unaligned_vector(scan: [*]obj.SchemeObject, _: obj.SchemeObject) callconv(.c) [*]obj.SchemeObject {
-    return scan + 1;
-}
-
-pub export fn gc_handle_manifest_closure(scan: [*]obj.SchemeObject, _: obj.SchemeObject) callconv(.c) [*]obj.SchemeObject {
-    return scan + 1;
-}
-
-pub export fn gc_handle_linkage_section(scan: [*]obj.SchemeObject, _: obj.SchemeObject) callconv(.c) [*]obj.SchemeObject {
-    return scan + 1;
-}
-
-pub export fn gc_handle_broken_heart(scan: [*]obj.SchemeObject, _: obj.SchemeObject) callconv(.c) [*]obj.SchemeObject {
-    return scan + 1;
-}
-
-pub export fn gc_transport_words(from: [*]obj.SchemeObject, n_words: c_ulong, _: bool) callconv(.c) [*]obj.SchemeObject {
-    const count: usize = @intCast(n_words);
-    const dst = mock_tospace_ptr orelse blk: {
-        const p = abi.Free;
-        abi.Free = p + count;
-        break :blk p;
-    };
-    if (count > 0) {
-        @memcpy(dst[0..count], from[0..count]);
-        from[0] = obj.makeBrokenHeart(dst);
-    }
-    if (mock_tospace_ptr != null) {
-        mock_tospace_ptr = dst + count;
-    }
-    return dst;
-}
-
-pub export fn gc_no_cc_support() callconv(.c) noreturn {
-    @panic("mock gc_no_cc_support");
-}
-
-pub export fn tospace_available_p(n_words: c_ulong) callconv(.c) bool {
-    const p = mock_tospace_ptr orelse return false;
-    const base_end = @intFromPtr((&mock_heap).ptr + mock_heap.len);
-    const cur = @intFromPtr(p);
-    return cur <= base_end and @as(usize, @intCast(n_words)) * @sizeOf(obj.SchemeObject) <= base_end - cur;
-}
-
-pub export fn read_tospace(ptr: [*]obj.SchemeObject) callconv(.c) obj.SchemeObject {
-    return ptr[0];
-}
-
-pub export fn write_tospace(ptr: [*]obj.SchemeObject, value: obj.SchemeObject) callconv(.c) void {
-    ptr[0] = value;
-}
-
-pub export fn newspace_to_tospace(ptr: ?*anyopaque) callconv(.c) ?*anyopaque {
-    return ptr;
-}
-
-pub export fn discard_tospace() callconv(.c) void {
-    mock_tospace_ptr = null;
-}
-
-pub export fn open_code_tospace(n_words: c_ulong) callconv(.c) bool {
-    if (n_words > mock_code_tospace.len) return false;
-    mock_code_tospace_ptr = (&mock_code_tospace).ptr;
-    return true;
-}
-
-pub export fn discard_code_tospace() callconv(.c) void {
-    mock_code_tospace_ptr = (&mock_code_tospace).ptr;
-}
-
-pub export fn get_code_newspace_start() callconv(.c) [*]obj.SchemeObject {
-    return (&mock_code_tospace).ptr;
-}
-
-pub export fn get_code_newspace_ptr() callconv(.c) [*]obj.SchemeObject {
-    return mock_code_tospace_ptr;
-}
-
-pub export fn code_tospace_available_p(n_words: c_ulong) callconv(.c) bool {
-    const used = (@intFromPtr(mock_code_tospace_ptr) - @intFromPtr((&mock_code_tospace).ptr)) / @sizeOf(obj.SchemeObject);
-    return used + @as(usize, @intCast(n_words)) <= mock_code_tospace.len;
-}
-
-pub export fn gc_transport_words_to_code_tospace(from: [*]obj.SchemeObject, n_words: c_ulong, _: bool) callconv(.c) [*]obj.SchemeObject {
-    const count: usize = @intCast(n_words);
-    const dst = mock_code_tospace_ptr;
-    if (count > 0) {
-        @memcpy(dst[0..count], from[0..count]);
-        from[0] = obj.makeBrokenHeart(dst);
-    }
-    mock_code_tospace_ptr = dst + count;
-    return dst;
-}
-
-pub export fn gc_scan_code_tospace(_: [*]obj.SchemeObject, _: [*]obj.SchemeObject) callconv(.c) void {}
-pub export fn open_stage_tospace(_: [*]obj.SchemeObject, _: [*]obj.SchemeObject, _: c_ulong) callconv(.c) void {}
-pub export fn close_stage_tospace() callconv(.c) void {}
-pub export fn gc_scan_stage_tospace() callconv(.c) void {}
 pub export fn OS_file_remove(_: [*:0]const u8) callconv(.c) void {}
 pub export fn OS_file_remove_link(_: [*:0]const u8) callconv(.c) void {}

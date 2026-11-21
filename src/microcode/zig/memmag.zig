@@ -475,6 +475,7 @@ test "memmag ephemeron array sizing, make-ephemeron, memory setup, and std_gc cy
     storage.fixed_objects = obj.sharp_t;
     utils.history_register = (&arena).ptr + 5010;
     abi.open_tospace(abi.heap_start);
+    abi.initialize_weak_chain();
     abi.Registers[abi.regblock_int_code] = abi.int_gc;
     if (build_options.cc_support) {
         abi.Registers[abi.regblock_closure_free] = 123;
@@ -482,11 +483,7 @@ test "memmag ephemeron array sizing, make-ephemeron, memory setup, and std_gc cy
     }
 
     std_gc_pt1();
-    try std.testing.expectEqual(@as(usize, 1), stubs.mock_gc_drain_calls);
-    try std.testing.expectEqual(@as(usize, 1), stubs.mock_update_weak_calls);
-
     std_gc_pt2();
-    try std.testing.expectEqual(@as(usize, 1), stubs.mock_save_tospace_calls);
     try std.testing.expectEqual(obj.sharp_t, storage.fixed_objects);
     try std.testing.expectEqual((&arena).ptr + 5010, utils.history_register.?);
     try std.testing.expectEqual(@as(c_ulong, 0), abi.Registers[abi.regblock_int_code] & abi.int_gc);

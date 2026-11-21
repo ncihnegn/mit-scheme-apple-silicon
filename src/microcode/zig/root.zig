@@ -67,6 +67,7 @@ pub const lookup = @import("lookup.zig");
 pub const fasload = @import("fasload.zig");
 pub const fasdump = @import("fasdump.zig");
 pub const debug = @import("debug.zig");
+pub const gcloop = @import("gcloop.zig");
 
 comptime {
     _ = chacha;
@@ -134,6 +135,7 @@ comptime {
     _ = fasload;
     _ = fasdump;
     _ = debug;
+    _ = gcloop;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -208,4 +210,5 @@ test "microcode zig scaffold" {
     _ = fasload;
     _ = fasdump;
     _ = debug;
+    _ = gcloop;
 }

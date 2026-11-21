@@ -904,6 +904,7 @@ test "fasdump header transitions, fixups growth/restore, ccNewBlock, staged code
     abi.open_tospace(abi.heap_start);
     transact.transaction_record_action(.tat_abort, &abortFasdump, null);
     initializeFixups();
+    abi.current_gc_table = @ptrCast(fasdumpTable());
 
     current_pr = primutl.make_prim_renumber();
     var p_scan: [1]obj.SchemeObject = .{obj.makePrimitiveObject(1)};
@@ -919,7 +920,7 @@ test "fasdump header transitions, fixups growth/restore, ccNewBlock, staged code
     var sym_scan: [1]obj.SchemeObject = .{interned_sym};
     _ = handleSymbol(&sym_scan, interned_sym);
     const dumped_sym_addr = obj.objectAddress(sym_scan[0]);
-    try std.testing.expectEqual(obj.broken_heart_zero, dumped_sym_addr[1]);
+    try std.testing.expectEqual(obj.broken_heart_zero, abi.read_tospace(dumped_sym_addr + 1));
 
     const uninterned_cell = abi.heap_start + 132;
     uninterned_cell[0] = obj.makeNmvHeader(0);
@@ -928,7 +929,7 @@ test "fasdump header transitions, fixups growth/restore, ccNewBlock, staged code
     var usym_scan: [1]obj.SchemeObject = .{uninterned_sym};
     _ = handleSymbol(&usym_scan, uninterned_sym);
     const dumped_usym_addr = obj.objectAddress(usym_scan[0]);
-    try std.testing.expectEqual(obj.unbound_object, dumped_usym_addr[1]);
+    try std.testing.expectEqual(obj.unbound_object, abi.read_tospace(dumped_usym_addr + 1));
 
     // handleBrokenHeart skips datum==0 (broken_heart_zero)
     var bh_slot: [2]obj.SchemeObject = .{ obj.broken_heart_zero, obj.sharp_t };
@@ -948,6 +949,7 @@ test "fasdump header transitions, fixups growth/restore, ccNewBlock, staged code
     _ = handleEphemeron(&eph_scan, eph);
     try std.testing.expectEqual(@as(c_ulong, 1), dumped_ephemeron_count);
 
+    abi.discard_tospace();
     transact.transaction_commit();
     // Fixups restored sym_cell[0] and uninterned_cell[0] after transaction_commit
     try std.testing.expectEqual(obj.makeNmvHeader(0), sym_cell[0]);
