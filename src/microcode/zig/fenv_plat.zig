@@ -195,6 +195,20 @@ pub fn disableExcept(excepts: c_int) c_int {
     return linux_traps.fedisableexcept(excepts);
 }
 
+pub fn setDefaultEnv() c_int {
+    if (comptime builtin.os.tag.isDarwin()) {
+        const darwin_dfl = struct {
+            extern "c" var _FE_DFL_ENV: FenvT;
+        };
+        return fesetenv(&darwin_dfl._FE_DFL_ENV);
+    } else if (comptime builtin.os.tag == .linux) {
+        const raw_fn: *const fn (?*const anyopaque) callconv(.c) c_int = @ptrCast(&fesetenv);
+        return raw_fn(@ptrFromInt(std.math.maxInt(usize)));
+    } else {
+        @compileError("unsupported OS for FE_DFL_ENV");
+    }
+}
+
 test "fenv_plat sizes and exception masks match host libc invariants" {
     try std.testing.expect((fe_all_except & fe_invalid) == fe_invalid);
     try std.testing.expect((fe_all_except & fe_divbyzero) == fe_divbyzero);
@@ -204,5 +218,6 @@ test "fenv_plat sizes and exception masks match host libc invariants" {
 
     var env: FenvT = undefined;
     try std.testing.expectEqual(@as(c_int, 0), fegetenv(&env));
+    try std.testing.expectEqual(@as(c_int, 0), setDefaultEnv());
     try std.testing.expectEqual(@as(c_int, 0), fesetenv(&env));
 }

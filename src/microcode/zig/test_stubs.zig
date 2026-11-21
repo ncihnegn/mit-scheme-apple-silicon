@@ -270,6 +270,10 @@ pub export fn outf_error(_: [*:0]const u8, ...) callconv(.c) void {
     mock_outf_calls += 1;
 }
 
+pub export fn outf_error_line(_: [*:0]const u8, ...) callconv(.c) void {
+    mock_outf_calls += 1;
+}
+
 pub export fn outf_flush_error() callconv(.c) void {}
 
 pub export fn outf_flush_fatal() callconv(.c) void {}

@@ -78,6 +78,7 @@ pub const prospty = @import("prospty.zig");
 pub const prosproc = @import("prosproc.zig");
 pub const pruxdld = @import("pruxdld.zig");
 pub const pruxenv = @import("pruxenv.zig");
+pub const pruxffi = @import("pruxffi.zig");
 pub const pruxfs = @import("pruxfs.zig");
 pub const pruxio = @import("pruxio.zig");
 pub const pruxsock = @import("pruxsock.zig");
@@ -159,6 +160,7 @@ comptime {
     _ = prosproc;
     _ = pruxdld;
     _ = pruxenv;
+    _ = pruxffi;
     _ = pruxfs;
     _ = pruxio;
     _ = pruxsock;
@@ -247,6 +249,7 @@ test "microcode zig scaffold" {
     _ = prosproc;
     _ = pruxdld;
     _ = pruxenv;
+    _ = pruxffi;
     _ = pruxfs;
     _ = pruxio;
     _ = pruxsock;

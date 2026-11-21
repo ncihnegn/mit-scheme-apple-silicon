@@ -39,6 +39,7 @@ pub const max_error: c_int = 0x3F;
 pub const err_bad_error_code: c_long = 0x00;
 pub const err_unbound_variable: c_long = 0x01;
 pub const err_unassigned_variable: c_long = 0x02;
+pub const err_inapplicable_object: c_long = 0x03;
 pub const err_in_system_call: c_long = 0x04;
 pub const err_with_argument: c_long = 0x05;
 pub const err_bad_frame: c_long = 0x06;
@@ -77,6 +78,8 @@ pub const err_wrong_arity_primitives: c_long = 0x36;
 pub const err_fasdump_environment: c_long = 0x38;
 pub const err_fasload_band: c_long = 0x39;
 pub const err_fasload_compiled_mismatch: c_long = 0x3A;
+pub const err_stack_has_slipped: c_long = 0x3D;
+pub const err_cannot_recurse: c_long = 0x3E;
 pub const err_process_terminated: c_long = 0x3F;
 pub const prim_done: c_long = -1;
 pub const prim_do_expression: c_long = -2;
@@ -86,6 +89,7 @@ pub const prim_no_trap_eval: c_long = -5;
 pub const prim_no_trap_apply: c_long = -6;
 pub const prim_pop_return: c_long = -7;
 pub const prim_no_trap_pop_return: c_long = -11;
+pub const prim_return_to_c: c_long = -12;
 pub const max_return_code: c_ulong = 0x5E;
 pub const rc_end_of_computation: c_ulong = 0x00;
 pub const rc_join_stacklets: c_ulong = 0x01;
@@ -176,6 +180,7 @@ pub const fixobj_return_codes_vector: usize = 0x1C;
 pub const fixobj_error_procedure: usize = 0x1D;
 pub const fixobj_initial_hash: usize = 0x19;
 pub const fixobj_primitive_profiling_table: usize = 0x23;
+pub const fixobj_callback_handler: usize = 0x41;
 pub const n_fixed_objects: c_ulong = 0x45;
 pub const obarray_size: c_ulong = 32771;
 pub const fasdump_record_marker_start: c_ulong = 0x100;
@@ -502,6 +507,7 @@ pub extern var gc_space_needed: c_ulong;
 pub extern var critical_section_name: ?[*:0]const u8;
 pub extern var current_gc_table: ?*anyopaque;
 pub extern var history_register: [*]obj.SchemeObject;
+pub extern var last_return_code: ?[*]obj.SchemeObject;
 pub extern var prev_restore_history_offset: c_ulong;
 pub extern var ERROR_OUTPUT: OutfChannel;
 pub extern var FATAL_OUTPUT: OutfChannel;
@@ -551,6 +557,7 @@ pub extern "c" fn debug_stack_trace(OutfChannel) void;
 pub extern "c" fn debug_print_expr(obj.SchemeObject, [*:0]const u8) void;
 pub extern "c" fn outf_fatal([*:0]const u8, ...) void;
 pub extern "c" fn outf_error([*:0]const u8, ...) void;
+pub extern "c" fn outf_error_line([*:0]const u8, ...) void;
 pub extern "c" fn outf_flush_error() void;
 pub extern "c" fn code_address_p(?*const anyopaque) bool;
 pub extern "c" fn record_primitive_entry(obj.SchemeObject) void;
@@ -1298,6 +1305,10 @@ pub inline fn pushCont(rc: c_ulong, exp: obj.SchemeObject) void {
 
 pub inline fn makeApplyFrameHeader(size: c_ulong) obj.SchemeObject {
     return obj.makeObject(obj.tc_manifest_vector, size);
+}
+
+pub inline fn applyFrameHeaderNArgs(header: obj.SchemeObject) c_ulong {
+    return obj.objectDatum(header) - 1;
 }
 
 pub inline fn heapAvailable() c_ulong {
