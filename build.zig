@@ -110,7 +110,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/term.c",
     "src/microcode/utabmd.c",
     "src/microcode/utils.c",
-    "src/microcode/vector.c",
     "src/microcode/prosenv.c",
     "src/microcode/prosfile.c",
     "src/microcode/prosfs.c",
@@ -151,6 +150,7 @@ const zig_prim_sources = [_][]const u8{
     "src/microcode/zig/prentropy.zig",
     "src/microcode/zig/prkeccak.zig",
     "src/microcode/zig/prmd5.zig",
+    "src/microcode/zig/vector.zig",
 };
 
 const config_h_bottom =

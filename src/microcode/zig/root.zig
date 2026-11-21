@@ -22,6 +22,7 @@ pub const char = @import("char.zig");
 pub const hunk = @import("hunk.zig");
 pub const dfloat = @import("dfloat.zig");
 pub const list = @import("list.zig");
+pub const vector = @import("vector.zig");
 
 comptime {
     _ = chacha;
@@ -44,6 +45,7 @@ comptime {
     _ = hunk;
     _ = dfloat;
     _ = list;
+    _ = vector;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -73,4 +75,5 @@ test "microcode zig scaffold" {
     _ = hunk;
     _ = dfloat;
     _ = list;
+    _ = vector;
 }

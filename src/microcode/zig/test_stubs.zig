@@ -203,12 +203,3 @@ pub export fn OS_get_entropy(buf: *[32]u8) callconv(.c) void {
         slot.* = @intCast(idx + 0xA0);
     }
 }
-
-// Temporary stubs replaced in Commit B2 (bytevector.zig) and Commit B5 (vector.zig)
-pub export fn allocate_non_marked_vector(vec_type: c_uint, length: c_ulong, gc_check_p: bool) callconv(.c) obj.SchemeObject {
-    if (gc_check_p) abi.primitiveGcIfNeeded(1 + length);
-    const result = obj.makePointerObject(vec_type, Free);
-    Free[0] = obj.makeObject(obj.tc_manifest_nm_vector, length);
-    Free += 1 + @as(usize, @intCast(length));
-    return result;
-}
