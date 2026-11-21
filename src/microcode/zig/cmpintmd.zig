@@ -8,13 +8,16 @@ const abi = @import("prim_abi.zig");
 
 pub const aarch64 = @import("cmpintmd_aarch64.zig");
 pub const x86_64 = @import("cmpintmd_x86_64.zig");
+pub const svm1 = @import("cmpintmd_svm1.zig");
 
 comptime {
     if (!builtin.is_test) {
         switch (build_options.compiler_processor_type) {
             abi.compiler_aarch64_type => aarch64.exportAll(),
             abi.compiler_x86_64_type => x86_64.exportAll(),
-            else => {},
+            abi.compiler_svm_type => svm1.exportAll(),
+            abi.compiler_none_type => {},
+            else => @compileError("unsupported compiler_processor_type"),
         }
     }
 }
@@ -22,4 +25,5 @@ comptime {
 test {
     _ = aarch64;
     _ = x86_64;
+    _ = svm1;
 }

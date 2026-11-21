@@ -617,8 +617,6 @@ pub fn build(b: *std.Build) void {
     const c_flags = c_flags_list.items;
 
     // Assemble optional microcode C source list.
-    const use_zig_cmpintmd = arch.cc_arch_id == 15 or arch.cc_arch_id == 14;
-    const cmpintmd_c = b.fmt("src/microcode/cmpintmd/{s}.c", .{arch.cmpintmd});
     var scheme_c_sources: std.ArrayList([]const u8) = .empty;
     scheme_c_sources.appendSlice(b.allocator, &std_c_sources) catch @panic("OOM");
 
@@ -629,9 +627,6 @@ pub fn build(b: *std.Build) void {
     }
 
     scheme_c_sources.append(b.allocator, "src/microcode/cmpint.c") catch @panic("OOM");
-    if (!use_zig_cmpintmd) {
-        scheme_c_sources.append(b.allocator, cmpintmd_c) catch @panic("OOM");
-    }
 
     if (arch.is_svm) {
         scheme_c_sources.append(b.allocator, "src/microcode/svm1-interp.c") catch @panic("OOM");
@@ -905,11 +900,7 @@ pub fn build(b: *std.Build) void {
         }
         smoke_exe.root_module.addCSourceFile(.{ .file = b.path(spec.src), .flags = c_flags });
         if (spec.needs_cmpintmd) {
-            if (use_zig_cmpintmd) {
-                smoke_exe.root_module.addObject(cmpintmd_smoke_obj);
-            } else {
-                smoke_exe.root_module.addCSourceFile(.{ .file = b.path(cmpintmd_c), .flags = c_flags });
-            }
+            smoke_exe.root_module.addObject(cmpintmd_smoke_obj);
         }
         smoke_exe.root_module.addCSourceFiles(.{ .files = spec.deps, .flags = c_flags });
         if (spec.needs_native) {
