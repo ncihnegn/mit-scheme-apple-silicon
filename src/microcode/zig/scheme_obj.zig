@@ -36,6 +36,7 @@ pub const tc_constant: c_ulong = 0x08;
 pub const tc_vector: c_ulong = 0x0A;
 pub const tc_return_code: c_ulong = 0x0B;
 pub const tc_big_fixnum: c_ulong = 0x0E;
+pub const tc_environment: c_ulong = 0x12;
 pub const tc_non_marked_vector: c_ulong = 0x16;
 pub const tc_primitive: c_ulong = 0x18;
 pub const tc_fixnum: c_ulong = 0x1A;
@@ -92,6 +93,9 @@ pub const sharp_t: SchemeObject = makeObject(tc_constant, 0);
 pub const unspecific: SchemeObject = makeObject(tc_constant, 1);
 pub const empty_list: SchemeObject = makeObject(tc_constant, 9);
 pub const gc_reclaimed: SchemeObject = makeObject(tc_constant, 10);
+pub const the_global_env: SchemeObject = makeObject(tc_false, 0);
+pub const the_null_env: SchemeObject = makeObject(tc_false, 1);
+pub const unassigned_object: SchemeObject = makeObject(tc_reference_trap, 0);
 pub const unbound_object: SchemeObject = makeObject(tc_reference_trap, 2);
 pub const trap_max_immediate: c_ulong = 9;
 
@@ -265,6 +269,10 @@ pub inline fn ccReturnP(obj: SchemeObject) bool {
 
 pub inline fn ccEntryP(obj: SchemeObject) bool {
     return objectType(obj) == tc_compiled_entry;
+}
+
+pub inline fn environmentP(obj: SchemeObject) bool {
+    return objectType(obj) == tc_environment or obj == the_global_env;
 }
 
 pub inline fn cellContents(cell: SchemeObject) SchemeObject {

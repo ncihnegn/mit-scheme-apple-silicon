@@ -29,6 +29,16 @@ pub export var OS_Name: [*:0]const u8 = "unix";
 pub export var OS_Variant: [*:0]const u8 = "macOS";
 pub export var compiler_processor_type: c_uint = abi.compiler_aarch64_type;
 pub export var scheme_program_name: [*:0]const u8 = "mit-scheme-unit";
+pub export var critical_section_name: ?[*:0]const u8 = null;
+pub export var current_gc_table: ?*anyopaque = null;
+pub var mock_tospace_ptr: ?[*]obj.SchemeObject = null;
+pub var mock_gc_pt1_calls: usize = 0;
+pub var mock_gc_pt2_calls: usize = 0;
+pub var mock_resize_tospace_arg: c_ulong = 0;
+pub var mock_lookup_result: c_long = abi.prim_done;
+pub var mock_lookup_value: obj.SchemeObject = obj.sharp_f;
+pub var mock_define_calls: usize = 0;
+pub var mock_link_calls: usize = 0;
 pub export var MAX_STATIC_PRIMITIVE: c_long = 1;
 pub export var Static_Primitive_Procedure_Table = [_]abi.PrimitiveProcedure{ &mockDummyPrim, &mockDummyPrim };
 pub export var Static_Primitive_Arity_Table = [_]c_int{ 1, 2 };
@@ -44,6 +54,16 @@ pub fn resetMockRuntime() void {
     mock_trap_state = 4;
     mock_under_emacs = 0;
     compiler_processor_type = abi.compiler_aarch64_type;
+    critical_section_name = null;
+    current_gc_table = null;
+    mock_tospace_ptr = null;
+    mock_gc_pt1_calls = 0;
+    mock_gc_pt2_calls = 0;
+    mock_resize_tospace_arg = 0;
+    mock_lookup_result = abi.prim_done;
+    mock_lookup_value = obj.sharp_f;
+    mock_define_calls = 0;
+    mock_link_calls = 0;
     mock_return_to_interpreter = obj.makeObject(obj.tc_compiled_return, 1);
     mock_reflect_to_interface = obj.makeObject(obj.tc_compiled_return, 2);
     mock_heap = @splat(0);
@@ -398,4 +418,85 @@ pub export fn initialize_interrupt_handler_vector() callconv(.c) obj.SchemeObjec
 
 pub export fn initialize_interrupt_mask_vector() callconv(.c) obj.SchemeObject {
     return abi.make_vector(16, obj.ulongToFixnum(0), false);
+}
+
+var mock_std_gc_table_sentinel: u8 = 0;
+
+pub export fn open_tospace(start: [*]obj.SchemeObject) callconv(.c) void {
+    mock_tospace_ptr = start;
+}
+
+pub export fn initialize_weak_chain() callconv(.c) void {}
+
+pub export fn get_newspace_ptr() callconv(.c) [*]obj.SchemeObject {
+    return mock_tospace_ptr.?;
+}
+
+pub export fn add_to_tospace(o: obj.SchemeObject) callconv(.c) void {
+    mock_tospace_ptr.?[0] = o;
+    mock_tospace_ptr = mock_tospace_ptr.? + 1;
+}
+
+pub export fn std_gc_table() callconv(.c) ?*anyopaque {
+    return &mock_std_gc_table_sentinel;
+}
+
+pub export fn gc_scan_tospace(_: [*]obj.SchemeObject, _: ?[*]obj.SchemeObject) callconv(.c) void {}
+
+pub export fn increment_tospace_ptr(n: c_ulong) callconv(.c) void {
+    mock_tospace_ptr = mock_tospace_ptr.? + @as(usize, @intCast(n));
+}
+
+pub export fn std_gc_pt1() callconv(.c) void {
+    mock_gc_pt1_calls += 1;
+}
+
+pub export fn std_gc_pt2() callconv(.c) void {
+    mock_gc_pt2_calls += 1;
+}
+
+pub export fn resize_tospace(size: c_ulong) callconv(.c) void {
+    mock_resize_tospace_arg = size;
+}
+
+pub export fn lookup_variable(_: obj.SchemeObject, _: obj.SchemeObject, val_out: *obj.SchemeObject) callconv(.c) c_long {
+    val_out.* = mock_lookup_value;
+    return mock_lookup_result;
+}
+
+pub export fn assign_variable(_: obj.SchemeObject, _: obj.SchemeObject, new_val: obj.SchemeObject, val_out: *obj.SchemeObject) callconv(.c) c_long {
+    val_out.* = mock_lookup_value;
+    mock_lookup_value = new_val;
+    return mock_lookup_result;
+}
+
+pub export fn define_variable(_: obj.SchemeObject, _: obj.SchemeObject, new_val: obj.SchemeObject) callconv(.c) c_long {
+    mock_define_calls += 1;
+    mock_lookup_value = new_val;
+    return mock_lookup_result;
+}
+
+pub export fn variable_unassigned_p(_: obj.SchemeObject, _: obj.SchemeObject, val_out: *obj.SchemeObject) callconv(.c) c_long {
+    val_out.* = mock_lookup_value;
+    return mock_lookup_result;
+}
+
+pub export fn variable_unbound_p(_: obj.SchemeObject, _: obj.SchemeObject, val_out: *obj.SchemeObject) callconv(.c) c_long {
+    val_out.* = mock_lookup_value;
+    return mock_lookup_result;
+}
+
+pub export fn variable_unreferenceable_p(_: obj.SchemeObject, _: obj.SchemeObject, val_out: *obj.SchemeObject) callconv(.c) c_long {
+    val_out.* = mock_lookup_value;
+    return mock_lookup_result;
+}
+
+pub export fn link_variables(_: obj.SchemeObject, _: obj.SchemeObject, _: obj.SchemeObject, _: obj.SchemeObject) callconv(.c) c_long {
+    mock_link_calls += 1;
+    return mock_lookup_result;
+}
+
+pub export fn unbind_variable(_: obj.SchemeObject, _: obj.SchemeObject, val_out: *obj.SchemeObject) callconv(.c) c_long {
+    val_out.* = mock_lookup_value;
+    return mock_lookup_result;
 }

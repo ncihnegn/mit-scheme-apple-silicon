@@ -28,15 +28,24 @@ pub const term_exit: c_int = 0x0C;
 pub const term_no_space: c_int = 0x15;
 pub const err_undefined_primitive: c_long = 0x09;
 pub const err_wrong_number_of_arguments: c_long = 0x0C;
+pub const err_unbound_variable: c_long = 0x01;
+pub const err_unassigned_variable: c_long = 0x02;
+pub const err_macro_binding: c_long = 0x13;
 pub const err_out_of_file_handles: c_long = 0x20;
 pub const err_floating_overflow: c_long = 0x32;
 pub const err_unimplemented_primitive: c_long = 0x33;
 pub const err_wrong_arity_primitives: c_long = 0x36;
 pub const err_process_terminated: c_long = 0x3F;
+pub const prim_done: c_long = -1;
+pub const prim_do_expression: c_long = -2;
 pub const prim_apply: c_long = -3;
+pub const prim_interrupt: c_long = -4;
 pub const prim_no_trap_eval: c_long = -5;
 pub const prim_no_trap_apply: c_long = -6;
+pub const prim_pop_return: c_long = -7;
 pub const prim_no_trap_pop_return: c_long = -11;
+pub const rc_normal_gc_done: c_ulong = 0x20;
+pub const constant_space_fudge: c_ulong = 128;
 pub const max_return_code: c_ulong = 0x5E;
 pub const rc_comp_interrupt_restart: c_ulong = 0x43;
 pub const rc_comp_lookup_trap_restart: c_ulong = 0x53;
@@ -171,7 +180,10 @@ pub extern var stack_start: [*]obj.SchemeObject;
 pub extern var stack_end: [*]obj.SchemeObject;
 pub extern var memory_block_start: [*]obj.SchemeObject;
 pub extern var fixed_objects: obj.SchemeObject;
+pub extern var heap_reserved: c_ulong;
 pub extern var gc_space_needed: c_ulong;
+pub extern var critical_section_name: ?[*:0]const u8;
+pub extern var current_gc_table: ?*anyopaque;
 pub extern var trapping: bool;
 pub extern var constant_start: [*]obj.SchemeObject;
 pub extern var constant_alloc_next: [*]obj.SchemeObject;
@@ -237,6 +249,26 @@ pub extern "c" fn reflect_to_interface_frame_type([*]obj.SchemeObject) c_int;
 pub extern "c" fn cpoint_compiled_code_next(obj.SchemeObject, c_ulong) c_ulong;
 pub extern "c" fn cpoint_compiled_address_next(obj.SchemeObject, c_ulong) c_ulong;
 pub extern "c" fn cpoint_reflect_to_interface_next(obj.SchemeObject, c_ulong) c_ulong;
+
+pub extern "c" fn open_tospace([*]obj.SchemeObject) void;
+pub extern "c" fn initialize_weak_chain() void;
+pub extern "c" fn get_newspace_ptr() [*]obj.SchemeObject;
+pub extern "c" fn add_to_tospace(obj.SchemeObject) void;
+pub extern "c" fn std_gc_table() ?*anyopaque;
+pub extern "c" fn gc_scan_tospace([*]obj.SchemeObject, ?[*]obj.SchemeObject) void;
+pub extern "c" fn increment_tospace_ptr(c_ulong) void;
+pub extern "c" fn std_gc_pt1() void;
+pub extern "c" fn std_gc_pt2() void;
+pub extern "c" fn resize_tospace(c_ulong) void;
+
+pub extern "c" fn lookup_variable(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) c_long;
+pub extern "c" fn assign_variable(obj.SchemeObject, obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) c_long;
+pub extern "c" fn define_variable(obj.SchemeObject, obj.SchemeObject, obj.SchemeObject) c_long;
+pub extern "c" fn variable_unassigned_p(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) c_long;
+pub extern "c" fn variable_unbound_p(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) c_long;
+pub extern "c" fn variable_unreferenceable_p(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) c_long;
+pub extern "c" fn link_variables(obj.SchemeObject, obj.SchemeObject, obj.SchemeObject, obj.SchemeObject) c_long;
+pub extern "c" fn unbind_variable(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) c_long;
 
 pub extern "c" fn arg_integer(c_int) c_long;
 pub extern "c" fn arg_nonnegative_integer(c_int) c_long;
@@ -567,4 +599,27 @@ pub inline fn stackCheck(n: usize) void {
         Registers[regblock_int_code] |= int_stack_overflow;
         compilerSetupInterrupt();
     }
+}
+
+pub inline fn stackCheckFatal(s: [*:0]const u8) void {
+    if (stackOverflowedP()) stack_death(s);
+}
+
+pub inline fn pushCont(rc: c_ulong, exp: obj.SchemeObject) void {
+    stackPush(exp);
+    stackPush(obj.makeObject(obj.tc_return_code, rc));
+}
+
+pub inline fn makeApplyFrameHeader(size: c_ulong) obj.SchemeObject {
+    return obj.makeObject(obj.tc_manifest_vector, size);
+}
+
+pub inline fn heapAvailable() c_ulong {
+    if (!freeOkP(Free)) return 0;
+    return @intCast((@intFromPtr(heap_alloc_limit) - @intFromPtr(Free)) / @sizeOf(obj.SchemeObject));
+}
+
+pub inline fn argHeapReserved(n: c_int) c_ulong {
+    const words: c_ulong = @intCast((@intFromPtr(heap_end) - @intFromPtr(heap_start)) / @sizeOf(obj.SchemeObject));
+    return arg_ulong_index_integer(n, words / 2);
 }

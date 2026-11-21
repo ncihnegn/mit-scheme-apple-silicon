@@ -54,6 +54,8 @@ pub const osscheme = @import("osscheme.zig");
 pub const returns = @import("returns.zig");
 pub const storage = @import("storage.zig");
 pub const utabmd = @import("utabmd.zig");
+pub const purify = @import("purify.zig");
+pub const lookprm = @import("lookprm.zig");
 
 comptime {
     _ = chacha;
@@ -108,6 +110,8 @@ comptime {
     _ = returns;
     _ = storage;
     _ = utabmd;
+    _ = purify;
+    _ = lookprm;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -169,4 +173,6 @@ test "microcode zig scaffold" {
     _ = returns;
     _ = storage;
     _ = utabmd;
+    _ = purify;
+    _ = lookprm;
 }
