@@ -1536,7 +1536,6 @@ pub export fn OS_signal_set_interrupt_handlers(q: c_uint, i: c_uint, t: c_uint) 
     mock_sig_int_handler = i;
     mock_sig_tstp_handler = t;
 }
-pub export fn initialize_interruptable_extent() callconv(.c) void {}
 pub export fn UX_initialize_ctty(_: c_int) callconv(.c) void {}
 pub export fn UX_initialize_channels() callconv(.c) void {}
 pub export fn UX_initialize_terminals() callconv(.c) void {}
@@ -1574,7 +1573,6 @@ pub export fn find_signal_name(sig: c_int) callconv(.c) [*:0]const u8 {
         else => "SIGTEST",
     };
 }
-pub export fn reset_interruptable_extent() callconv(.c) void {}
 pub export fn termination_trap() callconv(.c) noreturn {
     @panic("mock termination_trap");
 }
@@ -1585,10 +1583,6 @@ pub export var CONSOLE_OUTPUT: abi.OutfChannel = .{ .type = 0, .cookie = null };
 pub export fn FILE_OUTPUT(fp: *std.c.FILE) callconv(.c) abi.OutfChannel {
     return .{ .type = 3, .cookie = @ptrCast(fp) };
 }
-pub export fn enter_interruption_extent() callconv(.c) c_int {
-    return 0;
-}
-pub export fn exit_interruption_extent() callconv(.c) void {}
 pub export fn OS_ctty_int_char() callconv(.c) abi.CcT {
     return 7;
 }

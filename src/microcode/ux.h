@@ -304,7 +304,6 @@ USA.
 #  include <util.h>
 #endif
 
-#include "intext.h"
 #include "dstack.h"
 #include "osscheme.h"
 #include "syscall.h"

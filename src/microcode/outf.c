@@ -41,14 +41,34 @@ USA.
    Use outf where you would normally think of using fprintf and
    outf_flush where you would normally use fflush.  */
 
-#include "config.h"
-#include "outf.h"
+#include <stdarg.h>
+#include <stdio.h>
 
-#ifdef __WIN32__
-#  include <windows.h>
-#  include "ntscreen.h"
-   extern HANDLE master_tty_window;
-#endif
+typedef struct
+{
+  enum { OUTF_CONSOLE, OUTF_ERROR, OUTF_FATAL, OUTF_FILE } type;
+  void * cookie;
+} outf_channel;
+
+extern outf_channel CONSOLE_OUTPUT;
+extern outf_channel ERROR_OUTPUT;
+extern outf_channel FATAL_OUTPUT;
+
+extern outf_channel FILE_OUTPUT (FILE *);
+extern void outf (outf_channel, const char *, ...);
+extern void voutf (outf_channel, const char *, va_list);
+extern void outf_flush (outf_channel);
+extern void outf_console (const char *, ...);
+extern void outf_error (const char *, ...);
+extern void outf_error_line (const char *, ...);
+extern void outf_fatal (const char *, ...);
+extern void voutf_console (const char *, va_list);
+extern void outf_flush_console (void);
+extern void voutf_error (const char *, va_list);
+extern void outf_flush_error (void);
+extern void voutf_error_line (const char *, va_list);
+extern void voutf_fatal (const char *, va_list);
+extern void outf_flush_fatal (void);
 
 outf_channel CONSOLE_OUTPUT = { .type = OUTF_CONSOLE };
 outf_channel ERROR_OUTPUT = { .type = OUTF_ERROR };
@@ -128,83 +148,6 @@ outf_fatal (const char * format, ...)
   voutf_fatal (format, args);
   va_end (args);
 }
-
-#ifdef __WIN32__
-
-#define OUTF_VARIANTS_DEFINED 1
-#define MAX_FATAL_BUF 1000
-static char fatal_buf [MAX_FATAL_BUF + 1] = { '\0' };
-
-#ifdef CL386
-#  define VSNPRINTF(buffer, length, format, args)			\
-     _vsnprintf ((buffer), (length), (format), (args))
-#else
-#  ifdef __WATCOMC__
-#    define VSNPRINTF(buffer, length, format, args)			\
-       vsprintf ((buffer), (format), (args))
-#  endif
-#endif
-
-static void
-voutf_master_tty (const char * format, va_list args)
-{
-  char buf [1000];
-  VSNPRINTF (buf, 1000, format, args);
-  Screen_WriteText (master_tty_window, buf);
-}
-
-void
-voutf_console (const char * format, va_list args)
-{
-  if (master_tty_window != 0)
-    voutf_master_tty (format, args);
-  else
-    vfprintf (stdout, format, args);
-}
-
-void
-outf_flush_console (void)
-{
-  if (master_tty_window == 0)
-    fflush (stdout);
-}
-
-void
-voutf_error (const char * format, va_list args)
-{
-  if (master_tty_window != 0)
-    voutf_master_tty (format, args);
-  else
-    vfprintf (stderr, format, args);
-}
-
-void
-outf_flush_error (void)
-{
-  if (master_tty_window == 0)
-    fflush (stderr);
-}
-
-void
-voutf_fatal (const char * format, va_list args)
-{
-  unsigned int end = (strlen (fatal_buf));
-  VSNPRINTF ((& (fatal_buf[end])), (MAX_FATAL_BUF - end), format, args);
-}
-
-void
-outf_flush_fatal (void)
-{
-  fprintf (stderr, "%s", fatal_buf);
-  fflush (stderr);
-  MessageBox
-    (0, fatal_buf, "MIT/GNU Scheme terminating", (MB_OK | MB_TASKMODAL));
-  (fatal_buf[0]) = '\0';
-}
-
-#endif /* __WIN32__ */
-
-#ifndef OUTF_VARIANTS_DEFINED
 
 void
 voutf_console (const char * format, va_list args)
@@ -249,5 +192,3 @@ outf_flush_fatal (void)
 {
   fflush (stderr);
 }
-
-#endif /* not OUTF_VARIANTS_DEFINED */

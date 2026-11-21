@@ -74,7 +74,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/interp.c",
     "src/microcode/outf.c",
     "src/microcode/term.c",
-    "src/microcode/intext.c",
 };
 
 const zig_prim_sources = [_][]const u8{
