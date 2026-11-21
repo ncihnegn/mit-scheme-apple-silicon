@@ -1390,6 +1390,37 @@ pub export fn termination_trap() callconv(.c) noreturn {
 pub export fn userio_choose_option(_: [*:0]const u8, _: [*:0]const u8, _: [*]const ?[*:0]const u8) callconv(.c) u8 {
     return 'N';
 }
+pub export var CONSOLE_OUTPUT: abi.OutfChannel = .{ .type = 0, .cookie = null };
+pub export fn FILE_OUTPUT(fp: *std.c.FILE) callconv(.c) abi.OutfChannel {
+    return .{ .type = 3, .cookie = @ptrCast(fp) };
+}
+pub export fn enter_interruption_extent() callconv(.c) c_int {
+    return 0;
+}
+pub export fn exit_interruption_extent() callconv(.c) void {}
+pub export fn OS_ctty_int_char() callconv(.c) abi.CcT {
+    return 7;
+}
+pub export fn OS_ctty_tstp_char() callconv(.c) abi.CcT {
+    return 26;
+}
+pub export fn OS_ctty_disabled_char() callconv(.c) abi.CcT {
+    return 0xff;
+}
+pub export fn UX_reinitialize_tty() callconv(.c) void {}
+pub export fn termination_signal(_: [*:0]const u8) callconv(.c) noreturn {
+    @panic("mock termination_signal");
+}
+pub export fn hard_reset(_: ?*anyopaque) callconv(.c) void {}
+pub export fn soft_reset() callconv(.c) void {}
+pub export fn trap_handler(_: [*:0]const u8, _: c_int, _: ?*std.c.siginfo_t, _: ?*anyopaque) callconv(.c) void {}
+pub export fn userio_buffered_input() callconv(.c) void {}
+pub export fn userio_read_char() callconv(.c) u8 {
+    return '\n';
+}
+pub export fn userio_read_char_raw() callconv(.c) u8 {
+    return 'i';
+}
 pub export var stop_signal_hook: ?*const fn (c_int) callconv(.c) void = null;
 pub export var subprocess_death_hook: ?*const fn (abi.PidT, *c_int) callconv(.c) void = null;
 pub export fn OS_ctty_fd() callconv(.c) c_int {
