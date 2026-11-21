@@ -212,26 +212,3 @@ pub export fn allocate_non_marked_vector(vec_type: c_uint, length: c_ulong, gc_c
     Free += 1 + @as(usize, @intCast(length));
     return result;
 }
-
-pub export fn arg_bytevector(n: c_int, len_r: *c_ulong) callconv(.c) [*]u8 {
-    abi.checkArg(n, obj.bytevectorP);
-    const bv = abi.argRef(@intCast(n));
-    len_r.* = obj.bytevectorLength(bv);
-    return obj.bytevectorData(bv);
-}
-
-pub export fn allocate_bytevector(nbytes: c_ulong) callconv(.c) obj.SchemeObject {
-    const result = allocate_non_marked_vector(@intCast(obj.tc_bytevector), obj.bytevectorLengthToGcLength(nbytes), true);
-    obj.setBytevectorLength(result, nbytes);
-    obj.bytevectorSet(result, @intCast(nbytes), 0x00);
-    return result;
-}
-
-pub export fn memory_to_bytevector(n_bytes: c_ulong, vp: ?*const anyopaque) callconv(.c) obj.SchemeObject {
-    const result = allocate_bytevector(n_bytes);
-    if (n_bytes > 0) {
-        const src: [*]const u8 = @ptrCast(vp.?);
-        @memcpy(obj.bytevectorData(result)[0..@intCast(n_bytes)], src[0..@intCast(n_bytes)]);
-    }
-    return result;
-}

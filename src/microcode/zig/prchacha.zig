@@ -86,10 +86,10 @@ test "prchacha primitives compute expected zero-key vectors at offset" {
     const stubs = @import("test_stubs.zig");
     stubs.resetMockRuntime();
 
-    const output_bv = stubs.allocate_bytevector(70);
-    const input_bv = stubs.allocate_bytevector(16);
-    const key_bv = stubs.allocate_bytevector(32);
-    const const_bv = stubs.memory_to_bytevector(16, "expand 32-byte k");
+    const output_bv = abi.allocate_bytevector(70);
+    const input_bv = abi.allocate_bytevector(16);
+    const key_bv = abi.allocate_bytevector(32);
+    const const_bv = abi.memory_to_bytevector(16, "expand 32-byte k");
 
     stubs.setArgs(&.{ output_bv, obj.ulongToFixnum(4), input_bv, key_bv, const_bv });
     try std.testing.expectEqual(obj.unspecific, Prim_chacha8_core());

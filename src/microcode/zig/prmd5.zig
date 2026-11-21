@@ -92,8 +92,8 @@ test "prmd5 oneshot and streaming primitives match RFC1321" {
         0xd6, 0x96, 0x3f, 0x7d, 0x28, 0xe1, 0x7f, 0x72,
     };
 
-    const msg = stubs.memory_to_bytevector(5, "xabcy");
-    const abc = stubs.memory_to_bytevector(3, "abc");
+    const msg = abi.memory_to_bytevector(5, "xabcy");
+    const abc = abi.memory_to_bytevector(3, "abc");
 
     // One-shot MD5
     stubs.setArgs(&.{abc});

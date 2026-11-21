@@ -72,7 +72,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/bigprm.c",
     "src/microcode/bitstr.c",
     "src/microcode/boot.c",
-    "src/microcode/bytevector.c",
     "src/microcode/char.c",
     "src/microcode/daemon.c",
     "src/microcode/debug.c",
@@ -85,7 +84,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/fixnum.c",
     "src/microcode/floenv.c",
     "src/microcode/flonum.c",
-    "src/microcode/fma.c",
     "src/microcode/gcloop.c",
     "src/microcode/generic.c",
     "src/microcode/hooks.c",
@@ -97,7 +95,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/lookprm.c",
     "src/microcode/lookup.c",
     "src/microcode/memmag.c",
-    "src/microcode/missing.c",
     "src/microcode/option.c",
     "src/microcode/osscheme.c",
     "src/microcode/ostty.c",
@@ -149,6 +146,7 @@ const std_c_sources = [_][]const u8{
 };
 
 const zig_prim_sources = [_][]const u8{
+    "src/microcode/zig/bytevector.zig",
     "src/microcode/zig/prchacha.zig",
     "src/microcode/zig/prentropy.zig",
     "src/microcode/zig/prkeccak.zig",

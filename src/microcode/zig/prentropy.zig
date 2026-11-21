@@ -22,7 +22,7 @@ test "prentropy fills 32-byte bytevector" {
     const stubs = @import("test_stubs.zig");
     stubs.resetMockRuntime();
 
-    const bv = stubs.allocate_bytevector(32);
+    const bv = abi.allocate_bytevector(32);
     stubs.setArgs(&.{bv});
     try std.testing.expectEqual(obj.unspecific, Prim_get_entropy());
     for (0..32) |i| {

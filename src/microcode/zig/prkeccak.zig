@@ -32,7 +32,7 @@ test "prkeccak permutes sha3-256 empty block" {
     const stubs = @import("test_stubs.zig");
     stubs.resetMockRuntime();
 
-    const bv = stubs.allocate_bytevector(200);
+    const bv = abi.allocate_bytevector(200);
     const data = obj.bytevectorData(bv);
     @memset(data[0..200], 0);
     data[0] = 0x06;
