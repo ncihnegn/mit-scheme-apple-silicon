@@ -39,7 +39,7 @@ inline fn bignumToPointer(bignum: obj.SchemeObject) [*]UnsignedDigit {
     return @ptrCast(obj.vectorLoc(bignum, 0));
 }
 
-inline fn bignumStartPtr(bignum: obj.SchemeObject) [*]UnsignedDigit {
+pub inline fn bignumStartPtr(bignum: obj.SchemeObject) [*]UnsignedDigit {
     return bignumToPointer(bignum) + 1;
 }
 
@@ -47,7 +47,7 @@ inline fn bignumSetHeader(bignum: obj.SchemeObject, length: BignumLength, negati
     bignumToPointer(bignum)[0] = @as(UnsignedDigit, @intCast(length)) | (if (negative_p) bignum_radix else 0);
 }
 
-inline fn bignumLength(bignum: obj.SchemeObject) BignumLength {
+pub inline fn bignumLength(bignum: obj.SchemeObject) BignumLength {
     return @intCast(bignumToPointer(bignum)[0] & bignum_digit_mask);
 }
 

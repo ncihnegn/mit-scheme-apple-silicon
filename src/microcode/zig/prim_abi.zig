@@ -23,16 +23,42 @@ pub const int_timer: c_ulong = 0x0040;
 pub const int_global_3: c_ulong = 0x0080;
 pub const int_suspend: c_ulong = 0x0100;
 pub const int_mask: c_ulong = (@as(c_ulong, 1) << 16) - 1;
+pub const max_interrupt_number: c_ulong = 0xF;
 
 pub const term_bad_stack: c_int = 0x06;
+pub const term_no_interrupt_handler: c_int = 0x0A;
 pub const term_exit: c_int = 0x0C;
 pub const term_no_space: c_int = 0x15;
-pub const err_undefined_primitive: c_long = 0x09;
-pub const err_wrong_number_of_arguments: c_long = 0x0C;
+pub const err_bad_error_code: c_long = 0x00;
 pub const err_unbound_variable: c_long = 0x01;
 pub const err_unassigned_variable: c_long = 0x02;
+pub const err_in_system_call: c_long = 0x04;
+pub const err_with_argument: c_long = 0x05;
+pub const err_undefined_primitive: c_long = 0x09;
+pub const err_external_return: c_long = 0x0A;
+pub const err_wrong_number_of_arguments: c_long = 0x0C;
+pub const err_arg_1_wrong_type: c_long = 0x0D;
+pub const err_arg_2_wrong_type: c_long = 0x0E;
+pub const err_arg_3_wrong_type: c_long = 0x0F;
+pub const err_arg_1_bad_range: c_long = 0x10;
+pub const err_arg_2_bad_range: c_long = 0x11;
+pub const err_arg_3_bad_range: c_long = 0x12;
 pub const err_macro_binding: c_long = 0x13;
 pub const err_out_of_file_handles: c_long = 0x20;
+pub const err_arg_4_bad_range: c_long = 0x22;
+pub const err_arg_5_bad_range: c_long = 0x23;
+pub const err_arg_6_bad_range: c_long = 0x24;
+pub const err_arg_7_bad_range: c_long = 0x25;
+pub const err_arg_8_bad_range: c_long = 0x26;
+pub const err_arg_9_bad_range: c_long = 0x27;
+pub const err_arg_10_bad_range: c_long = 0x28;
+pub const err_arg_4_wrong_type: c_long = 0x29;
+pub const err_arg_5_wrong_type: c_long = 0x2A;
+pub const err_arg_6_wrong_type: c_long = 0x2B;
+pub const err_arg_7_wrong_type: c_long = 0x2C;
+pub const err_arg_8_wrong_type: c_long = 0x2D;
+pub const err_arg_9_wrong_type: c_long = 0x2E;
+pub const err_arg_10_wrong_type: c_long = 0x2F;
 pub const err_floating_overflow: c_long = 0x32;
 pub const err_unimplemented_primitive: c_long = 0x33;
 pub const err_wrong_arity_primitives: c_long = 0x36;
@@ -45,18 +71,19 @@ pub const prim_no_trap_eval: c_long = -5;
 pub const prim_no_trap_apply: c_long = -6;
 pub const prim_pop_return: c_long = -7;
 pub const prim_no_trap_pop_return: c_long = -11;
-pub const rc_normal_gc_done: c_ulong = 0x20;
+pub const max_return_code: c_ulong = 0x5E;
 pub const rc_join_stacklets: c_ulong = 0x01;
 pub const rc_internal_apply: c_ulong = 0x03;
 pub const rc_restore_history: c_ulong = 0x05;
 pub const rc_snap_need_thunk: c_ulong = 0x1C;
+pub const rc_normal_gc_done: c_ulong = 0x20;
+pub const rc_pop_from_compiled_code: c_ulong = 0x29;
+pub const rc_restore_dont_copy_history: c_ulong = 0x2F;
+pub const rc_pop_return_error: c_ulong = 0x40;
+pub const rc_eval_error: c_ulong = 0x41;
 pub const rc_stack_marker: c_ulong = 0x42;
-pub const hist_rib: usize = 0;
-pub const rib_next_reduction: usize = 2;
-pub const rib_mark: usize = 2;
-pub const constant_space_fudge: c_ulong = 128;
-pub const max_return_code: c_ulong = 0x5E;
 pub const rc_comp_interrupt_restart: c_ulong = 0x43;
+pub const rc_restore_int_mask: c_ulong = 0x45;
 pub const rc_comp_lookup_trap_restart: c_ulong = 0x53;
 pub const rc_comp_assignment_trap_restart: c_ulong = 0x54;
 pub const rc_comp_op_ref_trap_restart: c_ulong = 0x56;
@@ -64,10 +91,21 @@ pub const rc_comp_cache_ref_apply_restart: c_ulong = 0x57;
 pub const rc_comp_safe_ref_trap_restart: c_ulong = 0x58;
 pub const rc_comp_unassigned_trap_restart: c_ulong = 0x59;
 pub const rc_hardware_trap: c_ulong = 0x5C;
+pub const rc_internal_apply_val: c_ulong = 0x5D;
 pub const rc_comp_error_restart: c_ulong = 0x5E;
+pub const hist_rib: usize = 0;
+pub const hist_next_subproblem: usize = 1;
+pub const hist_prev_subproblem: usize = 2;
+pub const hist_mark: usize = 1;
+pub const rib_exp: usize = 0;
+pub const rib_env: usize = 1;
+pub const rib_next_reduction: usize = 2;
+pub const rib_mark: usize = 2;
+pub const constant_space_fudge: c_ulong = 128;
 pub const cont_size: usize = 2;
 pub const env_cont_size: usize = cont_size + 1;
 pub const history_cont_size: usize = cont_size + 2;
+pub const lexpr_primitive_arity: c_int = -1;
 pub const unknown_primitive_arity: c_int = -2;
 pub const syscall_malloc: c_int = 29;
 pub const syserr_not_enough_space: c_int = 33;
@@ -106,6 +144,8 @@ pub const fixobj_return_frames_vector: usize = 0x1A;
 pub const fixobj_reflect_code_names: usize = 0x1B;
 pub const fixobj_return_codes_vector: usize = 0x1C;
 pub const fixobj_error_procedure: usize = 0x1D;
+pub const fixobj_initial_hash: usize = 0x19;
+pub const fixobj_primitive_profiling_table: usize = 0x23;
 pub const n_fixed_objects: c_ulong = 0x45;
 pub const obarray_size: c_ulong = 32771;
 pub const fasdump_record_marker_start: c_ulong = 0x100;
@@ -177,6 +217,31 @@ pub const ReturnFrameType = enum(c_int) {
     limit = 19,
 };
 
+pub const CcEntryTypeMarker = enum(c_int) {
+    procedure = 0,
+    continuation = 1,
+    expression = 2,
+    internal_procedure = 3,
+    internal_continuation = 4,
+    trampoline = 5,
+    return_to_interpreter = 6,
+    closure = 7,
+};
+
+pub const CcEntryType = extern struct {
+    marker: CcEntryTypeMarker,
+    args: extern union {
+        for_procedure: extern struct {
+            n_required: c_uint,
+            n_optional: c_uint,
+            rest_p: bool,
+        },
+        for_continuation: extern struct {
+            offset: c_ulong,
+        },
+    },
+};
+
 pub extern var Registers: [14]obj.SchemeObject;
 pub extern var Free: [*]obj.SchemeObject;
 pub extern var Free_primitive: ?[*]obj.SchemeObject;
@@ -195,6 +260,8 @@ pub extern var critical_section_name: ?[*:0]const u8;
 pub extern var current_gc_table: ?*anyopaque;
 pub extern var history_register: [*]obj.SchemeObject;
 pub extern var prev_restore_history_offset: c_ulong;
+pub extern var ERROR_OUTPUT: OutfChannel;
+pub extern var FATAL_OUTPUT: OutfChannel;
 pub extern var trapping: bool;
 pub extern var constant_start: [*]obj.SchemeObject;
 pub extern var constant_alloc_next: [*]obj.SchemeObject;
@@ -289,6 +356,11 @@ pub extern "c" fn back_out_of_primitive() void;
 pub extern "c" fn apply_compiled_from_primitive(c_ulong, obj.SchemeObject) void;
 pub extern "c" fn compiled_with_stack_marker(obj.SchemeObject) void;
 pub extern "c" fn compiled_with_interrupt_mask(c_ulong, obj.SchemeObject, c_ulong) void;
+pub extern "c" fn termination_no_error_handler() noreturn;
+pub extern "c" fn OS_error_code_to_syserr(c_int) c_int;
+pub extern "c" fn guarantee_interp_return() void;
+pub extern "c" fn read_cc_entry_type(*CcEntryType, ?*anyopaque) bool;
+pub extern "c" fn record_applicator(obj.SchemeObject) obj.SchemeObject;
 
 pub extern "c" fn arg_integer(c_int) c_long;
 pub extern "c" fn arg_nonnegative_integer(c_int) c_long;
@@ -673,4 +745,30 @@ pub inline fn contFrameRet(frame: [*]const obj.SchemeObject) obj.SchemeObject {
 
 pub inline fn contFrameExp(frame: [*]const obj.SchemeObject) obj.SchemeObject {
     return frame[1];
+}
+
+pub inline fn primitiveNArgs(prim: obj.SchemeObject) c_ulong {
+    const arity = Primitive_Arity_Table.?[@intCast(obj.objectDatum(prim))];
+    return if (arity == lexpr_primitive_arity) getLexprActuals() else @intCast(arity);
+}
+
+pub inline fn pushEnvCont(rc: c_ulong, exp: obj.SchemeObject, env: obj.SchemeObject) void {
+    stackPush(env);
+    pushCont(rc, exp);
+}
+
+pub inline fn addressInHeapP(addr: [*]const obj.SchemeObject) bool {
+    return @intFromPtr(addr) >= @intFromPtr(heap_start) and @intFromPtr(addr) < @intFromPtr(heap_end);
+}
+
+pub inline fn spaceBeforeGc() c_ulong {
+    if (gcEnabledP()) return heapAvailable();
+    if (addressInHeapP(Free)) {
+        return @intCast((@intFromPtr(heap_end) - @intFromPtr(Free)) / @sizeOf(obj.SchemeObject));
+    }
+    return 0;
+}
+
+pub inline fn historyUnmark(slot: *obj.SchemeObject) void {
+    slot.* &= ~obj.history_mark_mask;
 }

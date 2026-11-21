@@ -1,6 +1,7 @@
 const std = @import("std");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const utils = @import("utils.zig");
 
 pub var signal_block_depth: i32 = 0;
 pub var fatal_count: usize = 0;
@@ -40,9 +41,6 @@ pub var mock_lookup_result: c_long = abi.prim_done;
 pub var mock_lookup_value: obj.SchemeObject = obj.sharp_f;
 pub var mock_define_calls: usize = 0;
 pub var mock_link_calls: usize = 0;
-var mock_dummy_history: [3]obj.SchemeObject = @splat(obj.sharp_f);
-pub export var history_register: [*]obj.SchemeObject = (&mock_dummy_history).ptr;
-pub export var prev_restore_history_offset: c_ulong = 0;
 pub var mock_apply_compiled_calls: usize = 0;
 pub var mock_last_compiled_nargs: c_ulong = 0;
 pub var mock_last_compiled_proc: obj.SchemeObject = obj.sharp_f;
@@ -51,6 +49,13 @@ pub var mock_last_marker_thunk: obj.SchemeObject = obj.sharp_f;
 pub var mock_int_mask_calls: usize = 0;
 pub var mock_last_compiled_mask: c_ulong = 0;
 pub var mock_last_compiled_new_mask: c_ulong = 0;
+pub export var ERROR_OUTPUT: abi.OutfChannel = .{ .type = 1, .cookie = null };
+pub export var FATAL_OUTPUT: abi.OutfChannel = .{ .type = 2, .cookie = null };
+pub var mock_cc_entry_bad: bool = false;
+pub var mock_cc_entry_type: abi.CcEntryType = .{
+    .marker = .procedure,
+    .args = .{ .for_procedure = .{ .n_required = 0, .n_optional = 0, .rest_p = false } },
+};
 pub export var MAX_STATIC_PRIMITIVE: c_long = 1;
 pub export var Static_Primitive_Procedure_Table = [_]abi.PrimitiveProcedure{ &mockDummyPrim, &mockDummyPrim };
 pub export var Static_Primitive_Arity_Table = [_]c_int{ 1, 2 };
@@ -77,9 +82,14 @@ pub fn resetMockRuntime() void {
     mock_lookup_value = obj.sharp_f;
     mock_define_calls = 0;
     mock_link_calls = 0;
-    mock_dummy_history = @splat(obj.sharp_f);
-    history_register = (&mock_dummy_history).ptr;
-    prev_restore_history_offset = 0;
+    utils.history_register = null;
+    utils.prev_restore_history_offset = 0;
+    utils.death_blow = 0;
+    mock_cc_entry_bad = false;
+    mock_cc_entry_type = .{
+        .marker = .procedure,
+        .args = .{ .for_procedure = .{ .n_required = 0, .n_optional = 0, .rest_p = false } },
+    };
     mock_apply_compiled_calls = 0;
     mock_last_compiled_nargs = 0;
     mock_last_compiled_proc = obj.sharp_f;
@@ -165,31 +175,31 @@ fn mockPrintOneContinuationFrame(_: obj.SchemeObject) callconv(.c) bool {
     return true;
 }
 
-pub export fn error_wrong_type_arg(_: c_int) callconv(.c) noreturn {
-    @panic("mock error_wrong_type_arg");
-}
-
-pub export fn error_bad_range_arg(_: c_int) callconv(.c) noreturn {
-    @panic("mock error_bad_range_arg");
-}
-
-pub export fn error_external_return() callconv(.c) noreturn {
-    @panic("mock error_external_return");
-}
-
-pub export fn signal_error_from_primitive(_: c_long) callconv(.c) noreturn {
-    @panic("mock signal_error_from_primitive");
-}
-
-pub export fn signal_interrupt_from_primitive() callconv(.c) noreturn {
-    @panic("mock signal_interrupt_from_primitive");
-}
-
 pub export fn Microcode_Termination(_: c_int) callconv(.c) noreturn {
     @panic("mock Microcode_Termination");
 }
 
-pub export fn record_primitive_entry(_: obj.SchemeObject) callconv(.c) void {}
+pub export fn termination_no_error_handler() callconv(.c) noreturn {
+    @panic("mock termination_no_error_handler");
+}
+
+pub export fn OS_error_code_to_syserr(code: c_int) callconv(.c) c_int {
+    return code;
+}
+
+pub export fn guarantee_interp_return() callconv(.c) void {}
+
+comptime {
+    if (@import("build_options").cc_support) {
+        @export(&mockReadCcEntryType, .{ .name = "read_cc_entry_type" });
+    }
+}
+
+fn mockReadCcEntryType(cet: *abi.CcEntryType, _: ?*anyopaque) callconv(.c) bool {
+    if (mock_cc_entry_bad) return true;
+    cet.* = mock_cc_entry_type;
+    return false;
+}
 
 pub export fn gc_type_code(tc: c_uint) callconv(.c) c_int {
     return switch (@as(c_ulong, tc)) {
@@ -225,77 +235,6 @@ pub export fn gc_ptr_type(o: obj.SchemeObject) callconv(.c) c_int {
     return @intFromEnum(abi.GcPtrType.not);
 }
 
-pub export fn hashable_object_p(o: obj.SchemeObject) callconv(.c) bool {
-    return obj.objectType(o) != obj.tc_reference_trap;
-}
-
-pub export fn hash_object(o: obj.SchemeObject) callconv(.c) u32 {
-    return @truncate(o *% 2654435761);
-}
-
-pub export fn combine_hashes(h1: u32, h2: u32) callconv(.c) u32 {
-    return (h1 *% 33) ^ h2;
-}
-
-pub export fn arg_integer(n: c_int) callconv(.c) c_long {
-    const val = abi.argRef(@intCast(n));
-    if (!obj.fixnumP(val)) error_wrong_type_arg(n);
-    return obj.fixnumToLong(val);
-}
-
-pub export fn arg_nonnegative_integer(n: c_int) callconv(.c) c_long {
-    const val = arg_integer(n);
-    if (val < 0) error_bad_range_arg(n);
-    return val;
-}
-
-pub export fn arg_index_integer(n: c_int, upper_limit: c_long) callconv(.c) c_long {
-    const val = arg_nonnegative_integer(n);
-    if (val >= upper_limit) error_bad_range_arg(n);
-    return val;
-}
-
-pub export fn arg_ulong_integer(n: c_int) callconv(.c) c_ulong {
-    const val = abi.argRef(@intCast(n));
-    if (!obj.fixnumP(val)) error_wrong_type_arg(n);
-    if (!obj.fixnumToUlongP(val)) error_bad_range_arg(n);
-    return obj.fixnumToUlong(val);
-}
-
-pub export fn arg_ulong_index_integer(n: c_int, upper_limit: c_ulong) callconv(.c) c_ulong {
-    const val = arg_ulong_integer(n);
-    if (val >= upper_limit) error_bad_range_arg(n);
-    return val;
-}
-
-pub export fn memory_hash(length: c_ulong, vp: ?*const anyopaque) callconv(.c) u32 {
-    var result: u32 = 2166136261;
-    if (length == 0) return result;
-    const bytes: [*]const u8 = @ptrCast(vp.?);
-    var i: usize = 0;
-    while (i < @as(usize, @intCast(length))) : (i += 1) {
-        result ^= @as(u32, bytes[i]);
-        result *%= 16777619;
-    }
-    return result;
-}
-
-pub export fn arg_integer_in_range(n: c_int, lower_limit: c_long, upper_limit: c_long) callconv(.c) c_long {
-    const val = abi.argRef(@intCast(n));
-    if (!obj.fixnumP(val)) error_wrong_type_arg(n);
-    const num = obj.fixnumToLong(val);
-    if (num < lower_limit or num >= upper_limit) error_bad_range_arg(n);
-    return num;
-}
-
-pub export fn arg_index_integer_to_intmax(n: c_int, upper_limit: i64) callconv(.c) i64 {
-    const val = abi.argRef(@intCast(n));
-    if (!obj.fixnumP(val)) error_wrong_type_arg(n);
-    const num: i64 = @intCast(obj.fixnumToLong(val));
-    if (num < 0 or num >= upper_limit) error_bad_range_arg(n);
-    return num;
-}
-
 pub export fn get_object_address(o: obj.SchemeObject) callconv(.c) ?[*]obj.SchemeObject {
     return if (gc_ptr_type(o) == @intFromEnum(abi.GcPtrType.normal)) obj.objectAddress(o) else null;
 }
@@ -318,8 +257,6 @@ pub export fn OS_get_entropy(buf: *[32]u8) callconv(.c) void {
     }
 }
 
-pub export fn canonicalize_primitive_context() callconv(.c) void {}
-
 pub export fn abort_to_interpreter(_: c_long) callconv(.c) noreturn {
     @panic("mock abort_to_interpreter");
 }
@@ -330,10 +267,6 @@ pub export fn stack_death(_: [*:0]const u8) callconv(.c) noreturn {
 
 pub export fn termination_init_error() callconv(.c) noreturn {
     @panic("mock termination_init_error");
-}
-
-pub export fn error_in_system_call(_: c_int, _: c_int) callconv(.c) noreturn {
-    @panic("mock error_in_system_call");
 }
 
 pub export fn termination_normal(_: c_int) callconv(.c) noreturn {
@@ -432,21 +365,7 @@ pub export fn OS_syserr_names(len_out: *c_ulong, names_out: *[*]?[*:0]const u8) 
     names_out.* = &mock_syserr_names_arr;
 }
 
-pub export fn initialize_interrupt_handler_vector() callconv(.c) obj.SchemeObject {
-    return abi.make_vector(16, obj.sharp_f, false);
-}
-
-pub export fn make_dummy_history() callconv(.c) [*]obj.SchemeObject {
-    return (&mock_dummy_history).ptr;
-}
-
-pub export fn save_history(_: c_ulong) callconv(.c) void {}
-
-pub export fn stop_history() callconv(.c) void {}
-
-pub export fn preserve_interrupt_mask() callconv(.c) void {}
-
-pub export fn back_out_of_primitive() callconv(.c) void {}
+var mock_std_gc_table_sentinel: u8 = 0;
 
 comptime {
     if (@import("build_options").cc_support) {
@@ -472,12 +391,6 @@ fn mockCompiledWithInterruptMask(old_mask: c_ulong, _: obj.SchemeObject, new_mas
     mock_last_compiled_mask = old_mask;
     mock_last_compiled_new_mask = new_mask;
 }
-
-pub export fn initialize_interrupt_mask_vector() callconv(.c) obj.SchemeObject {
-    return abi.make_vector(16, obj.ulongToFixnum(0), false);
-}
-
-var mock_std_gc_table_sentinel: u8 = 0;
 
 pub export fn open_tospace(start: [*]obj.SchemeObject) callconv(.c) void {
     mock_tospace_ptr = start;

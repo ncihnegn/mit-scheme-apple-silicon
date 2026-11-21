@@ -43,7 +43,7 @@ pub export var n_ephemerons_requested: c_ulong = 0;
 pub export var ephemeron_request_hard_p: bool = false;
 
 var registers_storage: [14]obj.SchemeObject = @splat(0);
-var memory_base_storage: ?[*]obj.SchemeObject = null;
+pub var memory_base_storage: ?[*]obj.SchemeObject = null;
 
 var eval_debug: bool = false;
 var hex_input_debug: bool = false;
@@ -54,19 +54,19 @@ var cont_debug: bool = false;
 var primitive_debug: bool = false;
 var lookup_debug: bool = false;
 var define_debug: bool = false;
-var gc_debug: bool = false;
+pub var gc_debug: bool = false;
 var upgrade_debug: bool = false;
 var dump_debug: bool = false;
-var trace_on_error: bool = false;
+pub var trace_on_error: bool = false;
 var per_file: bool = false;
 var bignum_debug: bool = false;
-var print_errors: bool = true;
-var debug_slotno_storage: c_uint = 0;
-var debug_nslots_storage: c_uint = 0;
-var local_slotno_storage: c_uint = 0;
-var local_nslots_storage: c_uint = 0;
-var debug_circle_storage: [100]c_uint = @splat(0);
-var local_circle_storage: [100]c_uint = @splat(0);
+pub var print_errors: bool = true;
+pub var debug_slotno_storage: c_uint = 0;
+pub var debug_nslots_storage: c_uint = 0;
+pub var local_slotno_storage: c_uint = 0;
+pub var local_nslots_storage: c_uint = 0;
+pub var debug_circle_storage: [100]c_uint = @splat(0);
+pub var local_circle_storage: [100]c_uint = @splat(0);
 
 comptime {
     if (!build_options.cc_support) {

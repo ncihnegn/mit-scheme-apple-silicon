@@ -77,7 +77,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/option.c",
     "src/microcode/outf.c",
     "src/microcode/term.c",
-    "src/microcode/utils.c",
     "src/microcode/prosenv.c",
     "src/microcode/prosfile.c",
     "src/microcode/prosfs.c",
