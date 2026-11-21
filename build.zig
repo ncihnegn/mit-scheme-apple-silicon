@@ -69,7 +69,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/boot.c",
     "src/microcode/debug.c",
     "src/microcode/error.c",
-    "src/microcode/extern.c",
     "src/microcode/fasdump.c",
     "src/microcode/fasl.c",
     "src/microcode/fasload.c",
@@ -89,7 +88,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/purutl.c",
     "src/microcode/returns.c",
     "src/microcode/storage.c",
-    "src/microcode/sysprim.c",
     "src/microcode/term.c",
     "src/microcode/utabmd.c",
     "src/microcode/utils.c",
@@ -130,6 +128,7 @@ const zig_prim_sources = [_][]const u8{
     "src/microcode/zig/char.zig",
     "src/microcode/zig/daemon.zig",
     "src/microcode/zig/dfloat.zig",
+    "src/microcode/zig/extern_prim.zig",
     "src/microcode/zig/fixnum.zig",
     "src/microcode/zig/floenv.zig",
     "src/microcode/zig/flonum.zig",
@@ -146,6 +145,7 @@ const zig_prim_sources = [_][]const u8{
     "src/microcode/zig/step.zig",
     "src/microcode/zig/string.zig",
     "src/microcode/zig/syntax.zig",
+    "src/microcode/zig/sysprim.zig",
     "src/microcode/zig/vector.zig",
 };
 

@@ -43,6 +43,8 @@ pub const rgxprim = @import("rgxprim.zig");
 pub const bkpt = @import("bkpt.zig");
 pub const daemon = @import("daemon.zig");
 pub const step = @import("step.zig");
+pub const extern_prim = @import("extern_prim.zig");
+pub const sysprim = @import("sysprim.zig");
 
 comptime {
     _ = chacha;
@@ -86,6 +88,8 @@ comptime {
     _ = bkpt;
     _ = daemon;
     _ = step;
+    _ = extern_prim;
+    _ = sysprim;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -136,4 +140,6 @@ test "microcode zig scaffold" {
     _ = bkpt;
     _ = daemon;
     _ = step;
+    _ = extern_prim;
+    _ = sysprim;
 }

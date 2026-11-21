@@ -6,9 +6,15 @@ pub var signal_block_depth: i32 = 0;
 pub var fatal_count: usize = 0;
 pub var last_closed_channel: ?c_uint = null;
 pub var printed_continuation_count: usize = 0;
+pub var mock_trap_state: c_int = 4;
+pub var mock_under_emacs: c_int = 0;
 
 var mock_heap: [8192]obj.SchemeObject = @splat(0);
 var mock_stack: [128]obj.SchemeObject = @splat(0);
+var mock_const: [64]obj.SchemeObject = @splat(0);
+var mock_prim_arities = [_]c_int{ 1, 2, -1 };
+var mock_prim_names = [_][*:0]const u8{ "CAR", "CDR", "LIST" };
+var mock_prim_docs = [_]?[*:0]const u8{ "Returns car", null, null };
 
 pub export var Registers: [14]obj.SchemeObject = @splat(0);
 pub export var Free: [*]obj.SchemeObject = (&mock_heap).ptr;
@@ -20,18 +26,29 @@ pub export var stack_pointer: [*]obj.SchemeObject = (&mock_stack).ptr + mock_sta
 pub export var stack_guard: [*]obj.SchemeObject = (&mock_stack).ptr + 8;
 pub export var stack_start: [*]obj.SchemeObject = (&mock_stack).ptr;
 pub export var stack_end: [*]obj.SchemeObject = (&mock_stack).ptr + mock_stack.len;
+pub export var constant_start: [*]obj.SchemeObject = (&mock_const).ptr;
+pub export var constant_alloc_next: [*]obj.SchemeObject = (&mock_const).ptr;
+pub export var constant_end: [*]obj.SchemeObject = (&mock_const).ptr + mock_const.len;
 pub export var memory_block_start: [*]obj.SchemeObject = (&mock_heap).ptr;
 pub export var fixed_objects: obj.SchemeObject = obj.sharp_f;
 pub export var gc_space_needed: c_ulong = 0;
 pub export var trapping: bool = false;
+pub export var scheme_program_name: [*:0]const u8 = "mit-scheme-unit";
+pub export var MAX_PRIMITIVE: c_ulong = 2;
+pub export var Primitive_Arity_Table: [*]c_int = (&mock_prim_arities).ptr;
+pub export var Primitive_Name_Table: [*][*:0]const u8 = (&mock_prim_names).ptr;
+pub export var Primitive_Documentation_Table: [*]?[*:0]const u8 = (&mock_prim_docs).ptr;
 
 pub fn resetMockRuntime() void {
     signal_block_depth = 0;
     fatal_count = 0;
     last_closed_channel = null;
     printed_continuation_count = 0;
+    mock_trap_state = 4;
+    mock_under_emacs = 0;
     mock_heap = @splat(0);
     mock_stack = @splat(0);
+    mock_const = @splat(0);
     Registers = @splat(0);
     heap_start = (&mock_heap).ptr;
     heap_end = (&mock_heap).ptr + mock_heap.len;
@@ -44,9 +61,16 @@ pub fn resetMockRuntime() void {
     stack_start[0] = obj.makeBrokenHeart(stack_start);
     stack_guard = stack_start + 8;
     stack_pointer = stack_end;
+    constant_start = (&mock_const).ptr;
+    constant_alloc_next = (&mock_const).ptr;
+    constant_end = (&mock_const).ptr + mock_const.len;
     fixed_objects = obj.sharp_f;
     gc_space_needed = 0;
     trapping = false;
+    MAX_PRIMITIVE = 2;
+    Primitive_Arity_Table = (&mock_prim_arities).ptr;
+    Primitive_Name_Table = (&mock_prim_names).ptr;
+    Primitive_Documentation_Table = (&mock_prim_docs).ptr;
 }
 
 pub fn setArgs(args: []const obj.SchemeObject) void {
@@ -242,4 +266,50 @@ pub export fn abort_to_interpreter(_: c_long) callconv(.c) noreturn {
 
 pub export fn stack_death(_: [*:0]const u8) callconv(.c) noreturn {
     @panic("mock stack_death");
+}
+
+pub export fn find_primitive(sname: obj.SchemeObject, _: bool, _: bool, _: c_int) callconv(.c) obj.SchemeObject {
+    const ptr: [*:0]const u8 = @ptrCast(obj.legacyStringData(sname));
+    for (0..@as(usize, @intCast(MAX_PRIMITIVE))) |i| {
+        if (strcmp_ci(ptr, Primitive_Name_Table[i]) == 0) {
+            return obj.makePrimitiveObject(@intCast(i));
+        }
+    }
+    return obj.sharp_f;
+}
+
+pub export fn termination_normal(_: c_int) callconv(.c) noreturn {
+    @panic("mock termination_normal");
+}
+
+pub export fn OS_restartable_exit() callconv(.c) void {}
+
+pub export fn OS_under_emacs_p() callconv(.c) c_int {
+    return mock_under_emacs;
+}
+
+pub export fn OS_set_trap_state(state: c_int) callconv(.c) c_int {
+    const old = mock_trap_state;
+    mock_trap_state = state;
+    return old;
+}
+
+pub export fn cc_block_linkage_info(block: obj.SchemeObject) callconv(.c) obj.SchemeObject {
+    return block;
+}
+
+pub export fn return_address_p(o: obj.SchemeObject) callconv(.c) bool {
+    return obj.returnCodeP(o);
+}
+
+pub export fn cpoint_next_frame(_: obj.SchemeObject, idx: c_ulong) callconv(.c) c_ulong {
+    return idx + 1;
+}
+
+pub export fn return_frame_type(_: [*]obj.SchemeObject) callconv(.c) c_int {
+    return 1;
+}
+
+pub export fn return_code_frame_type(_: obj.SchemeObject) callconv(.c) c_int {
+    return 2;
 }

@@ -29,6 +29,7 @@ pub const tc_false: c_ulong = 0x00;
 pub const tc_pair: c_ulong = 0x01;
 pub const tc_list: c_ulong = tc_pair;
 pub const tc_character: c_ulong = 0x02;
+pub const tc_compiled_return: c_ulong = 0x04;
 pub const tc_uninterned_symbol: c_ulong = 0x05;
 pub const tc_big_flonum: c_ulong = 0x06;
 pub const tc_constant: c_ulong = 0x08;
@@ -39,6 +40,7 @@ pub const tc_non_marked_vector: c_ulong = 0x16;
 pub const tc_primitive: c_ulong = 0x18;
 pub const tc_fixnum: c_ulong = 0x1A;
 pub const tc_unicode_string: c_ulong = 0x1B;
+pub const tc_control_point: c_ulong = 0x1C;
 pub const tc_interned_symbol: c_ulong = 0x1D;
 pub const tc_character_string: c_ulong = 0x1E;
 pub const tc_hunk3_a: c_ulong = 0x20;
@@ -54,6 +56,7 @@ pub const tc_bytevector: c_ulong = 0x33;
 pub const tc_cell: c_ulong = 0x36;
 pub const tc_weak_cons: c_ulong = 0x37;
 pub const tc_quad: c_ulong = 0x38;
+pub const tc_compiled_code_block: c_ulong = 0x3D;
 pub const tc_record: c_ulong = 0x3E;
 
 pub const tc_manifest_vector: c_ulong = tc_false;
@@ -164,6 +167,18 @@ pub inline fn makeBrokenHeart(addr: [*]const SchemeObject) SchemeObject {
     return makePointerObject(tc_broken_heart, addr);
 }
 
+pub inline fn makePrimitiveObject(index: c_ulong) SchemeObject {
+    return makeObject(tc_primitive, index);
+}
+
+pub inline fn primitiveNumber(prim: SchemeObject) c_ulong {
+    return objectDatum(prim);
+}
+
+pub inline fn makeReturnCode(n: c_ulong) SchemeObject {
+    return makeObject(tc_return_code, n);
+}
+
 pub inline fn pairP(obj: SchemeObject) bool {
     return objectType(obj) == tc_list;
 }
@@ -211,6 +226,22 @@ pub inline fn legacyStringP(obj: SchemeObject) bool {
 
 pub inline fn unicodeStringP(obj: SchemeObject) bool {
     return objectType(obj) == tc_unicode_string;
+}
+
+pub inline fn controlPointP(obj: SchemeObject) bool {
+    return objectType(obj) == tc_control_point;
+}
+
+pub inline fn ccBlockP(obj: SchemeObject) bool {
+    return objectType(obj) == tc_compiled_code_block;
+}
+
+pub inline fn returnCodeP(obj: SchemeObject) bool {
+    return objectType(obj) == tc_return_code;
+}
+
+pub inline fn primitiveP(obj: SchemeObject) bool {
+    return objectType(obj) == tc_primitive;
 }
 
 pub inline fn ustringBytesPerCp(obj: SchemeObject) c_ulong {
