@@ -1,7 +1,7 @@
 pub const transact = @import("transact.zig");
-pub const jit = @import("jit.zig");
+pub const code_arena = @import("code_arena.zig");
 
 comptime {
     _ = transact;
-    _ = jit;
+    _ = code_arena;
 }

@@ -74,7 +74,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/boot.c",
     "src/microcode/bytevector.c",
     "src/microcode/char.c",
-    "src/microcode/code_arena.c",
     "src/microcode/daemon.c",
     "src/microcode/debug.c",
     "src/microcode/dfloat.c",
@@ -815,18 +814,14 @@ pub fn build(b: *std.Build) void {
         .{
             .name = "jit-smoke",
             .src = "tests/microcode/jit-smoke.c",
-            .deps = &.{
-                "src/microcode/code_arena.c",
-            },
+            .deps = &.{},
             .needs_cmpintmd = true,
             .needs_native = false,
         },
         .{
             .name = "arena-smoke",
             .src = "tests/microcode/arena-smoke.c",
-            .deps = &.{
-                "src/microcode/code_arena.c",
-            },
+            .deps = &.{},
             .needs_cmpintmd = false,
             .needs_native = false,
         },
@@ -835,7 +830,6 @@ pub fn build(b: *std.Build) void {
             .src = "tests/microcode/gc-arena-smoke.c",
             .deps = &.{
                 "src/microcode/gcloop.c",
-                "src/microcode/code_arena.c",
             },
             .needs_cmpintmd = true,
             .needs_native = false,
@@ -846,7 +840,6 @@ pub fn build(b: *std.Build) void {
             .deps = &.{
                 "src/microcode/fasl.c",
                 "src/microcode/gcloop.c",
-                "src/microcode/code_arena.c",
             },
             .needs_cmpintmd = true,
             .needs_native = false,
@@ -857,7 +850,6 @@ pub fn build(b: *std.Build) void {
             .deps = &.{
                 "src/microcode/cmpint.c",
                 "src/microcode/gcloop.c",
-                "src/microcode/code_arena.c",
             },
             .needs_cmpintmd = true,
             .needs_native = true,

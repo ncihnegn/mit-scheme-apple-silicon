@@ -10,6 +10,8 @@ pub const transact = @import("transact.zig");
 pub const ptrvec = @import("ptrvec.zig");
 pub const avltree = @import("avltree.zig");
 pub const jit = @import("jit.zig");
+pub const scheme_obj = @import("scheme_obj.zig");
+pub const code_arena = @import("code_arena.zig");
 
 comptime {
     _ = chacha;
@@ -21,6 +23,7 @@ comptime {
     _ = ptrvec;
     _ = avltree;
     _ = jit;
+    _ = code_arena;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -38,4 +41,6 @@ test "microcode zig scaffold" {
     _ = ptrvec;
     _ = avltree;
     _ = jit;
+    _ = scheme_obj;
+    _ = code_arena;
 }
