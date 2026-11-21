@@ -13,6 +13,8 @@ pub const regblock_expr: usize = 5;
 pub const regblock_return: usize = 6;
 pub const regblock_lexpr_actuals: usize = 7;
 pub const regblock_primitive: usize = 8;
+pub const regblock_closure_free: usize = 9;
+pub const regblock_closure_space: usize = 10;
 pub const regblock_stack_guard: usize = 11;
 pub const regblock_int_code: usize = 12;
 
@@ -26,6 +28,7 @@ pub const int_mask: c_ulong = (@as(c_ulong, 1) << 16) - 1;
 pub const max_interrupt_number: c_ulong = 0xF;
 
 pub const term_bad_stack: c_int = 0x06;
+pub const term_stack_overflow: c_int = 0x07;
 pub const term_no_interrupt_handler: c_int = 0x0A;
 pub const term_exit: c_int = 0x0C;
 pub const term_no_space: c_int = 0x15;
@@ -102,6 +105,10 @@ pub const rib_env: usize = 1;
 pub const rib_next_reduction: usize = 2;
 pub const rib_mark: usize = 2;
 pub const constant_space_fudge: c_ulong = 128;
+pub const default_heap_reserved: c_ulong = 4500;
+pub const stack_guard_size: c_ulong = 4096;
+pub const ephemeron_size: c_ulong = 5;
+pub const marked_ephemeron_manifest: obj.SchemeObject = obj.makeVectorHeader(ephemeron_size - 1);
 pub const cont_size: usize = 2;
 pub const env_cont_size: usize = cont_size + 1;
 pub const history_cont_size: usize = cont_size + 2;
@@ -359,8 +366,28 @@ pub extern "c" fn compiled_with_interrupt_mask(c_ulong, obj.SchemeObject, c_ulon
 pub extern "c" fn termination_no_error_handler() noreturn;
 pub extern "c" fn OS_error_code_to_syserr(c_int) c_int;
 pub extern "c" fn guarantee_interp_return() void;
+pub extern "c" fn update_weak_pointers() void;
 pub extern "c" fn read_cc_entry_type(*CcEntryType, ?*anyopaque) bool;
 pub extern "c" fn record_applicator(obj.SchemeObject) obj.SchemeObject;
+
+pub const GcTospaceAllocator = *const fn (c_ulong, *?[*]obj.SchemeObject, *?[*]obj.SchemeObject) callconv(.c) void;
+pub const GcAbortHandler = *const fn () callconv(.c) noreturn;
+pub const GcWalkProc = *const fn ([*]obj.SchemeObject, [*]obj.SchemeObject, ?*anyopaque) callconv(.c) bool;
+
+pub extern var compiler_utilities: obj.SchemeObject;
+pub extern "c" fn OS_malloc_init(usize) ?*anyopaque;
+pub extern "c" fn outf_flush_fatal() void;
+pub extern "c" fn initialize_gc(c_ulong, *?[*]obj.SchemeObject, *?[*]obj.SchemeObject, GcTospaceAllocator, GcAbortHandler) void;
+pub extern "c" fn save_tospace(GcWalkProc, ?*anyopaque) bool;
+pub extern "c" fn tospace_to_newspace(?*anyopaque) ?*anyopaque;
+pub extern "c" fn gc_scan_oldspace([*]obj.SchemeObject, [*]obj.SchemeObject) void;
+pub extern "c" fn gc_drain_tospace_and_code_arena([*]obj.SchemeObject) void;
+pub extern "c" fn aarch64_flush_i_cache() void;
+pub extern "c" fn debug_verify_heap() void;
+pub extern "c" fn std_gc_death([*:0]const u8, ...) noreturn;
+pub extern "c" fn initialize_gc_object_references() void;
+pub extern "c" fn finalize_gc_object_references() void;
+pub extern "c" fn collect_gc_object_references(obj.SchemeObject, obj.SchemeObject) void;
 
 pub extern "c" fn arg_integer(c_int) c_long;
 pub extern "c" fn arg_nonnegative_integer(c_int) c_long;
@@ -771,4 +798,21 @@ pub inline fn spaceBeforeGc() c_ulong {
 
 pub inline fn historyUnmark(slot: *obj.SchemeObject) void {
     slot.* &= ~obj.history_mark_mask;
+}
+
+pub inline fn resetHeapAllocLimit() void {
+    heap_alloc_limit = heap_end - @as(usize, @intCast(heap_reserved));
+    compilerSetupInterrupt();
+}
+
+pub inline fn setStackLimits(start: [*]obj.SchemeObject, size: c_ulong) void {
+    stack_start = start;
+    stack_end = start + @as(usize, @intCast(size));
+}
+
+pub inline fn initializeStack() void {
+    stack_pointer = stack_end;
+    stack_start[0] = obj.makeBrokenHeart(stack_start);
+    stack_guard = stack_start + @as(usize, @intCast(stack_guard_size));
+    compilerSetupInterrupt();
 }

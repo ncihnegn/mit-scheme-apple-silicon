@@ -56,6 +56,7 @@ pub const tc_tagged_object: c_ulong = 0x25;
 pub const tc_combination: c_ulong = 0x26;
 pub const tc_manifest_nm_vector: c_ulong = 0x27;
 pub const tc_compiled_entry: c_ulong = 0x28;
+pub const tc_ephemeron: c_ulong = 0x2B;
 pub const tc_vector_1b: c_ulong = 0x2F;
 pub const tc_bit_string: c_ulong = tc_vector_1b;
 pub const tc_reference_trap: c_ulong = 0x32;

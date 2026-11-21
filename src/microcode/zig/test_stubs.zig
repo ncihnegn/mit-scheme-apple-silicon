@@ -1,6 +1,9 @@
 const std = @import("std");
+const builtin = @import("builtin");
+const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const storage = @import("storage.zig");
 const utils = @import("utils.zig");
 
 pub var signal_block_depth: i32 = 0;
@@ -34,8 +37,10 @@ pub export var critical_section_name: ?[*:0]const u8 = null;
 pub export var current_gc_table: ?*anyopaque = null;
 pub export var compiler_utilities: obj.SchemeObject = obj.sharp_f;
 pub var mock_tospace_ptr: ?[*]obj.SchemeObject = null;
-pub var mock_gc_pt1_calls: usize = 0;
-pub var mock_gc_pt2_calls: usize = 0;
+pub var mock_gc_drain_calls: usize = 0;
+pub var mock_save_tospace_calls: usize = 0;
+pub var mock_update_weak_calls: usize = 0;
+pub var mock_icache_flush_calls: usize = 0;
 pub var mock_resize_tospace_arg: c_ulong = 0;
 pub var mock_lookup_result: c_long = abi.prim_done;
 pub var mock_lookup_value: obj.SchemeObject = obj.sharp_f;
@@ -75,9 +80,17 @@ pub fn resetMockRuntime() void {
     current_gc_table = null;
     compiler_utilities = obj.sharp_f;
     mock_tospace_ptr = null;
-    mock_gc_pt1_calls = 0;
-    mock_gc_pt2_calls = 0;
+    mock_gc_drain_calls = 0;
+    mock_save_tospace_calls = 0;
+    mock_update_weak_calls = 0;
+    mock_icache_flush_calls = 0;
     mock_resize_tospace_arg = 0;
+    storage.memory_block_end = null;
+    storage.heap_reserved = 0;
+    storage.ephemeron_array = obj.sharp_f;
+    storage.ephemeron_count = 0;
+    storage.n_ephemerons_requested = 0;
+    storage.ephemeron_request_hard_p = false;
     mock_lookup_result = abi.prim_done;
     mock_lookup_value = obj.sharp_f;
     mock_define_calls = 0;
@@ -207,6 +220,7 @@ pub export fn gc_type_code(tc: c_uint) callconv(.c) c_int {
         obj.tc_hunk3_a, obj.tc_hunk3_b => @intFromEnum(abi.GcType.triple),
         obj.tc_vector,
         obj.tc_record,
+        obj.tc_ephemeron,
         obj.tc_big_fixnum,
         obj.tc_bytevector,
         obj.tc_big_flonum,
@@ -261,8 +275,8 @@ pub export fn abort_to_interpreter(_: c_long) callconv(.c) noreturn {
     @panic("mock abort_to_interpreter");
 }
 
-pub export fn stack_death(_: [*:0]const u8) callconv(.c) noreturn {
-    @panic("mock stack_death");
+pub export fn OS_malloc_init(size: usize) callconv(.c) ?*anyopaque {
+    return std.c.malloc(if (size == 0) 1 else size);
 }
 
 pub export fn termination_init_error() callconv(.c) noreturn {
@@ -417,13 +431,59 @@ pub export fn increment_tospace_ptr(n: c_ulong) callconv(.c) void {
     mock_tospace_ptr = mock_tospace_ptr.? + @as(usize, @intCast(n));
 }
 
-pub export fn std_gc_pt1() callconv(.c) void {
-    mock_gc_pt1_calls += 1;
+pub export fn initialize_gc(
+    _: c_ulong,
+    _: *?[*]obj.SchemeObject,
+    _: *?[*]obj.SchemeObject,
+    _: abi.GcTospaceAllocator,
+    _: abi.GcAbortHandler,
+) callconv(.c) void {}
+
+pub export fn save_tospace(_: abi.GcWalkProc, _: ?*anyopaque) callconv(.c) bool {
+    mock_save_tospace_calls += 1;
+    return true;
 }
 
-pub export fn std_gc_pt2() callconv(.c) void {
-    mock_gc_pt2_calls += 1;
+pub export fn tospace_to_newspace(ptr: ?*anyopaque) callconv(.c) ?*anyopaque {
+    return ptr;
 }
+
+pub export fn gc_scan_oldspace(_: [*]obj.SchemeObject, _: [*]obj.SchemeObject) callconv(.c) void {}
+
+pub export fn gc_drain_tospace_and_code_arena(_: [*]obj.SchemeObject) callconv(.c) void {
+    mock_gc_drain_calls += 1;
+}
+
+pub export fn update_weak_pointers() callconv(.c) void {
+    mock_update_weak_calls += 1;
+}
+
+comptime {
+    if (build_options.cc_is_native and builtin.cpu.arch == .aarch64) {
+        @export(&mockAarch64FlushICache, .{ .name = "aarch64_flush_i_cache" });
+    }
+    if (build_options.debugging) {
+        @export(&mockDebugVerifyHeap, .{ .name = "debug_verify_heap" });
+        @export(&mockStdGcDeath, .{ .name = "std_gc_death" });
+        @export(&mockInitGcObjRefs, .{ .name = "initialize_gc_object_references" });
+        @export(&mockFinalizeGcObjRefs, .{ .name = "finalize_gc_object_references" });
+        @export(&mockCollectGcObjRefs, .{ .name = "collect_gc_object_references" });
+    }
+}
+
+fn mockAarch64FlushICache() callconv(.c) void {
+    mock_icache_flush_calls += 1;
+}
+
+fn mockDebugVerifyHeap() callconv(.c) void {}
+
+fn mockStdGcDeath(_: [*:0]const u8, ...) callconv(.c) noreturn {
+    @panic("mock std_gc_death");
+}
+
+fn mockInitGcObjRefs() callconv(.c) void {}
+fn mockFinalizeGcObjRefs() callconv(.c) void {}
+fn mockCollectGcObjRefs(_: obj.SchemeObject, _: obj.SchemeObject) callconv(.c) void {}
 
 pub export fn resize_tospace(size: c_ulong) callconv(.c) void {
     mock_resize_tospace_arg = size;
