@@ -84,6 +84,7 @@ pub const pruxfs = @import("pruxfs.zig");
 pub const pruxio = @import("pruxio.zig");
 pub const pruxsock = @import("pruxsock.zig");
 pub const ux = @import("ux.zig");
+pub const uxctty = @import("uxctty.zig");
 pub const uxentropy = @import("uxentropy.zig");
 pub const uxenv = @import("uxenv.zig");
 pub const uxfile = @import("uxfile.zig");
@@ -175,6 +176,7 @@ comptime {
     _ = pruxio;
     _ = pruxsock;
     _ = ux;
+    _ = uxctty;
     _ = uxentropy;
     _ = uxenv;
     _ = uxfile;
@@ -275,6 +277,7 @@ test "microcode zig scaffold" {
     _ = pruxio;
     _ = pruxsock;
     _ = ux;
+    _ = uxctty;
     _ = uxentropy;
     _ = uxenv;
     _ = uxfile;

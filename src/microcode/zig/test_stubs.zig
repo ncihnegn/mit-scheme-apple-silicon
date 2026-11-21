@@ -90,6 +90,9 @@ pub var mock_terminal_open_calls: usize = 0;
 pub var mock_tty_get_calls: usize = 0;
 pub var mock_tty_set_calls: usize = 0;
 pub var mock_tty_raw_calls: usize = 0;
+pub var mock_sig_quit_handler: c_uint = 3;
+pub var mock_sig_int_handler: c_uint = 5;
+pub var mock_sig_tstp_handler: c_uint = 4;
 pub var mock_write_var_cache_calls: usize = 0;
 pub var mock_make_uuo_link_calls: usize = 0;
 pub var mock_apply_compiled_calls: usize = 0;
@@ -197,6 +200,9 @@ pub fn resetMockRuntime() void {
     mock_tty_get_calls = 0;
     mock_tty_set_calls = 0;
     mock_tty_raw_calls = 0;
+    mock_sig_quit_handler = 3;
+    mock_sig_int_handler = 5;
+    mock_sig_tstp_handler = 4;
     storage.memory_block_end = null;
     storage.heap_reserved = 0;
     storage.ephemeron_array = obj.sharp_f;
@@ -1295,6 +1301,57 @@ pub export fn terminal_state_raw(_: *abi.TttyState, _: c_int) callconv(.c) void 
 pub export fn termination_eof() callconv(.c) noreturn {
     @panic("mock termination_eof");
 }
+pub export fn UX_PC_VDISABLE(_: c_int) callconv(.c) abi.CcT {
+    return if (builtin.os.tag.isDarwin()) 0xff else 0;
+}
+pub export fn UX_terminal_control_ok(_: c_int) callconv(.c) c_int {
+    return 1;
+}
+pub export fn OS_signal_quit_handler() callconv(.c) c_uint {
+    return mock_sig_quit_handler;
+}
+pub export fn OS_signal_int_handler() callconv(.c) c_uint {
+    return mock_sig_int_handler;
+}
+pub export fn OS_signal_tstp_handler() callconv(.c) c_uint {
+    return mock_sig_tstp_handler;
+}
+pub export fn OS_signal_set_interrupt_handlers(q: c_uint, i: c_uint, t: c_uint) callconv(.c) void {
+    mock_sig_quit_handler = q;
+    mock_sig_int_handler = i;
+    mock_sig_tstp_handler = t;
+}
+pub export fn initialize_interruptable_extent() callconv(.c) void {}
+pub export fn UX_initialize_ctty(_: c_int) callconv(.c) void {}
+pub export fn UX_initialize_channels() callconv(.c) void {}
+pub export fn UX_initialize_terminals() callconv(.c) void {}
+pub export fn UX_initialize_environment() callconv(.c) void {}
+pub export fn UX_initialize_tty() callconv(.c) void {}
+pub export fn UX_initialize_userio() callconv(.c) void {}
+pub export fn UX_initialize_signals() callconv(.c) void {}
+pub export fn UX_initialize_processes() callconv(.c) void {}
+pub export fn UX_initialize_trap_recovery() callconv(.c) void {}
+pub export fn UX_initialize_directory_reader() callconv(.c) void {}
+pub export fn UX_reset_channels() callconv(.c) void {}
+pub export fn UX_reset_terminals() callconv(.c) void {}
+pub export fn UX_reset_processes() callconv(.c) void {}
+pub export fn OS_ctty_quit_char() callconv(.c) abi.CcT {
+    return 3;
+}
+pub export fn UX_ctty_save_external_state() callconv(.c) void {}
+pub export fn UX_ctty_save_internal_state() callconv(.c) void {}
+pub export fn UX_ctty_restore_internal_state() callconv(.c) void {}
+pub export fn UX_ctty_restore_external_state() callconv(.c) void {}
+pub export fn OS_ctty_interrupt_control() callconv(.c) c_int {
+    return 0;
+}
+pub export fn char_description(_: u8, _: c_int) callconv(.c) [*:0]const u8 {
+    return "`^C'";
+}
+pub export fn userio_confirm(_: [*:0]const u8) callconv(.c) c_int {
+    return 0;
+}
+pub export fn UX_dump_core() callconv(.c) void {}
 pub export fn OS_current_user_name() callconv(.c) [*:0]const u8 {
     return "mock-user";
 }
