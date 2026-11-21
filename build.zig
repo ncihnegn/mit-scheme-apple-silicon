@@ -76,7 +76,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/fasload.c",
     "src/microcode/gcloop.c",
     "src/microcode/interp.c",
-    "src/microcode/lookup.c",
     "src/microcode/outf.c",
     "src/microcode/term.c",
     "src/microcode/prosenv.c",

@@ -205,76 +205,107 @@ pub export fn Prim_unbind_variable() callconv(.c) obj.SchemeObject {
 
 test "lookprm primitives dispatch lookup helpers and map reference codes" {
     const stubs = @import("test_stubs.zig");
-    const str = @import("string.zig");
+    const intern = @import("intern.zig");
     stubs.resetMockRuntime();
     defer stubs.resetMockRuntime();
 
-    const sym = abi.system_pair_cons(@intCast(obj.tc_uninterned_symbol), str.char_pointer_to_string("x"), obj.unbound_object);
+    const fixobj = abi.make_vector(abi.fixobj_gc_reclaimed + 1, obj.sharp_f, false);
+    obj.vectorSet(fixobj, abi.fixobj_non_object, obj.unassigned_object);
+    obj.vectorSet(fixobj, abi.fixobj_obarray, abi.make_vector(7, obj.empty_list, false));
+    abi.fixed_objects = fixobj;
+
+    const sym = intern.char_pointer_to_symbol("x");
+    const other_sym = intern.char_pointer_to_symbol("y");
     const env = obj.the_global_env;
-    const frame_env = obj.makeObject(obj.tc_environment, 0);
+
+    // Procedure frame with parameter `other_sym`
+    const names = abi.make_vector(2, obj.sharp_f, false);
+    obj.vectorSet(names, 1, other_sym);
+    const lambda = abi.cons(obj.sharp_f, names);
+    const proc_addr = abi.Free;
+    proc_addr[0] = lambda;
+    proc_addr[1] = env;
+    abi.Free = proc_addr + 2;
+    const proc = obj.makePointerObject(obj.tc_procedure, proc_addr);
+    const env_addr = abi.Free;
+    env_addr[0] = obj.makeVectorHeader(2);
+    env_addr[1] = proc;
+    env_addr[2] = obj.ulongToFixnum(55);
+    abi.Free = env_addr + 3;
+    const frame_env = obj.makePointerObject(obj.tc_environment, env_addr);
+
     try std.testing.expect(obj.environmentP(env));
     try std.testing.expect(obj.environmentP(frame_env));
     try std.testing.expect(!obj.environmentP(obj.the_null_env));
 
-    stubs.mock_lookup_result = abi.prim_done;
-    stubs.mock_lookup_value = obj.ulongToFixnum(99);
-    stubs.setArgs(&.{ env, sym });
-    try std.testing.expectEqual(obj.ulongToFixnum(99), Prim_lexical_reference());
-    stubs.setArgs(&.{ frame_env, sym });
-    try std.testing.expectEqual(obj.ulongToFixnum(99), Prim_local_reference());
-
-    stubs.setArgs(&.{ env, sym, obj.ulongToFixnum(123) });
-    try std.testing.expectEqual(obj.ulongToFixnum(99), Prim_lexical_assignment());
-    try std.testing.expectEqual(obj.ulongToFixnum(123), stubs.mock_lookup_value);
-
-    stubs.setArgs(&.{ env, sym, obj.ulongToFixnum(456) });
-    try std.testing.expectEqual(sym, Prim_local_assignment());
-    try std.testing.expectEqual(@as(usize, 1), stubs.mock_define_calls);
-    try std.testing.expectEqual(obj.ulongToFixnum(456), stubs.mock_lookup_value);
-
-    // LEXICAL-REFERENCE-TYPE mapping: 0=unbound, 1=unassigned, 2=normal, 3=macro
-    stubs.mock_lookup_result = abi.err_unbound_variable;
+    // Unbound (0)
     stubs.setArgs(&.{ env, sym });
     try std.testing.expectEqual(obj.ulongToFixnum(0), Prim_lexical_reference_type());
+    stubs.setArgs(&.{ env, sym });
+    try std.testing.expectEqual(obj.sharp_t, Prim_unbound_test());
+    stubs.setArgs(&.{ env, sym });
+    try std.testing.expectEqual(obj.sharp_t, Prim_unreferenceable_test());
 
-    stubs.mock_lookup_result = abi.err_unassigned_variable;
+    // Define & lookup in global env and procedure frame
+    stubs.setArgs(&.{ env, sym, obj.ulongToFixnum(99) });
+    try std.testing.expectEqual(sym, Prim_local_assignment());
+    stubs.setArgs(&.{ env, sym });
+    try std.testing.expectEqual(obj.ulongToFixnum(99), Prim_lexical_reference());
+    stubs.setArgs(&.{ frame_env, other_sym });
+    try std.testing.expectEqual(obj.ulongToFixnum(55), Prim_local_reference());
+
+    // Normal binding (2) & assignment returning previous value
+    stubs.setArgs(&.{ env, sym });
+    try std.testing.expectEqual(obj.ulongToFixnum(2), Prim_lexical_reference_type());
+    stubs.setArgs(&.{ env, sym });
+    try std.testing.expectEqual(obj.ulongToFixnum(99), Prim_safe_lexical_reference());
+    stubs.setArgs(&.{ env, sym, obj.ulongToFixnum(123) });
+    try std.testing.expectEqual(obj.ulongToFixnum(99), Prim_lexical_assignment());
+    stubs.setArgs(&.{ env, sym });
+    try std.testing.expectEqual(obj.ulongToFixnum(123), Prim_lexical_reference());
+
+    // Unassigned (1) via LOCAL-ASSIGNMENT with external unassigned object
+    stubs.setArgs(&.{ env, sym, obj.unassigned_object });
+    _ = Prim_local_assignment();
     stubs.setArgs(&.{ env, sym });
     try std.testing.expectEqual(obj.ulongToFixnum(1), Prim_lexical_reference_type());
     stubs.setArgs(&.{ env, sym });
     try std.testing.expectEqual(obj.unassigned_object, Prim_safe_lexical_reference());
-
-    stubs.mock_lookup_result = abi.prim_done;
-    stubs.mock_lookup_value = obj.ulongToFixnum(7);
     stubs.setArgs(&.{ env, sym });
-    try std.testing.expectEqual(obj.ulongToFixnum(2), Prim_lexical_reference_type());
-    stubs.setArgs(&.{ env, sym });
-    try std.testing.expectEqual(obj.ulongToFixnum(7), Prim_safe_lexical_reference());
+    try std.testing.expectEqual(obj.sharp_t, Prim_unassigned_test());
 
-    const macro_trap = obj.makeObject(obj.tc_reference_trap, 15);
-    stubs.mock_lookup_result = abi.err_macro_binding;
-    stubs.mock_lookup_value = macro_trap;
+    // Macro trap (3) via pointer trap {TRAP_MACRO, #t}
+    const trap_addr = abi.Free;
+    trap_addr[0] = obj.ulongToFixnum(obj.trap_macro);
+    trap_addr[1] = obj.sharp_t;
+    abi.Free = trap_addr + 2;
+    const macro_trap = obj.makePointerObject(obj.tc_reference_trap, trap_addr);
+    obj.setSymbolGlobalValue(sym, macro_trap);
     stubs.setArgs(&.{ env, sym });
     try std.testing.expectEqual(obj.ulongToFixnum(3), Prim_lexical_reference_type());
     stubs.setArgs(&.{ env, sym });
     try std.testing.expectEqual(macro_trap, Prim_safe_lexical_reference());
-
-    stubs.mock_lookup_result = abi.prim_done;
-    stubs.mock_lookup_value = obj.sharp_t;
+    // LEXICAL-UNREFERENCEABLE? delegates to variable_unreferenceable_p: #t on macro, #f on value, err_bad_frame on invalid env/sym.
     stubs.setArgs(&.{ env, sym });
-    try std.testing.expectEqual(obj.sharp_t, Prim_unassigned_test());
-    stubs.setArgs(&.{ env, sym });
-    try std.testing.expectEqual(obj.sharp_t, Prim_unbound_test());
-    // LEXICAL-UNREFERENCEABLE? permits arbitrary objects in arg 1 & 2.
-    stubs.setArgs(&.{ obj.sharp_f, obj.sharp_f });
     try std.testing.expectEqual(obj.sharp_t, Prim_unreferenceable_test());
+    stubs.setArgs(&.{ frame_env, other_sym });
+    try std.testing.expectEqual(obj.sharp_f, Prim_unreferenceable_test());
+    var dummy: obj.SchemeObject = undefined;
+    try std.testing.expectEqual(abi.err_bad_frame, abi.variable_unreferenceable_p(obj.sharp_f, obj.sharp_f, &dummy));
 
-    stubs.setArgs(&.{ env, frame_env, sym });
+    // Link & unbind
+    stubs.setArgs(&.{ env, frame_env, other_sym });
     try std.testing.expectEqual(obj.unspecific, Prim_environment_link_name());
-    stubs.setArgs(&.{ env, sym, frame_env, sym });
-    try std.testing.expectEqual(obj.unspecific, Prim_link_variables());
-    try std.testing.expectEqual(@as(usize, 2), stubs.mock_link_calls);
+    stubs.setArgs(&.{ env, other_sym });
+    try std.testing.expectEqual(obj.ulongToFixnum(55), Prim_lexical_reference());
 
-    stubs.mock_lookup_value = obj.sharp_f;
+    stubs.setArgs(&.{ env, sym, frame_env, other_sym });
+    try std.testing.expectEqual(obj.unspecific, Prim_link_variables());
+    stubs.setArgs(&.{ env, sym });
+    try std.testing.expectEqual(obj.ulongToFixnum(55), Prim_lexical_reference());
+
+    stubs.setArgs(&.{ env, sym });
+    try std.testing.expectEqual(obj.sharp_t, Prim_unbind_variable());
     stubs.setArgs(&.{ env, sym });
     try std.testing.expectEqual(obj.sharp_f, Prim_unbind_variable());
 }

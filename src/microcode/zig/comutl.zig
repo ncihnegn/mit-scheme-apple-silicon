@@ -419,6 +419,8 @@ test "comutl stack offset, entry kind, liarc prefix binding, code arena install 
     const stubs = @import("test_stubs.zig");
     stubs.resetMockRuntime();
     defer stubs.resetMockRuntime();
+    wind.dstack_initialize();
+    defer wind.dstack_reset();
 
     // STACK-TOP-ADDRESS & STACK-ADDRESS-OFFSET
     const top = Prim_stack_top_address();

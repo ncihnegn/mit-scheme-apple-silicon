@@ -63,6 +63,7 @@ pub const memmag = @import("memmag.zig");
 pub const boot = @import("boot.zig");
 pub const comutl = @import("comutl.zig");
 pub const option = @import("option.zig");
+pub const lookup = @import("lookup.zig");
 
 comptime {
     _ = chacha;
@@ -126,6 +127,7 @@ comptime {
     _ = boot;
     _ = comutl;
     _ = option;
+    _ = lookup;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -196,4 +198,5 @@ test "microcode zig scaffold" {
     _ = boot;
     _ = comutl;
     _ = option;
+    _ = lookup;
 }

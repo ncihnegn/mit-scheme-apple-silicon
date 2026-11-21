@@ -37,6 +37,7 @@ pub const err_unbound_variable: c_long = 0x01;
 pub const err_unassigned_variable: c_long = 0x02;
 pub const err_in_system_call: c_long = 0x04;
 pub const err_with_argument: c_long = 0x05;
+pub const err_bad_frame: c_long = 0x06;
 pub const err_undefined_primitive: c_long = 0x09;
 pub const err_external_return: c_long = 0x0A;
 pub const err_wrong_number_of_arguments: c_long = 0x0C;
@@ -64,6 +65,7 @@ pub const err_arg_9_wrong_type: c_long = 0x2E;
 pub const err_arg_10_wrong_type: c_long = 0x2F;
 pub const err_floating_overflow: c_long = 0x32;
 pub const err_unimplemented_primitive: c_long = 0x33;
+pub const err_illegal_reference_trap: c_long = 0x34;
 pub const err_wrong_arity_primitives: c_long = 0x36;
 pub const err_process_terminated: c_long = 0x3F;
 pub const prim_done: c_long = -1;
@@ -258,6 +260,12 @@ pub const CcEntryTypeGroup = enum(c_ulong) {
     unknown = 4,
 };
 
+pub const CacheRefKind = enum(c_int) {
+    lookup_cache = 0,
+    assignment_cache = 1,
+    operator_cache = 2,
+};
+
 pub extern var Registers: [14]obj.SchemeObject;
 pub extern var Free: [*]obj.SchemeObject;
 pub extern var Free_primitive: ?[*]obj.SchemeObject;
@@ -441,6 +449,9 @@ pub extern "c" fn bkpt_closure_install(?*anyopaque) obj.SchemeObject;
 pub extern "c" fn bkpt_remove(?*anyopaque, obj.SchemeObject) void;
 pub extern "c" fn bkpt_p(?*anyopaque) bool;
 pub extern "c" fn bkpt_proceed(?*anyopaque, obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn cc_block_environment(obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn write_variable_cache(obj.SchemeObject, obj.SchemeObject, c_ulong) void;
+pub extern "c" fn make_uuo_link(obj.SchemeObject, obj.SchemeObject, obj.SchemeObject, c_ulong) c_long;
 
 pub extern "c" fn arg_integer(c_int) c_long;
 pub extern "c" fn arg_nonnegative_integer(c_int) c_long;

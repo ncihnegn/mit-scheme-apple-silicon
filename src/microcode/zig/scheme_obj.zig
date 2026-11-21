@@ -65,6 +65,7 @@ pub const tc_bytevector: c_ulong = 0x33;
 pub const tc_cell: c_ulong = 0x36;
 pub const tc_weak_cons: c_ulong = 0x37;
 pub const tc_quad: c_ulong = 0x38;
+pub const tc_linkage_section: c_ulong = 0x39;
 pub const tc_ratnum: c_ulong = 0x3A;
 pub const tc_stack_environment: c_ulong = 0x3B;
 pub const tc_complex: c_ulong = 0x3C;
@@ -104,9 +105,18 @@ pub const empty_list: SchemeObject = makeObject(tc_constant, 9);
 pub const gc_reclaimed: SchemeObject = makeObject(tc_constant, 10);
 pub const the_global_env: SchemeObject = makeObject(tc_false, 0);
 pub const the_null_env: SchemeObject = makeObject(tc_false, 1);
+pub const half_datum_length: std.math.Log2Int(SchemeObject) = if (@sizeOf(c_ulong) == 4) 13 else 29;
+pub const broken_heart_zero: SchemeObject = makeObject(tc_broken_heart, 0);
 pub const unassigned_object: SchemeObject = makeObject(tc_reference_trap, 0);
 pub const unbound_object: SchemeObject = makeObject(tc_reference_trap, 2);
 pub const trap_max_immediate: c_ulong = 9;
+pub const trap_unassigned: c_ulong = 0;
+pub const trap_unbound: c_ulong = 2;
+pub const trap_expensive: c_ulong = 6;
+pub const trap_compiler_cached: c_ulong = 14;
+pub const trap_macro: c_ulong = 15;
+pub const non_trap_kind: c_ulong = 32;
+pub const expensive_object: SchemeObject = makeObject(tc_reference_trap, trap_expensive);
 
 pub const tc_history_unmarked: c_ulong = tc_hunk3_a;
 pub const tc_history_marked: c_ulong = tc_hunk3_b;
@@ -136,6 +146,18 @@ pub inline fn objectAddress(obj: SchemeObject) [*]SchemeObject {
 
 pub inline fn makePointerObject(tc: c_ulong, addr: [*]const SchemeObject) SchemeObject {
     return makeObject(tc, addressToDatum(addr));
+}
+
+pub inline fn makeObjectFromObjects(type_obj: SchemeObject, datum_obj: SchemeObject) SchemeObject {
+    return makeObject(objectType(type_obj), objectDatum(datum_obj));
+}
+
+pub inline fn objectNewAddress(type_obj: SchemeObject, addr: [*]const SchemeObject) SchemeObject {
+    return objectNewDatum(type_obj, addressToDatum(addr));
+}
+
+pub inline fn objectNewRawAddress(type_obj: SchemeObject, raw_addr: usize) SchemeObject {
+    return objectNewDatum(type_obj, rawAddressToDatum(raw_addr));
 }
 
 pub inline fn datumToRawAddress(datum: c_ulong) usize {
@@ -317,6 +339,198 @@ pub inline fn makeCcBlock(addr: [*]const SchemeObject) SchemeObject {
 
 pub inline fn environmentP(obj: SchemeObject) bool {
     return objectType(obj) == tc_environment or obj == the_global_env;
+}
+
+pub inline fn globalFrameP(o: SchemeObject) bool {
+    return o == the_global_env;
+}
+
+pub inline fn nullFrameP(o: SchemeObject) bool {
+    return o == the_null_env;
+}
+
+pub inline fn procedureFrameP(o: SchemeObject) bool {
+    return objectType(o) == tc_environment;
+}
+
+pub inline fn brokenHeartP(o: SchemeObject) bool {
+    return objectType(o) == tc_broken_heart;
+}
+
+pub inline fn referenceTrapP(o: SchemeObject) bool {
+    return objectType(o) == tc_reference_trap;
+}
+
+pub inline fn procLambda(proc: SchemeObject) SchemeObject {
+    return memoryRef(proc, 0);
+}
+
+pub inline fn procEnvironment(proc: SchemeObject) SchemeObject {
+    return memoryRef(proc, 1);
+}
+
+pub inline fn envProc(env: SchemeObject) SchemeObject {
+    return memoryRef(env, 1);
+}
+
+pub inline fn setEnvExtension(env: SchemeObject, ext: SchemeObject) void {
+    memorySet(env, 1, ext);
+}
+
+pub inline fn envVals(env: SchemeObject) [*]SchemeObject {
+    return memoryLoc(env, 2);
+}
+
+pub inline fn envParent(env: SchemeObject) SchemeObject {
+    return procEnvironment(envProc(env));
+}
+
+pub inline fn frameExtensionParent(ext: SchemeObject) SchemeObject {
+    return vectorRef(ext, 0);
+}
+
+pub inline fn setFrameExtensionParent(ext: SchemeObject, parent: SchemeObject) void {
+    vectorSet(ext, 0, parent);
+}
+
+pub inline fn frameExtensionProc(ext: SchemeObject) SchemeObject {
+    return vectorRef(ext, 1);
+}
+
+pub inline fn setFrameExtensionProc(ext: SchemeObject, proc: SchemeObject) void {
+    vectorSet(ext, 1, proc);
+}
+
+pub inline fn frameExtensionLength(ext: SchemeObject) c_ulong {
+    return fixnumToUlong(vectorRef(ext, 2));
+}
+
+pub inline fn setFrameExtensionLength(ext: SchemeObject, n: c_ulong) void {
+    vectorSet(ext, 2, ulongToFixnum(n));
+}
+
+pub inline fn frameExtensionMaxLength(ext: SchemeObject) c_ulong {
+    return vectorLength(ext) - 3;
+}
+
+pub inline fn frameExtensionBindings(ext: SchemeObject) [*]SchemeObject {
+    return vectorLoc(ext, 3);
+}
+
+pub inline fn extendedFrameP(frame: SchemeObject) bool {
+    return vectorP(envProc(frame));
+}
+
+pub inline fn extendedFrameProc(frame: SchemeObject) SchemeObject {
+    return frameExtensionProc(envProc(frame));
+}
+
+pub inline fn extendedFrameBindings(frame: SchemeObject) [*]SchemeObject {
+    return frameExtensionBindings(envProc(frame));
+}
+
+pub inline fn extendedFrameLength(frame: SchemeObject) c_ulong {
+    return frameExtensionLength(envProc(frame));
+}
+
+pub inline fn extendedFrameMaxLength(frame: SchemeObject) c_ulong {
+    return frameExtensionMaxLength(envProc(frame));
+}
+
+pub inline fn setExtendedFrameLength(frame: SchemeObject, n: c_ulong) void {
+    setFrameExtensionLength(envProc(frame), n);
+}
+
+pub inline fn lambdaNames(exp: SchemeObject) SchemeObject {
+    return memoryRef(exp, 1);
+}
+
+pub inline fn lambdaParams(exp: SchemeObject) [*]SchemeObject {
+    return vectorLoc(lambdaNames(exp), 1);
+}
+
+pub inline fn lambdaNParams(exp: SchemeObject) c_ulong {
+    return vectorLength(lambdaNames(exp)) - 1;
+}
+
+pub inline fn symbolGlobalValue(sym: SchemeObject) SchemeObject {
+    return memoryRef(sym, 1);
+}
+
+pub inline fn setSymbolGlobalValue(sym: SchemeObject, val: SchemeObject) void {
+    memorySet(sym, 1, val);
+}
+
+pub inline fn symbolGlobalValueCell(sym: SchemeObject) [*]SchemeObject {
+    return memoryLoc(sym, 1);
+}
+
+pub inline fn ptrRefTrapTag(trap: SchemeObject) SchemeObject {
+    return memoryRef(trap, 0);
+}
+
+pub inline fn ptrRefTrapCache(trap: SchemeObject) SchemeObject {
+    return memoryRef(trap, 1);
+}
+
+pub inline fn setPtrRefTrapCache(trap: SchemeObject, cache: SchemeObject) void {
+    memorySet(trap, 1, cache);
+}
+
+pub inline fn cacheValue(cache: SchemeObject) SchemeObject {
+    return memoryRef(cache, 0);
+}
+
+pub inline fn setCacheValue(cache: SchemeObject, val: SchemeObject) void {
+    memorySet(cache, 0, val);
+}
+
+pub inline fn cacheClone(cache: SchemeObject) SchemeObject {
+    return memoryRef(cache, 1);
+}
+
+pub inline fn setCacheClone(cache: SchemeObject, clone: SchemeObject) void {
+    memorySet(cache, 1, clone);
+}
+
+pub inline fn cacheRefs(cache: SchemeObject) SchemeObject {
+    return memoryRef(cache, 2);
+}
+
+pub inline fn setCacheRefs(cache: SchemeObject, refs: SchemeObject) void {
+    memorySet(cache, 2, refs);
+}
+
+pub inline fn cacheCloneP(cache: SchemeObject) bool {
+    return cacheValue(cache) == expensive_object;
+}
+
+pub inline fn cacheLookupRefs(cache: SchemeObject) [*]SchemeObject {
+    return memoryLoc(cacheRefs(cache), 0);
+}
+
+pub inline fn cacheAssignmentRefs(cache: SchemeObject) [*]SchemeObject {
+    return memoryLoc(cacheRefs(cache), 1);
+}
+
+pub inline fn cacheOperatorRefs(cache: SchemeObject) [*]SchemeObject {
+    return memoryLoc(cacheRefs(cache), 2);
+}
+
+pub inline fn cacheRefBlock(ref: SchemeObject) SchemeObject {
+    return pairCar(ref);
+}
+
+pub inline fn setCacheRefBlock(ref: SchemeObject, block: SchemeObject) void {
+    setPairCar(ref, block);
+}
+
+pub inline fn cacheRefOffset(ref: SchemeObject) c_ulong {
+    return objectDatum(pairCdr(ref));
+}
+
+pub inline fn setCacheRefOffset(ref: SchemeObject, offset: c_ulong) void {
+    setPairCdr(ref, ulongToFixnum(offset));
 }
 
 pub inline fn promiseP(obj: SchemeObject) bool {

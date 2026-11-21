@@ -43,10 +43,8 @@ pub var mock_save_tospace_calls: usize = 0;
 pub var mock_update_weak_calls: usize = 0;
 pub var mock_icache_flush_calls: usize = 0;
 pub var mock_resize_tospace_arg: c_ulong = 0;
-pub var mock_lookup_result: c_long = abi.prim_done;
-pub var mock_lookup_value: obj.SchemeObject = obj.sharp_f;
-pub var mock_define_calls: usize = 0;
-pub var mock_link_calls: usize = 0;
+pub var mock_write_var_cache_calls: usize = 0;
+pub var mock_make_uuo_link_calls: usize = 0;
 pub var mock_apply_compiled_calls: usize = 0;
 pub var mock_last_compiled_nargs: c_ulong = 0;
 pub var mock_last_compiled_proc: obj.SchemeObject = obj.sharp_f;
@@ -115,10 +113,8 @@ pub fn resetMockRuntime() void {
     storage.ephemeron_count = 0;
     storage.n_ephemerons_requested = 0;
     storage.ephemeron_request_hard_p = false;
-    mock_lookup_result = abi.prim_done;
-    mock_lookup_value = obj.sharp_f;
-    mock_define_calls = 0;
-    mock_link_calls = 0;
+    mock_write_var_cache_calls = 0;
+    mock_make_uuo_link_calls = 0;
     utils.history_register = null;
     utils.prev_restore_history_offset = 0;
     utils.death_blow = 0;
@@ -513,48 +509,6 @@ pub export fn resize_tospace(size: c_ulong) callconv(.c) void {
     mock_resize_tospace_arg = size;
 }
 
-pub export fn lookup_variable(_: obj.SchemeObject, _: obj.SchemeObject, val_out: *obj.SchemeObject) callconv(.c) c_long {
-    val_out.* = mock_lookup_value;
-    return mock_lookup_result;
-}
-
-pub export fn assign_variable(_: obj.SchemeObject, _: obj.SchemeObject, new_val: obj.SchemeObject, val_out: *obj.SchemeObject) callconv(.c) c_long {
-    val_out.* = mock_lookup_value;
-    mock_lookup_value = new_val;
-    return mock_lookup_result;
-}
-
-pub export fn define_variable(_: obj.SchemeObject, _: obj.SchemeObject, new_val: obj.SchemeObject) callconv(.c) c_long {
-    mock_define_calls += 1;
-    mock_lookup_value = new_val;
-    return mock_lookup_result;
-}
-
-pub export fn variable_unassigned_p(_: obj.SchemeObject, _: obj.SchemeObject, val_out: *obj.SchemeObject) callconv(.c) c_long {
-    val_out.* = mock_lookup_value;
-    return mock_lookup_result;
-}
-
-pub export fn variable_unbound_p(_: obj.SchemeObject, _: obj.SchemeObject, val_out: *obj.SchemeObject) callconv(.c) c_long {
-    val_out.* = mock_lookup_value;
-    return mock_lookup_result;
-}
-
-pub export fn variable_unreferenceable_p(_: obj.SchemeObject, _: obj.SchemeObject, val_out: *obj.SchemeObject) callconv(.c) c_long {
-    val_out.* = mock_lookup_value;
-    return mock_lookup_result;
-}
-
-pub export fn link_variables(_: obj.SchemeObject, _: obj.SchemeObject, _: obj.SchemeObject, _: obj.SchemeObject) callconv(.c) c_long {
-    mock_link_calls += 1;
-    return mock_lookup_result;
-}
-
-pub export fn unbind_variable(_: obj.SchemeObject, _: obj.SchemeObject, val_out: *obj.SchemeObject) callconv(.c) c_long {
-    val_out.* = mock_lookup_value;
-    return mock_lookup_result;
-}
-
 pub export fn init_exit_scheme() callconv(.c) void {}
 pub export fn OS_file_access(_: [*:0]const u8, _: c_uint) callconv(.c) c_int {
     return 0;
@@ -596,6 +550,9 @@ comptime {
         @export(&mockBkptRemove, .{ .name = "bkpt_remove" });
         @export(&mockBkptP, .{ .name = "bkpt_p" });
         @export(&mockBkptProceed, .{ .name = "bkpt_proceed" });
+        @export(&mockCcBlockEnvironment, .{ .name = "cc_block_environment" });
+        @export(&mockWriteVariableCache, .{ .name = "write_variable_cache" });
+        @export(&mockMakeUuoLink, .{ .name = "make_uuo_link" });
     }
     if (build_options.cc_is_native) {
         @export(&mockCcReturnAddressToEntryAddress, .{ .name = "cc_return_address_to_entry_address" });
@@ -604,6 +561,20 @@ comptime {
 
 fn mockCcEntryToBlock(entry: obj.SchemeObject) callconv(.c) obj.SchemeObject {
     return entry;
+}
+
+fn mockCcBlockEnvironment(block: obj.SchemeObject) callconv(.c) obj.SchemeObject {
+    const len = obj.vectorLength(block);
+    return if (len >= 1) obj.vectorRef(block, @intCast(len - 1)) else obj.the_global_env;
+}
+
+fn mockWriteVariableCache(_: obj.SchemeObject, _: obj.SchemeObject, _: c_ulong) callconv(.c) void {
+    mock_write_var_cache_calls += 1;
+}
+
+fn mockMakeUuoLink(_: obj.SchemeObject, _: obj.SchemeObject, _: obj.SchemeObject, _: c_ulong) callconv(.c) c_long {
+    mock_make_uuo_link_calls += 1;
+    return abi.prim_done;
 }
 
 fn mockCcReturnToBlock(ret: obj.SchemeObject) callconv(.c) obj.SchemeObject {
