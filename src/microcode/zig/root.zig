@@ -20,6 +20,8 @@ pub const prentropy = @import("prentropy.zig");
 pub const bytevector = @import("bytevector.zig");
 pub const char = @import("char.zig");
 pub const hunk = @import("hunk.zig");
+pub const dfloat = @import("dfloat.zig");
+pub const list = @import("list.zig");
 
 comptime {
     _ = chacha;
@@ -40,6 +42,8 @@ comptime {
     _ = bytevector;
     _ = char;
     _ = hunk;
+    _ = dfloat;
+    _ = list;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -67,4 +71,6 @@ test "microcode zig scaffold" {
     _ = bytevector;
     _ = char;
     _ = hunk;
+    _ = dfloat;
+    _ = list;
 }
