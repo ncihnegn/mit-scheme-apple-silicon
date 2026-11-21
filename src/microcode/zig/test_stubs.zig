@@ -171,11 +171,19 @@ pub export fn arg_ulong_index_integer(n: c_int, upper_limit: c_ulong) callconv(.
     return val;
 }
 
-pub export fn arg_flonum(n: c_int) callconv(.c) f64 {
-    const val = abi.argRef(@intCast(n));
-    if (!obj.flonumP(val)) error_wrong_type_arg(n);
-    const ptr: *const f64 = @ptrCast(@alignCast(obj.memoryLoc(val, 1)));
-    return ptr.*;
+pub export fn string_p(o: obj.SchemeObject) callconv(.c) bool {
+    const t = obj.objectType(o);
+    return t == obj.tc_character_string or t == obj.tc_bytevector;
+}
+
+pub export fn allocate_string(nbytes: c_ulong) callconv(.c) obj.SchemeObject {
+    const res = abi.allocate_non_marked_vector(
+        @intCast(obj.tc_character_string),
+        obj.bytevectorLengthToGcLength(nbytes),
+        true,
+    );
+    obj.setBytevectorLength(res, nbytes);
+    return res;
 }
 
 pub export fn arg_integer_in_range(n: c_int, lower_limit: c_long, upper_limit: c_long) callconv(.c) c_long {
@@ -467,18 +475,6 @@ pub export fn bignum_to_digit_stream(
 
 pub export fn bignum_max_digit_stream_radix() callconv(.c) c_long {
     return 1 << 30;
-}
-
-pub export fn double_to_flonum(x: f64) callconv(.c) obj.SchemeObject {
-    obj.alignFloat(&Free);
-    abi.primitiveGcIfNeeded(obj.flonum_size + 1);
-    const result = obj.makePointerObject(obj.tc_big_flonum, Free);
-    Free[0] = obj.makeNmvHeader(obj.flonum_size);
-    Free += 1;
-    const fp: *f64 = @ptrCast(@alignCast(Free));
-    fp.* = x;
-    Free += @as(usize, @intCast(obj.flonum_size));
-    return result;
 }
 
 pub export fn OS_get_entropy(buf: *[32]u8) callconv(.c) void {

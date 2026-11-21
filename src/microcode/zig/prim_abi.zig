@@ -110,6 +110,8 @@ pub extern "c" fn arg_integer_in_range(c_int, c_long, c_long) c_long;
 pub extern "c" fn arg_index_integer_to_intmax(c_int, i64) i64;
 pub extern "c" fn error_unimplemented_primitive() noreturn;
 pub extern "c" fn Mul(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub extern "c" fn string_p(obj.SchemeObject) bool;
+pub extern "c" fn allocate_string(c_ulong) obj.SchemeObject;
 
 pub const BignumComparison = enum(c_int) {
     equal = 0,

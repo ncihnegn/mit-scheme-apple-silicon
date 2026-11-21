@@ -29,6 +29,9 @@ pub const generic = @import("generic.zig");
 pub const artutl = @import("artutl.zig");
 pub const bigprm = @import("bigprm.zig");
 pub const intprm = @import("intprm.zig");
+pub const fenv_plat = @import("fenv_plat.zig");
+pub const floenv = @import("floenv.zig");
+pub const flonum = @import("flonum.zig");
 
 comptime {
     _ = chacha;
@@ -58,6 +61,9 @@ comptime {
     _ = artutl;
     _ = bigprm;
     _ = intprm;
+    _ = fenv_plat;
+    _ = floenv;
+    _ = flonum;
     if (builtin.is_test) {
         _ = @import("test_stubs.zig");
     }
@@ -94,4 +100,7 @@ test "microcode zig scaffold" {
     _ = artutl;
     _ = bigprm;
     _ = intprm;
+    _ = fenv_plat;
+    _ = floenv;
+    _ = flonum;
 }

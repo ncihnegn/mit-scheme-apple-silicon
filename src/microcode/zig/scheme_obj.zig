@@ -418,6 +418,14 @@ pub inline fn setBytevectorLength(bv: SchemeObject, nbytes: c_ulong) void {
     bytevectorSet(bv, @intCast(nbytes), 0x00);
 }
 
+pub inline fn legacyStringLength(s: SchemeObject) c_ulong {
+    return bytevectorLength(s);
+}
+
+pub inline fn legacyStringData(s: SchemeObject) [*]u8 {
+    return bytevectorData(s);
+}
+
 pub const flonum_size: c_ulong = bytesToWords(@sizeOf(f64));
 
 pub inline fn floatingVectorLength(v: SchemeObject) c_ulong {
