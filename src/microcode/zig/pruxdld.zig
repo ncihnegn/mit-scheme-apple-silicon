@@ -35,8 +35,11 @@ fn signalDlError(op_name: [*:0]const u8, err_msg: ?[*:0]const u8) noreturn {
 
 fn signalWinDlError(op_name: [*:0]const u8) noreturn {
     var msg_buf: [64]u8 = undefined;
-    const msg_z = std.fmt.bufPrintZ(&msg_buf, "Win32 error {d}", .{win.kernel32.GetLastError()}) catch "Win32 error";
-    signalDlError(op_name, msg_z.ptr);
+    const msg_ptr: [*:0]const u8 = if (std.fmt.bufPrint(msg_buf[0 .. msg_buf.len - 1], "Win32 error {d}", .{win.kernel32.GetLastError()})) |s| blk: {
+        msg_buf[s.len] = 0;
+        break :blk @ptrCast(&msg_buf);
+    } else |_| "Win32 error";
+    signalDlError(op_name, msg_ptr);
 }
 
 fn dldLoad(path: ?[*:0]const u8) *anyopaque {
