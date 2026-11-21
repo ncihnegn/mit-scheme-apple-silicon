@@ -139,22 +139,45 @@ pub const lexpr_primitive_arity: c_int = -1;
 pub const unknown_primitive_arity: c_int = -2;
 pub const syscall_accept: c_int = 0;
 pub const syscall_bind: c_int = 1;
+pub const syscall_chdir: c_int = 2;
 pub const syscall_chmod: c_int = 3;
+pub const syscall_clock_gettime: c_int = 4;
 pub const syscall_connect: c_int = 6;
 pub const syscall_fstat: c_int = 12;
 pub const syscall_ftruncate: c_int = 16;
+pub const syscall_getcwd: c_int = 17;
 pub const syscall_gethostname: c_int = 18;
+pub const syscall_gettimeofday: c_int = 19;
+pub const syscall_gmtime: c_int = 20;
+pub const syscall_link: c_int = 24;
 pub const syscall_listen: c_int = 25;
+pub const syscall_localtime: c_int = 26;
 pub const syscall_lseek: c_int = 27;
+pub const syscall_lstat: c_int = 28;
 pub const syscall_malloc: c_int = 29;
+pub const syscall_mkdir: c_int = 30;
+pub const syscall_mktime: c_int = 31;
+pub const syscall_ntp_adjtime: c_int = 32;
 pub const syscall_open: c_int = 34;
+pub const syscall_opendir: c_int = 35;
 pub const syscall_read: c_int = 38;
+pub const syscall_readlink: c_int = 39;
+pub const syscall_realloc: c_int = 40;
+pub const syscall_rename: c_int = 41;
+pub const syscall_rmdir: c_int = 42;
 pub const syscall_select: c_int = 43;
+pub const syscall_setitimer: c_int = 44;
 pub const syscall_setsockopt: c_int = 46;
 pub const syscall_shutdown: c_int = 47;
 pub const syscall_socket: c_int = 52;
+pub const syscall_stat: c_int = 53;
+pub const syscall_statfs: c_int = 54;
+pub const syscall_symlink: c_int = 55;
+pub const syscall_time: c_int = 63;
 pub const syscall_uname: c_int = 65;
+pub const syscall_unlink: c_int = 66;
 pub const syscall_utime: c_int = 67;
+pub const syscall_write: c_int = 69;
 pub const syserr_not_enough_space: c_int = 33;
 
 pub const PrimitiveProcedure = *const fn () callconv(.c) obj.SchemeObject;
@@ -501,6 +524,7 @@ pub const ChannelType = enum(c_uint) {
 };
 
 pub const mode_reg: c_uint = 0o666;
+pub const mode_dir: c_uint = 0o777;
 
 pub const TttyState = extern struct {
     tio: std.c.termios,
@@ -531,6 +555,29 @@ pub inline fn cFstat(fd: std.c.fd_t, buf: *Stat) c_int {
         return LinuxLibc.fstat(fd, buf);
     }
     return std.c.fstat(fd, buf);
+}
+
+pub inline fn cStat(path: [*:0]const u8, buf: *Stat) c_int {
+    if (builtin.os.tag == .linux) {
+        const LinuxLibc = struct {
+            extern "c" fn stat(path: [*:0]const u8, buf: *Stat) callconv(.c) c_int;
+        };
+        return LinuxLibc.stat(path, buf);
+    }
+    return std.c.stat(path, buf);
+}
+
+pub inline fn cLstat(path: [*:0]const u8, buf: *Stat) c_int {
+    if (builtin.os.tag.isDarwin() and builtin.cpu.arch == .x86_64) {
+        const DarwinLibc = struct {
+            extern "c" fn @"lstat$INODE64"(path: [*:0]const u8, buf: *Stat) callconv(.c) c_int;
+        };
+        return DarwinLibc.@"lstat$INODE64"(path, buf);
+    }
+    const PosixLibc = struct {
+        extern "c" fn lstat(path: [*:0]const u8, buf: *Stat) callconv(.c) c_int;
+    };
+    return PosixLibc.lstat(path, buf);
 }
 
 pub fn makeChannel(fd: c_int, ch_type: ChannelType) Tchannel {
@@ -640,6 +687,7 @@ pub extern var OS_have_select_p: c_int;
 pub extern "c" fn channel_allocate() Tchannel;
 pub extern "c" fn terminal_open(Tchannel) void;
 pub extern "c" fn UX_prim_check_fd_errno(c_int) void;
+pub extern "c" fn UX_SC_CLK_TCK() ClockT;
 pub extern "c" fn OS_open_fd(c_int) Tchannel;
 pub extern "c" fn OS_channel_open_p(Tchannel) c_int;
 pub extern "c" fn OS_channel_close(Tchannel) void;

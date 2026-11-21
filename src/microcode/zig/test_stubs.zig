@@ -1265,6 +1265,9 @@ pub export fn UX_prim_check_errno(name: c_int) callconv(.c) void {
 pub export fn UX_prim_check_fd_errno(name: c_int) callconv(.c) void {
     _ = name;
 }
+pub export fn UX_SC_CLK_TCK() callconv(.c) abi.ClockT {
+    return 100;
+}
 pub export fn channel_allocate() callconv(.c) abi.Tchannel {
     for (&mock_channel_table_entries, 0..) |entry, idx| {
         if (entry.descriptor < 0) return @intCast(idx);

@@ -75,7 +75,6 @@ const std_c_sources = [_][]const u8{
     "src/microcode/outf.c",
     "src/microcode/term.c",
     "src/microcode/intext.c",
-    "src/microcode/ux.c",
     "src/microcode/uxctty.c",
     "src/microcode/uxenv.c",
     "src/microcode/uxfs.c",
