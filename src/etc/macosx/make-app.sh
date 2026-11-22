@@ -25,14 +25,49 @@
 
 # Utility to build a MacOS X application bundle to run Edwin.
 
-set -e
+set -euo pipefail
 
-# These values are placeholders; we need to get the right ones.
-: ${VERSION_STRING=9.2}
-: ${LONG_VERSION_STRING="release ${VERSION_STRING}"}
-: ${YEAR=$(date +%Y)}
-: ${bindir=/usr/local/bin}
-: ${libdir=/usr/local/lib}
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+SRC_DIR=$(cd "${SCRIPT_DIR}/../.." && pwd)
+REPO_ROOT=$(cd "${SRC_DIR}/.." && pwd)
+
+SCHEME_EXE=""
+STARTER_EXE=""
+PLUGINS="${PLUGINS:-edwin,imail}"
+
+abs_path() {
+    python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$1"
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --scheme-exe)
+            SCHEME_EXE=$(abs_path "$2")
+            shift 2
+            ;;
+        --macosx-starter)
+            STARTER_EXE=$(abs_path "$2")
+            shift 2
+            ;;
+        --plugins)
+            PLUGINS="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            exit 2
+            ;;
+    esac
+done
+
+if [[ -z ${VERSION_STRING:-} ]] && [[ -f "${REPO_ROOT}/build.zig" ]]; then
+    VERSION_STRING=$(sed -n 's/.*addOption(\[\]const u8, "package_version", "\([^"]*\)").*/\1/p' "${REPO_ROOT}/build.zig" | head -n 1 || true)
+fi
+: ${VERSION_STRING:=13.0.50}
+: ${LONG_VERSION_STRING:="release ${VERSION_STRING}"}
+: ${YEAR:=$(date +%Y)}
+
+cd "${SRC_DIR}"
 
 : ${USE_SWIFTUI_APP=1}
 USE_SWIFTUI=0
@@ -49,8 +84,12 @@ else
     : ${MACOSX_MIN_VERSION=${MACOSX_VERSION}}
 fi
 
+STAGE_TMP=$(mktemp -d)
 SWIFT_BUILD_DIR=
 cleanup_build_dirs() {
+    if [[ -n ${STAGE_TMP} ]] && [[ -d ${STAGE_TMP} ]]; then
+        rm -rf "${STAGE_TMP}"
+    fi
     if [[ -n ${SWIFT_BUILD_DIR} ]]; then
         rm -rf "${SWIFT_BUILD_DIR}"
     fi
@@ -59,36 +98,53 @@ trap cleanup_build_dirs EXIT
 
 rm -rf tmp mit-scheme.app
 
+if [[ -z ${SCHEME_EXE} ]]; then
+    if [[ -x "${REPO_ROOT}/zig-out/bin/mit-scheme" ]]; then
+        SCHEME_EXE="${REPO_ROOT}/zig-out/bin/mit-scheme"
+    else
+        if [[ -z ${DYLD_FALLBACK_LIBRARY_PATH:-} ]] && [[ -d /usr/local/lib ]]; then
+            export DYLD_FALLBACK_LIBRARY_PATH="/usr/local/lib:/usr/lib"
+        fi
+        (cd "${REPO_ROOT}" && zig build --release=fast)
+        SCHEME_EXE="${REPO_ROOT}/zig-out/bin/mit-scheme"
+    fi
+fi
+
 # Build directory structure for bundle.
 mkdir mit-scheme.app
 mkdir mit-scheme.app/Contents
 mkdir mit-scheme.app/Contents/MacOS
 mkdir mit-scheme.app/Contents/Resources
 
-# Install into temporary directory, then move contents into bundle.
-make install DESTDIR=$(pwd)/tmp
+INSTALL_ARGS=(
+    install
+    --skip-microcode
+    --version "${VERSION_STRING}"
+    --scheme-exe "${SCHEME_EXE}"
+    --prefix "${STAGE_TMP}"
+    --plugins "${PLUGINS}"
+)
+if [[ -n ${STARTER_EXE} ]] && [[ -x ${STARTER_EXE} ]]; then
+    INSTALL_ARGS+=(--macosx-starter "${STARTER_EXE}")
+fi
+python3 "${REPO_ROOT}/tools/build-scheme.py" "${INSTALL_ARGS[@]}"
 
-if [[ -z ${MIT_SCHEME_EXE} ]]; then
-    for FN in $(ls tmp"${bindir}"); do
-	[[ -L tmp${bindir}/${FN} ]] && continue
-	if [[ -f tmp${bindir}/${FN} ]]; then
-	    MIT_SCHEME_EXE=${FN}
-	    break;
-	fi
-    done
-fi
+AUXDIR=""
+for cand in "${STAGE_TMP}"/lib/mit-scheme-*; do
+    if [[ -d ${cand} ]]; then
+        AUXDIR=${cand}
+        break
+    fi
+done
 if [[ -z ${AUXDIR} ]]; then
-    for FN in $(ls tmp"${libdir}"); do
-	if [[ -d tmp${libdir}/${FN} ]]; then
-	    AUXDIR=${libdir}/${FN}
-	    break
-	fi
-    done
+    echo "error: installed auxiliary library directory missing under ${STAGE_TMP}/lib" >&2
+    exit 1
 fi
-mv tmp"${bindir}"/"${MIT_SCHEME_EXE}" \
+
+mv "${STAGE_TMP}/bin/mit-scheme" \
     mit-scheme.app/Contents/Resources/mit-scheme
 if [[ ${USE_SWIFTUI} -eq 1 ]]; then
-    rm -f tmp"${AUXDIR}"/macosx-starter
+    rm -f "${AUXDIR}/macosx-starter"
     SWIFT_BUILD_DIR=$(mktemp -d)
     SWIFT_BUILD_FLAGS=(
         --package-path etc/macosx/app
@@ -103,12 +159,15 @@ if [[ ${USE_SWIFTUI} -eq 1 ]]; then
     chmod 755 mit-scheme.app/Contents/MacOS/MITSchemeApp
     BUNDLE_EXECUTABLE=MITSchemeApp
 else
-    mv tmp"${AUXDIR}"/macosx-starter mit-scheme.app/Contents/MacOS/.
+    if [[ ! -x "${AUXDIR}/macosx-starter" ]]; then
+        echo "error: macosx-starter missing in ${AUXDIR}; pass --macosx-starter or build with zig build" >&2
+        exit 1
+    fi
+    mv "${AUXDIR}/macosx-starter" mit-scheme.app/Contents/MacOS/.
     BUNDLE_EXECUTABLE=macosx-starter
 fi
-rm -f tmp"${AUXDIR}"/runtime.com
-mv tmp"${AUXDIR}"/* mit-scheme.app/Contents/Resources/.
-rm -rf tmp
+rm -f "${AUXDIR}/runtime.com"
+mv "${AUXDIR}"/* mit-scheme.app/Contents/Resources/.
 cp -p etc/macosx/schlogo.icns mit-scheme.app/Contents/Resources/appIcon.icns
 
 # Generate an appropriate Info.plist file.

@@ -53,22 +53,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-PRINT_MK="${TMP_DIR}/print-dirs.mk"
-cat > "${PRINT_MK}" <<'EOF'
-.PHONY: print-app-dirs
-print-app-dirs:
-	@printf '%s\t%s\n' '$(bindir)' '$(libdir)'
-EOF
-
-IFS=$'\t' read -r CONFIGURED_BINDIR CONFIGURED_LIBDIR < <(
-    make -s -C "${SRC_DIR}" -f Makefile -f "${PRINT_MK}" print-app-dirs
-)
-
-echo "=== Building mit-scheme.app (bindir=${CONFIGURED_BINDIR}, libdir=${CONFIGURED_LIBDIR}) ==="
+echo "=== Building mit-scheme.app ==="
 env -u MIT_SCHEME_EXE \
-    bindir="${CONFIGURED_BINDIR}" \
-    libdir="${CONFIGURED_LIBDIR}" \
-    make -C "${SRC_DIR}" macosx-app
+    "${SRC_DIR}/etc/macosx/make-app.sh"
 
 APP_DIR="${SRC_DIR}/mit-scheme.app"
 BUNDLE_BIN="${APP_DIR}/Contents/Resources/mit-scheme"

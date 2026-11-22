@@ -125,24 +125,26 @@ public enum SchemeLocator {
             }
         }
 
-        // 3. Development tree fallback (walking up to src/microcode/scheme + src/lib/all.com).
+        // 3. Development tree fallback (walking up to zig-out/bin/mit-scheme or src/microcode/scheme + src/lib/all.com).
         let searchRoots = [currentDirectoryURL, Bundle.main.bundleURL, Bundle.main.executableURL?.deletingLastPathComponent()]
             .compactMap { $0 }
         for root in searchRoots {
             var dir = root.standardizedFileURL
             for _ in 0..<8 {
-                let devExe = dir.appendingPathComponent("src/microcode/scheme")
                 let devLib = dir.appendingPathComponent("src/lib", isDirectory: true)
                 let devBand = devLib.appendingPathComponent("all.com")
-                searched.append(devExe.path)
-                if fm.isExecutableFile(atPath: devExe.path) && fm.fileExists(atPath: devBand.path) {
-                    return SchemeLaunchConfig(
-                        executableURL: devExe,
-                        arguments: buildArgs(useMacApp: false, libraryDir: devLib, band: "all.com"),
-                        environment: launchEnv,
-                        workingDirectory: dir,
-                        sourceDescription: "Workspace Build (\(devExe.path))"
-                    )
+                for relExe in ["zig-out/bin/mit-scheme", "src/microcode/scheme"] {
+                    let devExe = dir.appendingPathComponent(relExe)
+                    searched.append(devExe.path)
+                    if fm.isExecutableFile(atPath: devExe.path) && fm.fileExists(atPath: devBand.path) {
+                        return SchemeLaunchConfig(
+                            executableURL: devExe,
+                            arguments: buildArgs(useMacApp: false, libraryDir: devLib, band: "all.com"),
+                            environment: launchEnv,
+                            workingDirectory: dir,
+                            sourceDescription: "Workspace Build (\(devExe.path))"
+                        )
+                    }
                 }
                 let parent = dir.deletingLastPathComponent()
                 if parent.path == dir.path {

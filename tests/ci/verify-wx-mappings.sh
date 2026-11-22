@@ -9,7 +9,11 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 REPO_ROOT=$(cd "${SCRIPT_DIR}/../.." && pwd)
-SCHEME_EXE="${REPO_ROOT}/src/microcode/scheme"
+if [ -x "${REPO_ROOT}/zig-out/bin/mit-scheme" ]; then
+    SCHEME_EXE="${REPO_ROOT}/zig-out/bin/mit-scheme"
+else
+    SCHEME_EXE="${REPO_ROOT}/src/microcode/scheme"
+fi
 LIBRARY_DIR="${REPO_ROOT}/src/lib"
 
 usage() {
@@ -159,7 +163,12 @@ def verify_darwin(pid, code_start):
             continue
         size = end - start
         if (
-            (rtype == "Untagged" or rtype.startswith("VM_ALLOCATE"))
+            (
+                rtype == "Untagged"
+                or rtype.startswith("VM_ALLOCATE")
+                or rtype.startswith("Malloc")
+                or rtype.startswith("MALLOC")
+            )
             and cur_prot == "rw-"
             and size >= 8 * 1024 * 1024
         ):

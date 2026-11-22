@@ -63,8 +63,8 @@ if [ "$(uname -s)" != "Darwin" ]; then
     exit 1
 fi
 
-if [ -z "${VERSION}" ] && [ -f "${SRC_DIR}/configure.ac" ]; then
-    VERSION=$(sed -n 's/^AC_INIT(\[[^]]*\],[[:space:]]*\[\([^]]*\)\].*/\1/p' "${SRC_DIR}/configure.ac" | head -n 1)
+if [ -z "${VERSION}" ] && [ -f "${REPO_ROOT}/build.zig" ]; then
+    VERSION=$(sed -n 's/.*addOption(\[\]const u8, "package_version", "\([^"]*\)").*/\1/p' "${REPO_ROOT}/build.zig" | head -n 1 || true)
 fi
 if [ -z "${VERSION}" ]; then
     VERSION="13.0.50"
@@ -94,24 +94,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
-PRINT_MK="${TMP_DIR}/print-dirs.mk"
-cat > "${PRINT_MK}" <<'EOF'
-.PHONY: print-app-dirs
-print-app-dirs:
-	@printf '%s\t%s\n' '$(bindir)' '$(libdir)'
-EOF
-
-IFS=$'\t' read -r CONFIGURED_BINDIR CONFIGURED_LIBDIR < <(
-    make -s -C "${SRC_DIR}" -f Makefile -f "${PRINT_MK}" print-app-dirs
-)
-
 echo "=== Building mit-scheme.app (version=${VERSION}, min_macos=${MIN_MACOS}) ==="
 env -u MIT_SCHEME_EXE \
     VERSION_STRING="${VERSION}" \
     MACOSX_MIN_VERSION="${MIN_MACOS}" \
-    bindir="${CONFIGURED_BINDIR}" \
-    libdir="${CONFIGURED_LIBDIR}" \
-    make -C "${SRC_DIR}" macosx-app </dev/null
+    "${SRC_DIR}/etc/macosx/make-app.sh" </dev/null
 
 APP_DIR="${SRC_DIR}/mit-scheme.app"
 BUNDLE_NAME="MIT:GNU Scheme ${VERSION}.app"

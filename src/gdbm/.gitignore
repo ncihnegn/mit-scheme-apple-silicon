@@ -20,3 +20,11 @@
 /missing
 /test-driver
 /texinfo.tex
+
+/gdbm-const
+/gdbm-const.c
+/gdbm-const.scm
+/gdbm-shim.c
+/gdbm-shim.so
+/stamp-scheme
+/stamp-shim

@@ -180,6 +180,30 @@ pub fn build(b: *std.Build) void {
         "Optional host mit-scheme binary passed to bootstrap step",
     );
 
+    const host_lib = b.option(
+        []const u8,
+        "host-lib",
+        "Optional host Scheme library directory containing all.com",
+    );
+
+    const cross = b.option(
+        bool,
+        "cross",
+        "Cross-compile Scheme subsystems using src/tools/ cross-toolchain",
+    ) orelse false;
+
+    const plugins = b.option(
+        []const u8,
+        "plugins",
+        "Comma-separated plugins to build/install, or 'none' (default: edwin,imail)",
+    ) orelse "edwin,imail";
+
+    const jobs = b.option(
+        usize,
+        "jobs",
+        "Maximum parallel Scheme compiler tasks",
+    );
+
     const check_library_path = b.option(
         []const u8,
         "check-library-path",
@@ -316,6 +340,7 @@ pub fn build(b: *std.Build) void {
         b.fmt("lib/{s}/mit-scheme.h", .{auxdir_name}),
     ).step);
 
+    var macosx_starter_exe: ?*std.Build.Step.Compile = null;
     if (target.result.os.tag.isDarwin()) {
         const starter = b.addExecutable(.{
             .name = "macosx-starter",
@@ -330,6 +355,7 @@ pub fn build(b: *std.Build) void {
         b.getInstallStep().dependOn(&b.addInstallArtifact(starter, .{
             .dest_dir = .{ .override = .{ .custom = b.fmt("lib/{s}", .{auxdir_name}) } },
         }).step);
+        macosx_starter_exe = starter;
     }
 
     // `zig build run -- <args>`
@@ -563,6 +589,77 @@ pub fn build(b: *std.Build) void {
         unit_test_step.dependOn(&b.addRunArtifact(starter_tests).step);
     }
 
+    // `zig build scheme`
+    const scheme_step = b.step(
+        "scheme",
+        "Build Scheme subsystems, bands, libraries, and plugins via tools/build-scheme.py",
+    );
+    const scheme_cmd = b.addSystemCommand(&.{
+        "python3",
+        "tools/build-scheme.py",
+        "build",
+        "--skip-microcode",
+        "--arch",
+        arch.scheme_arch,
+        "--plugins",
+        plugins,
+    });
+    scheme_cmd.addArg("--scheme-exe");
+    scheme_cmd.addFileArg(scheme_exe.getEmittedBin());
+    if (host_scheme) |hs| {
+        scheme_cmd.addArgs(&.{ "--host-scheme", hs });
+    }
+    if (host_lib) |hl| {
+        scheme_cmd.addArgs(&.{ "--host-lib", hl });
+    }
+    if (cross) {
+        scheme_cmd.addArg("--cross");
+    }
+    if (jobs) |j| {
+        scheme_cmd.addArgs(&.{ "--jobs", b.fmt("{d}", .{j}) });
+    }
+    scheme_cmd.setCwd(b.path("."));
+    scheme_step.dependOn(&scheme_cmd.step);
+
+    // `zig build install-scheme`
+    const install_scheme_step = b.step(
+        "install-scheme",
+        "Install Scheme binary, bands, core subsystems, and plugins to install prefix",
+    );
+    const install_scheme_cmd = b.addSystemCommand(&.{
+        "python3",
+        "tools/build-scheme.py",
+        "install",
+        "--skip-microcode",
+        "--arch",
+        arch.scheme_arch,
+        "--plugins",
+        plugins,
+    });
+    install_scheme_cmd.addArg("--prefix");
+    install_scheme_cmd.addDirectoryArg(.{ .relative = .{ .base = .install_prefix } });
+    install_scheme_cmd.addArg("--scheme-exe");
+    install_scheme_cmd.addFileArg(scheme_exe.getEmittedBin());
+    if (macosx_starter_exe) |starter| {
+        install_scheme_cmd.addArg("--macosx-starter");
+        install_scheme_cmd.addFileArg(starter.getEmittedBin());
+    }
+    install_scheme_cmd.setCwd(b.path("."));
+    install_scheme_step.dependOn(&install_scheme_cmd.step);
+
+    // `zig build clean-scheme`
+    const clean_scheme_step = b.step(
+        "clean-scheme",
+        "Clean Scheme build artifacts, bands, and staging symlinks",
+    );
+    const clean_scheme_cmd = b.addSystemCommand(&.{
+        "python3",
+        "tools/build-scheme.py",
+        "clean",
+    });
+    clean_scheme_cmd.setCwd(b.path("."));
+    clean_scheme_step.dependOn(&clean_scheme_cmd.step);
+
     // `zig build bootstrap`
     const bootstrap_step = b.step(
         "bootstrap",
@@ -584,7 +681,14 @@ pub fn build(b: *std.Build) void {
         "--src-dir",
         "src",
         "--allow-arm64-flonum-except",
+        "--library-path",
+        "src/lib",
+        "--scheme-exe",
     });
+    check_cmd.addFileArg(scheme_exe.getEmittedBin());
+    if (test_suite) |suite| {
+        check_cmd.addArgs(&.{ "--test", suite });
+    }
     check_cmd.setCwd(b.path("."));
     check_step.dependOn(&check_cmd.step);
 
@@ -614,7 +718,17 @@ pub fn build(b: *std.Build) void {
     // `zig build macos-app` & `zig build macos-dmg`
     if (target.result.os.tag.isDarwin()) {
         const app_step = b.step("macos-app", "Build MIT/GNU Scheme macOS .app bundle");
-        const app_cmd = b.addSystemCommand(&.{"./src/etc/macosx/make-app.sh"});
+        const app_cmd = b.addSystemCommand(&.{
+            "./src/etc/macosx/make-app.sh",
+            "--plugins",
+            plugins,
+        });
+        app_cmd.addArg("--scheme-exe");
+        app_cmd.addFileArg(scheme_exe.getEmittedBin());
+        if (macosx_starter_exe) |starter| {
+            app_cmd.addArg("--macosx-starter");
+            app_cmd.addFileArg(starter.getEmittedBin());
+        }
         app_cmd.setCwd(b.path("."));
         app_step.dependOn(&app_cmd.step);
 

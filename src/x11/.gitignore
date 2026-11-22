@@ -29,3 +29,4 @@
 /x11-const.c
 /x11-const.scm
 /x11-shim.c
+/x11-shim.so

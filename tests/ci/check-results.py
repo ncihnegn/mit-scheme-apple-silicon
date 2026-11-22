@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Run or parse `make check` output and fail on unexpected test failures."""
+"""Run or parse Scheme test suite output and fail on unexpected test failures."""
 
 import argparse
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -143,34 +142,6 @@ def _stream_subprocess(cmd, env, cwd=None):
     return rc, lines
 
 
-def run_make_check(src_dir):
-    """Execute FAST=y make -C <src_dir> check </dev/null and capture combined output."""
-    env = os.environ.copy()
-    env["FAST"] = "y"
-    return _stream_subprocess(["make", "-C", src_dir, "check"], env=env)
-
-
-def _apply_darwin_autotools_env(env):
-    """Export LIBTOOLIZE and ACLOCAL_PATH on macOS so tests/ffi/autobuild.sh finds libtool macros."""
-    if sys.platform != "darwin":
-        return
-    gl_bin = shutil.which("glibtoolize") or shutil.which("libtoolize")
-    if not gl_bin:
-        return
-    env.setdefault("LIBTOOLIZE", os.path.basename(gl_bin))
-    gl_aclocal = os.path.normpath(
-        os.path.join(os.path.dirname(os.path.realpath(gl_bin)), "..", "share", "aclocal")
-    )
-    candidates = [gl_aclocal, "/opt/homebrew/share/aclocal", "/usr/local/share/aclocal"]
-    existing = [p for p in env.get("ACLOCAL_PATH", "").split(":") if p]
-    prepend = []
-    for d in candidates:
-        if os.path.isdir(d) and d not in existing and d not in prepend:
-            prepend.append(d)
-    if prepend:
-        env["ACLOCAL_PATH"] = ":".join(prepend + existing)
-
-
 def run_scheme_check(scheme_exe, src_dir, library_path, test_name=None):
     """Run tests/check.scm directly using scheme_exe against library_path."""
     abs_exe = os.path.abspath(scheme_exe)
@@ -201,7 +172,6 @@ def run_scheme_check(scheme_exe, src_dir, library_path, test_name=None):
         env["MIT_SCHEME_EXE"] = abs_exe
         env["MITSCHEME_LIBRARY_PATH"] = effective_lib
         env["MITSCHEME_INF_DIRECTORY"] = effective_lib
-        _apply_darwin_autotools_env(env)
         if test_name:
             env["TEST"] = test_name
 
@@ -222,6 +192,22 @@ def run_scheme_check(scheme_exe, src_dir, library_path, test_name=None):
     finally:
         if tmpdir is not None:
             tmpdir.cleanup()
+
+
+def resolve_default_scheme_exe(src_dir):
+    abs_src = os.path.abspath(src_dir)
+    repo_root = os.path.dirname(abs_src)
+    for cand in (
+        os.path.join(repo_root, "zig-out", "bin", "mit-scheme"),
+        os.path.join(abs_src, "microcode", "scheme"),
+    ):
+        if os.path.isfile(cand) and os.access(cand, os.X_OK):
+            return cand
+    print(
+        f"error: no executable Scheme binary found; build with `zig build` or pass --scheme-exe",
+        file=sys.stderr,
+    )
+    return None
 
 
 def main():
@@ -265,21 +251,20 @@ def main():
             lines = f.readlines()
         rc = 0
     else:
-        if args.scheme_exe:
-            rc, lines = run_scheme_check(
-                args.scheme_exe,
-                args.src_dir,
-                args.library_path,
-                test_name=args.test,
-            )
-        else:
-            rc, lines = run_make_check(args.src_dir)
+        scheme_exe = args.scheme_exe or resolve_default_scheme_exe(args.src_dir)
+        if not scheme_exe:
+            return 1
+        rc, lines = run_scheme_check(
+            scheme_exe,
+            args.src_dir,
+            args.library_path,
+            test_name=args.test,
+        )
         if args.save_log:
             with open(args.save_log, "w", encoding="utf-8") as f:
                 f.writelines(lines)
         if rc != 0:
-            runner = "scheme check" if args.scheme_exe else "make check"
-            print(f"error: {runner} exited with status {rc}", file=sys.stderr)
+            print(f"error: scheme check exited with status {rc}", file=sys.stderr)
             return rc
 
     saw_summary, passed, failed = parse_summary(lines)

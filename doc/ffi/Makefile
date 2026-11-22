@@ -1,9 +1,8 @@
-# doc/ffi/Makefile.in
+# doc/ffi/Makefile
 
-@SET_MAKE@
-srcdir = @srcdir@
-top_srcdir = @top_srcdir@
-VPATH = @srcdir@
+srcdir = .
+top_srcdir = ..
+VPATH = $(srcdir)
 
 SOURCES = ffi.texinfo prhello.cdecl prhello.scm
 TEXINFO_ROOT = ffi

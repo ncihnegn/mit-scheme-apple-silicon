@@ -27,8 +27,6 @@ USA.
 
 /* Interface to the Blowfish encryption library */
 
-#include "config.h"
-
 #include "blowfish.h"
 
 typedef struct blowfish BF_KEY;

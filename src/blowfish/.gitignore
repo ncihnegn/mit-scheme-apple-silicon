@@ -32,6 +32,7 @@
 /blowfish-const.c
 /blowfish-const.scm
 /blowfish-shim.c
+/blowfish-shim.so
 /mit-scheme-blowfish.info
 /stamp-h1
 /stamp-scheme

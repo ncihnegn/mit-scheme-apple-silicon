@@ -9,7 +9,11 @@ case ${SCRIPT} in
         HERE=$(dirname "$(pwd)/${SCRIPT}")
         ;;
 esac
-MIT_SCHEME_EXE=${HERE}/microcode/scheme
+if [ -x "${HERE}/../zig-out/bin/mit-scheme" ]; then
+    MIT_SCHEME_EXE=${HERE}/../zig-out/bin/mit-scheme
+else
+    MIT_SCHEME_EXE=${HERE}/microcode/scheme
+fi
 MITSCHEME_INF_DIRECTORY=${HERE}/lib
 MITSCHEME_LIBRARY_PATH=${HERE}/lib
 export MIT_SCHEME_EXE

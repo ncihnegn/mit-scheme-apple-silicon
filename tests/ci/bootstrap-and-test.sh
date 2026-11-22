@@ -28,9 +28,9 @@ Usage: $0 [OPTIONS]
   --stage2-only          Bootstrap and install Stage 2 native host only, then exit
   --host-scheme PATH     Bootstrap host scheme binary (12.1 svm1 or patched 12.1 aarch64le)
   --host-lib PATH        Bootstrap host library directory
-  --jobs N               Parallel make jobs (default: CPU count)
+  --jobs N               Parallel build jobs (default: CPU count)
   --skip-build           Skip build stages; run verification against existing src/ build
-  --skip-check           Skip FAST=y make check
+  --skip-check           Skip Scheme test suite check
   --skip-macos-app       Skip macOS app bundle build/codesign verification
   --clean-after          Remove build and test artifacts from working tree when done
 EOF
@@ -104,43 +104,6 @@ if [ -z "${JOBS}" ]; then
     fi
 fi
 
-# On macOS (or separate-prefix Homebrew setups), GNU automake and libtool
-# often live in separate prefixes; export LIBTOOLIZE and ACLOCAL_PATH so
-# src/Setup.sh and tests/ffi/autobuild.sh locate libtool macros reliably.
-if [ "${SYSNAME}" = "Darwin" ]; then
-    GL_BIN=$(command -v glibtoolize 2>/dev/null || command -v libtoolize 2>/dev/null || true)
-    if [ -n "${GL_BIN}" ]; then
-        export LIBTOOLIZE
-        LIBTOOLIZE=$(basename "${GL_BIN}")
-        GL_REAL=$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "${GL_BIN}")
-        GL_ACLOCAL=$(cd "$(dirname "${GL_REAL}")/.." && pwd)/share/aclocal
-    else
-        GL_ACLOCAL=""
-    fi
-    BREW_PREFIX=""
-    LIBTOOL_PREFIX=""
-    if command -v brew >/dev/null 2>&1; then
-        BREW_PREFIX=$(brew --prefix)
-        LIBTOOL_PREFIX=$(brew --prefix libtool 2>/dev/null || true)
-    fi
-    EXTRA_ACLOCAL=""
-    for dir in \
-        "${GL_ACLOCAL}" \
-        "${LIBTOOL_PREFIX:+${LIBTOOL_PREFIX}/share/aclocal}" \
-        "${BREW_PREFIX:+${BREW_PREFIX}/share/aclocal}" \
-        "/usr/local/share/aclocal"; do
-        if [ -n "${dir}" ] && [ -d "${dir}" ]; then
-            case ":${EXTRA_ACLOCAL}:" in
-                *:"${dir}":*) ;;
-                *) EXTRA_ACLOCAL="${EXTRA_ACLOCAL:+${EXTRA_ACLOCAL}:}${dir}" ;;
-            esac
-        fi
-    done
-    if [ -n "${EXTRA_ACLOCAL}" ]; then
-        export ACLOCAL_PATH="${EXTRA_ACLOCAL}${ACLOCAL_PATH:+:${ACLOCAL_PATH}}"
-    fi
-fi
-
 WORK_TMP=$(mktemp -d)
 VERIFY_TMP=$(mktemp -d)
 cleanup() {
@@ -149,50 +112,7 @@ cleanup() {
 trap cleanup EXIT
 
 clean_tree() {
-    if [ -f "${SRC_DIR}/imail/Makefile" ]; then
-        make -C "${SRC_DIR}/imail" distclean || true
-    fi
-    if [ -f "${SRC_DIR}/Makefile" ]; then
-        make -C "${SRC_DIR}" distclean || true
-    fi
-    if [ -f "${SRC_DIR}/microcode/Makefile" ]; then
-        make -C "${SRC_DIR}/microcode" distclean || true
-    fi
-    rm -f "${SRC_DIR}/edwin/stamp-scheme" "${SRC_DIR}/imail/stamp-scheme"
-    if [ -f "${REPO_ROOT}/tests/ffi/Makefile" ]; then
-        make -C "${REPO_ROOT}/tests/ffi" maintainer-clean || true
-    fi
-    # Use distclean (not maintainer-clean) in tests/ so tests/microcode/*.c
-    # standalone smoke tests are preserved.
-    (cd "${REPO_ROOT}/tests" && ./Clean.sh distclean) || true
-    rm -rf \
-        "${REPO_ROOT}/tests/ffi/autom4te.cache" \
-        "${REPO_ROOT}/tests/ffi/m4" \
-        "${REPO_ROOT}/tests/ffi/.deps" \
-        "${REPO_ROOT}/tests/ffi/.libs" \
-        "${REPO_ROOT}/tests/ffi/ffi-test-types.bin" \
-        "${REPO_ROOT}/tests/ffi/ffi-test-const.bin" \
-        "${REPO_ROOT}/tests/ffi/ffi-test-unx.pkd" \
-        "${REPO_ROOT}/tests/ffi/ffi-test-shim.la" \
-        "${REPO_ROOT}/tests/ffi/ffi-test.lo" \
-        "${REPO_ROOT}/tests/ffi/ffi-test.o" \
-        "${REPO_ROOT}/tests/ffi/test-ffi-wrapper.com" \
-        "${REPO_ROOT}/tests/ffi/test-ffi-wrapper.bci"
-    if [ -d "${SRC_DIR}/tools" ]; then
-        # Preserve tracked .gitignore and README inside src/tools/.
-        find "${SRC_DIR}/tools" -mindepth 1 -maxdepth 1 \
-            ! -name '.gitignore' ! -name 'README' -exec rm -rf {} +
-    fi
-    rm -rf "${SRC_DIR}/mit-scheme.app" "${SRC_DIR}/tmp" \
-        "${SRC_DIR}/dummy-config.h.in" "${SRC_DIR}/dummy-config.h"
-}
-
-ensure_setup() {
-    local scheme_exe="$1"
-    # Remove config.h.in / dummy-config.h.in and configure before running src/Setup.sh
-    # to avoid its uninitialized-variable bug in clean() when files already exist.
-    rm -f "${SRC_DIR}/configure" "${SRC_DIR}/config.h.in" "${SRC_DIR}/dummy-config.h.in"
-    (cd "${SRC_DIR}" && MIT_SCHEME_EXE="${scheme_exe}" ./Setup.sh)
+    python3 "${REPO_ROOT}/tools/build-scheme.py" clean
 }
 
 resolve_host_scheme_and_lib() {
@@ -255,14 +175,12 @@ prepare_stage1_host() {
             exit 1
         fi
         echo "=== Stage 1: Building fixed svm1 microcode for safe fasdump ==="
-        if [ -f "${SRC_DIR}/microcode/Makefile" ]; then
-            make -C "${SRC_DIR}/microcode" distclean || true
+        if [ "${SYSNAME}" = "Darwin" ] && [ -z "${DYLD_FALLBACK_LIBRARY_PATH:-}" ] && [ -d /usr/local/lib ]; then
+            export DYLD_FALLBACK_LIBRARY_PATH="/usr/local/lib:/usr/lib"
         fi
-        (cd "${SRC_DIR}/microcode" && MIT_SCHEME_EXE="${HOST_SCHEME}" ./Setup.sh && ./configure --enable-native-code=svm1)
-        make -C "${SRC_DIR}/microcode" -j"${JOBS}"
-        cp "${SRC_DIR}/microcode/scheme" "${WORK_TMP}/svm1-scheme"
+        (cd "${REPO_ROOT}" && zig build -Darch=svm1_64le -Doptimize=ReleaseFast --prefix "${WORK_TMP}/stage1-svm1")
+        cp "${WORK_TMP}/stage1-svm1/bin/mit-scheme" "${WORK_TMP}/svm1-scheme"
         chmod +x "${WORK_TMP}/svm1-scheme"
-        make -C "${SRC_DIR}/microcode" distclean
         cat > "${wrapper}" <<EOF
 #!/bin/sh
 : "\${MITSCHEME_LIBRARY_PATH:=${HOST_LIB}}"
@@ -295,32 +213,19 @@ build_stage2() {
     clean_tree
     prepare_stage1_host
     echo "=== Stage 2: Cross-bootstrapping native aarch64le into ${STAGE2_PREFIX} ==="
-    ensure_setup "${STAGE1_HOST_SCHEME}"
-    (
-        cd "${SRC_DIR}"
-        MIT_SCHEME_EXE="${STAGE1_HOST_SCHEME}" \
-            ./configure --prefix="${STAGE2_PREFIX}" \
-            --enable-native-code=aarch64le \
-            --enable-cross-compiling
+    local build_args=(
+        build --install
+        --arch aarch64le
+        --optimize ReleaseFast
+        --cross
+        --host-scheme "${STAGE1_HOST_SCHEME}"
+        --prefix "${STAGE2_PREFIX}"
+        --jobs "${JOBS}"
     )
-    # Build 13.x SOS first and stage it under src/tools/sos/ so compile-xml
-    # (which calls (load-option 'sos)) does not load mismatched 12.1 sos binaries.
-    make -C "${SRC_DIR}" -j"${JOBS}" compile-sos
-    mkdir -p "${SRC_DIR}/tools/sos"
-    cp "${SRC_DIR}/sos/load.scm" "${SRC_DIR}/tools/sos/"
-    cp "${SRC_DIR}/sos/sos-unx.dkp" "${SRC_DIR}/tools/sos/sos-unx.pkd"
-    for f in "${SRC_DIR}/sos/"*.nib; do
-        cp "${f}" "${SRC_DIR}/tools/sos/$(basename "${f}" .nib).bin"
-    done
-
-    local cross_lib_path="${SRC_DIR}/tools"
     if [ -n "${HOST_LIB}" ]; then
-        cross_lib_path="${cross_lib_path}:${HOST_LIB}"
+        build_args+=(--host-lib "${HOST_LIB}")
     fi
-    MITSCHEME_LIBRARY_PATH="${cross_lib_path}" \
-        make -C "${SRC_DIR}" -j"${JOBS}" cross-host
-    make -C "${SRC_DIR}" -j"${JOBS}" cross-target
-    env -u MIT_SCHEME_EXE make -C "${SRC_DIR}" -j"${JOBS}" install
+    python3 "${REPO_ROOT}/tools/build-scheme.py" "${build_args[@]}"
 
     NATIVE_HOST="${STAGE2_PREFIX}/bin/mit-scheme"
     if ! "${NATIVE_HOST}" --batch-mode --no-init-file --eval '(%exit)' </dev/null >/dev/null 2>&1; then
@@ -333,24 +238,15 @@ build_stage2() {
 build_stage3() {
     echo "=== Stage 3: Clean self-hosted native rebuild (using ${NATIVE_HOST}) ==="
     clean_tree
-    ensure_setup "${NATIVE_HOST}"
-    (
-        cd "${SRC_DIR}"
-        MIT_SCHEME_EXE="${NATIVE_HOST}" ./configure
-    )
-    if ! grep -q '^#define CC_IS_NATIVE' "${SRC_DIR}/microcode/cmpintmd-config.h"; then
-        echo "error: plain ./configure did not enable CC_IS_NATIVE in cmpintmd-config.h" >&2
-        exit 1
-    fi
-    if ! grep -q '^MIT_SCHEME_ARCH = aarch64le' "${SRC_DIR}/microcode/Makefile"; then
-        echo "error: plain ./configure did not select MIT_SCHEME_ARCH = aarch64le" >&2
-        exit 1
-    fi
-    make -C "${SRC_DIR}" -j"${JOBS}"
+    python3 "${REPO_ROOT}/tools/build-scheme.py" build \
+        --arch aarch64le \
+        --optimize ReleaseFast \
+        --host-scheme "${NATIVE_HOST}" \
+        --jobs "${JOBS}"
 }
 
 run_verifications() {
-    local scheme_bin="${SRC_DIR}/microcode/scheme"
+    local scheme_bin="${REPO_ROOT}/zig-out/bin/mit-scheme"
     local lib_dir="${SRC_DIR}/lib"
     local native_log="${VERIFY_TMP}/verify-native.log"
     local trap_log="${VERIFY_TMP}/verify-trap.log"
@@ -360,7 +256,7 @@ run_verifications() {
         exit 1
     fi
 
-    echo "=== Running standalone microcode C smoke tests ==="
+    echo "=== Running standalone microcode Zig smoke tests ==="
     "${SCRIPT_DIR}/run-microcode-smoke.sh" \
         --ucode-dir "${SRC_DIR}/microcode" \
         --require-native
@@ -402,9 +298,11 @@ run_verifications() {
     fi
 
     if [ "${SKIP_CHECK}" -eq 0 ]; then
-        echo "=== Running Scheme test suite (FAST=y make check) ==="
+        echo "=== Running Scheme test suite ==="
         python3 "${SCRIPT_DIR}/check-results.py" \
             --src-dir "${SRC_DIR}" \
+            --scheme-exe "${scheme_bin}" \
+            --library-path "${lib_dir}" \
             --allow-arm64-flonum-except
     fi
 

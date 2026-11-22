@@ -27,8 +27,4 @@ USA.
 
 /* Interface to the pgsql database library */
 
-#include "config.h"
-
-#ifdef HAVE_LIBPQ_FE_H
-#  include <libpq-fe.h>
-#endif
+#include <libpq-fe.h>

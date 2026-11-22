@@ -20,3 +20,9 @@
 /test-driver
 
 /stamp-scheme
+/stamp-shim
+/pgsql-const
+/pgsql-const.c
+/pgsql-const.scm
+/pgsql-shim.c
+/pgsql-shim.so

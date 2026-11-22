@@ -43,12 +43,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.1
+
       - name: Install Homebrew build dependencies
         run: |
-          brew install autoconf automake libtool texinfo mit-scheme
-          TEXINFO_BIN="$(brew --prefix texinfo)/bin"
-          echo "${TEXINFO_BIN}" >> "$GITHUB_PATH"
-          "${TEXINFO_BIN}/makeinfo" --version | head -n 1
+          brew install mit-scheme
 
       - name: Restore Stage 2 native aarch64le host cache
         id: stage2-cache
@@ -59,8 +61,10 @@ jobs:
           key: >-
             macos-arm64-stage2-${{
               hashFiles(
-                'src/microcode/*.h',
-                'src/microcode/cmpintmd/aarch64*',
+                'build.zig',
+                'tools/build-scheme.py',
+                'src/microcode/zig/**',
+                'src/microcode/cmpauxmd/aarch64.S',
                 'src/compiler/**',
                 'src/runtime/**',
                 'src/sf/**',

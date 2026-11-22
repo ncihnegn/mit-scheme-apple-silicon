@@ -21,4 +21,6 @@ for SUBDIR in runtime/test-continuation-parser-data; do
     (cd ${SUBDIR} && TOPDIR=${TOPDIR} ${TOPDIR}/etc/Clean.sh ${COMMAND})
 done
 echo "Cleaning in ffi"
-(cd ffi && make ${COMMAND} || true)
+(cd ffi && rm -rf ffi-test-const ffi-test-const.c ffi-test-const.scm \
+    ffi-test-shim.c ffi-test-shim.so ffi-test-types.bin ffi-test-const.bin \
+    test-ffi-wrapper.com test-ffi-wrapper.bci *.o *.lo *.la .libs .deps)

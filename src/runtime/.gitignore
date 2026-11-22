@@ -1,3 +1,5 @@
+/generated-standard-libs
+
 # LIARC build products
 /*.c
 /*.o
