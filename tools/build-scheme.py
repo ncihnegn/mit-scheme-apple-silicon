@@ -297,18 +297,20 @@ def run_dag(
                 done.add(name)
 
 
-def resolve_cc() -> list[str]:
-    env_cc = os.environ.get("CC", "").strip()
-    if env_cc:
-        return shlex.split(env_cc)
-    for name in ("cc", "clang", "gcc"):
-        found = shutil.which(name)
-        if found:
-            return [found]
+def resolve_zig() -> str:
     zig = shutil.which("zig")
     if zig:
-        return [zig, "cc"]
-    raise SystemExit("error: no C compiler found (set CC or install cc/zig)")
+        return zig
+    raise SystemExit("error: zig compiler not found in PATH")
+
+
+def zig_opt_mode(optimize: str) -> str:
+    return {
+        "Debug": "debug",
+        "ReleaseFast": "fast",
+        "ReleaseSafe": "safe",
+        "ReleaseSmall": "small",
+    }[optimize]
 
 
 def darwin_zig_env(env: dict[str, str] | None = None) -> dict[str, str]:
@@ -322,16 +324,129 @@ def darwin_zig_env(env: dict[str, str] | None = None) -> dict[str, str]:
     return out
 
 
-def pkg_config_flags(package: str, mode: str, fallback: list[str] | None = None) -> list[str]:
+def pkg_config_try(package: str) -> tuple[list[str], list[str]] | None:
     pc = shutil.which("pkg-config")
-    if pc:
-        chk = subprocess.run([pc, "--exists", package], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if chk.returncode == 0:
-            res = subprocess.run([pc, mode, package], capture_output=True, text=True, check=True)
-            return shlex.split(res.stdout)
-    if fallback is not None:
-        return fallback
-    raise SystemExit(f"error: pkg-config package '{package}' not found")
+    if not pc:
+        return None
+    cflags = subprocess.run([pc, "--cflags", package], capture_output=True, text=True)
+    if cflags.returncode != 0:
+        return None
+    libs = subprocess.run([pc, "--libs", package], capture_output=True, text=True)
+    if libs.returncode != 0:
+        return None
+    return shlex.split(cflags.stdout), shlex.split(libs.stdout)
+
+
+def probe_header_flags(
+    header_rel: str,
+    prefixes: tuple[str, ...],
+    default_libs: list[str],
+    direct_inc_dirs: tuple[str, ...] = (),
+) -> tuple[list[str], list[str]] | None:
+    for prefix in prefixes:
+        p = Path(prefix)
+        inc_dir = p / "include"
+        if (inc_dir / header_rel).is_file():
+            cflags = [f"-I{inc_dir}"]
+            lib_dir = p / "lib"
+            libs = ([f"-L{lib_dir}"] if lib_dir.is_dir() else []) + default_libs
+            return cflags, libs
+    for inc in direct_inc_dirs:
+        p = Path(inc)
+        if (p / header_rel).is_file():
+            cflags = [f"-I{p}"]
+            lib_dir = p.parent / "lib"
+            libs = ([f"-L{lib_dir}"] if lib_dir.is_dir() else []) + default_libs
+            return cflags, libs
+    return None
+
+
+def libpq_flags() -> tuple[list[str], list[str]]:
+    if found := pkg_config_try("libpq"):
+        return found
+    pg_config = shutil.which("pg_config")
+    if pg_config:
+        inc_res = subprocess.run([pg_config, "--includedir"], capture_output=True, text=True)
+        lib_res = subprocess.run([pg_config, "--libdir"], capture_output=True, text=True)
+        if inc_res.returncode == 0 and lib_res.returncode == 0:
+            inc = inc_res.stdout.strip()
+            lib = lib_res.stdout.strip()
+            if inc and Path(inc, "libpq-fe.h").is_file():
+                libs = ([f"-L{lib}"] if lib and Path(lib).is_dir() else []) + ["-lpq"]
+                return [f"-I{inc}"], libs
+    if found := probe_header_flags(
+        "libpq-fe.h",
+        ("/opt/homebrew/opt/libpq", "/usr/local/opt/libpq", "/opt/homebrew", "/usr/local", "/usr"),
+        ["-lpq"],
+        direct_inc_dirs=("/usr/include/postgresql", "/usr/local/include/postgresql"),
+    ):
+        return found
+    raise SystemExit("error: libpq headers not found (install libpq/postgresql or configure pkg-config)")
+
+
+def gdbm_flags() -> tuple[list[str], list[str]]:
+    if found := pkg_config_try("gdbm"):
+        return found
+    if found := probe_header_flags(
+        "gdbm.h",
+        ("/opt/homebrew/opt/gdbm", "/usr/local/opt/gdbm", "/opt/homebrew", "/usr/local", "/usr"),
+        ["-lgdbm"],
+    ):
+        return found
+    return [], ["-lgdbm"]
+
+
+def x11_flags() -> tuple[list[str], list[str]]:
+    if found := pkg_config_try("x11"):
+        return found
+    if found := probe_header_flags(
+        "X11/Xlib.h",
+        ("/opt/X11", "/opt/homebrew", "/usr/local", "/usr", "/usr/X11R6"),
+        ["-lX11"],
+    ):
+        return found
+    return [], ["-lX11"]
+
+
+def split_pkg_flags(cflags: list[str], lib_flags: list[str]) -> tuple[list[str], list[str], list[str], list[str]]:
+    inc_dirs: list[str] = []
+    other_cflags: list[str] = []
+    lib_dirs: list[str] = []
+    link_args: list[str] = []
+
+    i = 0
+    while i < len(cflags):
+        tok = cflags[i]
+        if tok in ("-I", "-isystem") and i + 1 < len(cflags):
+            inc_dirs.append(cflags[i + 1])
+            i += 2
+        elif tok.startswith("-I") and len(tok) > 2:
+            inc_dirs.append(tok[2:])
+            i += 1
+        elif tok.startswith("-isystem") and len(tok) > 8:
+            inc_dirs.append(tok[8:])
+            i += 1
+        else:
+            other_cflags.append(tok)
+            i += 1
+
+    i = 0
+    while i < len(lib_flags):
+        tok = lib_flags[i]
+        if tok == "-L" and i + 1 < len(lib_flags):
+            lib_dirs.append(lib_flags[i + 1])
+            i += 2
+        elif tok.startswith("-L") and len(tok) > 2:
+            lib_dirs.append(tok[2:])
+            i += 1
+        elif tok == "-l" and i + 1 < len(lib_flags):
+            link_args.append(f"-l{lib_flags[i + 1]}")
+            i += 2
+        else:
+            link_args.append(tok)
+            i += 1
+
+    return inc_dirs, other_cflags, lib_dirs, link_args
 
 
 class SchemeContext:
@@ -1097,32 +1212,29 @@ class SchemeContext:
         remove_path(pdir / f"{name}-shim.la")
         remove_path(pdir / ".libs")
 
-        cc = resolve_cc()
-        cc_env = darwin_zig_env() if Path(cc[0]).name == "zig" else None
-        is_darwin = platform.system() == "Darwin"
+        zig = resolve_zig()
         exe_ext = ".exe" if platform.system() == "Windows" else ""
-        shared_flags = (
-            ["-bundle", "-undefined", "dynamic_lookup", "-fPIC"]
-            if is_darwin
-            else ["-shared", "-fPIC"]
-        )
         inc_dir = self.make_temp_lib_symlink(SRC_DIR / "lib")
 
         extra_cflags: list[str] = []
         extra_libs: list[str] = []
+        zig_root: str | None = None
+        translate_info: tuple[str, str] | None = None  # (c_mod_name, header_filename)
+
         if name == "blowfish":
-            c_sources = ["blowfish-shim.c", "blowfish.c", "blowfish-adapter.c"]
+            zig_root = "blowfish_adapter.zig"
         elif name == "gdbm":
-            c_sources = ["gdbm-shim.c", "gdbm-adapter.c"]
-            extra_libs = ["-lgdbm"]
+            zig_root = "gdbm_adapter.zig"
+            translate_info = ("gdbm_c", "gdbm-shim.h")
+            extra_cflags, extra_libs = gdbm_flags()
         elif name == "pgsql":
-            c_sources = ["pgsql-shim.c"]
-            extra_cflags = pkg_config_flags("libpq", "--cflags")
-            extra_libs = pkg_config_flags("libpq", "--libs")
+            extra_cflags, extra_libs = libpq_flags()
         else:  # x11
-            c_sources = ["x11-shim.c", "x11base.c", "x11color.c", "x11graph.c", "x11term.c"]
-            extra_cflags = pkg_config_flags("x11", "--cflags", fallback=[])
-            extra_libs = pkg_config_flags("x11", "--libs", fallback=["-lX11"])
+            zig_root = "x11.zig"
+            translate_info = ("x11_c", "x11.h")
+            extra_cflags, extra_libs = x11_flags()
+
+        inc_dirs, other_cflags, lib_dirs, link_args = split_pkg_flags(extra_cflags, extra_libs)
 
         scheme_env = self.target_env(target_scheme, prepend_dir=pdir)
         run_cmd(
@@ -1133,37 +1245,100 @@ class SchemeContext:
             label=f"plugin:{name}:shim",
         )
 
-        const_exe = pdir / f"{name}-const{exe_ext}"
-        run_cmd(
-            [*cc, "-O2", f"-I{inc_dir}", *extra_cflags, "-o", str(const_exe), f"{name}-const.c"],
-            cwd=pdir,
-            env=cc_env,
-            label=f"plugin:{name}:const-cc",
-        )
-        run_cmd([str(const_exe)], cwd=pdir, label=f"plugin:{name}:const-gen")
-        run_cmd(
-            [str(target_scheme), "--batch-mode"],
-            cwd=pdir,
-            env=scheme_env,
-            stdin_text=f'(sf "{name}-const")\n',
-            label=f"plugin:{name}:const-sf",
-        )
-        run_cmd(
-            [
-                *cc,
-                "-O2",
-                *shared_flags,
+        with tempfile.TemporaryDirectory(prefix=f"mit-scheme-plugin-{name}-") as tmpdir_raw:
+            tmp_dir = Path(tmpdir_raw)
+            zig_cache = tmp_dir / "zig-cache"
+            zig_cache.mkdir(parents=True, exist_ok=True)
+            zig_env = darwin_zig_env()
+            zig_env["ZIG_LOCAL_CACHE_DIR"] = str(zig_cache)
+
+            const_exe = pdir / f"{name}-const{exe_ext}"
+            run_cmd(
+                [
+                    zig,
+                    "cc",
+                    "-O2",
+                    f"-I{pdir}",
+                    f"-I{inc_dir}",
+                    *extra_cflags,
+                    "-o",
+                    str(const_exe),
+                    f"{name}-const.c",
+                ],
+                cwd=pdir,
+                env=zig_env,
+                label=f"plugin:{name}:const-cc",
+            )
+            run_cmd([str(const_exe)], cwd=pdir, label=f"plugin:{name}:const-gen")
+            run_cmd(
+                [str(target_scheme), "--batch-mode"],
+                cwd=pdir,
+                env=scheme_env,
+                stdin_text=f'(sf "{name}-const")\n',
+                label=f"plugin:{name}:const-sf",
+            )
+
+            lib_cmd = [
+                zig,
+                "build-lib",
+                "-dynamic",
+                "-fallow-shlib-undefined",
+                "-O",
+                zig_opt_mode(self.args.optimize),
+                "-fPIC",
+                "-fno-sanitize-c",
+                "-lc",
+                "--cache-dir",
+                str(zig_cache),
+                f"-femit-bin={pdir / f'{name}-shim.so'}",
+                f"-I{pdir}",
                 f"-I{inc_dir}",
-                *extra_cflags,
-                "-o",
-                f"{name}-shim.so",
-                *c_sources,
-                *extra_libs,
-            ],
-            cwd=pdir,
-            env=cc_env,
-            label=f"plugin:{name}:so",
-        )
+                *(f"-I{d}" for d in inc_dirs),
+                *(f"-L{d}" for d in lib_dirs),
+                *(arg for d in lib_dirs for arg in ("-rpath", d)),
+            ]
+
+            if translate_info is not None:
+                c_mod_name, header_name = translate_info
+                tc_cmd = [
+                    zig,
+                    "translate-c",
+                    "-lc",
+                    f"-I{pdir}",
+                    f"-I{inc_dir}",
+                    *(f"-I{d}" for d in inc_dirs),
+                    *other_cflags,
+                    header_name,
+                ]
+                print(f"[plugin:{name}:translate-c] + {' '.join(shlex.quote(a) for a in tc_cmd)}", flush=True)
+                tc_res = subprocess.run(tc_cmd, cwd=pdir, env=zig_env, capture_output=True, text=True)
+                if tc_res.returncode != 0:
+                    raise SystemExit(
+                        f"error: zig translate-c failed for plugin '{name}':\n{tc_res.stderr}"
+                    )
+                c_mod_file = tmp_dir / f"{c_mod_name}.zig"
+                c_mod_file.write_text(tc_res.stdout, encoding="utf-8")
+                lib_cmd.extend([
+                    "--dep",
+                    c_mod_name,
+                    f"-Mroot={zig_root}",
+                    f"-M{c_mod_name}={c_mod_file}",
+                ])
+            elif zig_root is not None:
+                lib_cmd.append(zig_root)
+
+            if other_cflags:
+                lib_cmd.extend(["-cflags", *other_cflags, "--"])
+            lib_cmd.append(f"{name}-shim.c")
+            lib_cmd.extend(link_args)
+
+            run_cmd(
+                lib_cmd,
+                cwd=pdir,
+                env=zig_env,
+                label=f"plugin:{name}:so",
+            )
+
         run_cmd(
             ["sh", "./compile.sh"],
             cwd=pdir,
