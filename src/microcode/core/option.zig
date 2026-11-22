@@ -892,7 +892,8 @@ test "option quoting, parsePathString, parseStandardOptions, and readBandSizes" 
     try std.testing.expectEqualStrings("--version", std.mem.span(option_unused_argv.?[0].?));
 
     // readBandSizes against a temporary FASL file
-    const tmp_path: [*:0]const u8 = "/tmp/zig_option_band_test.com";
+    var tmp_path_buf: [512]u8 = undefined;
+    const tmp_path = (stubs.tempFilePath(&tmp_path_buf, "zig_option_band_test.com") orelse unreachable).ptr;
     var arena: [64]obj.SchemeObject = @splat(0);
     var hdr = std.mem.zeroes(fasl.FaslHeader);
     hdr.version = fasl.fasl_version_code_space;

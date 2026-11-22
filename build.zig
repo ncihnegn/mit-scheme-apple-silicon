@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 const ArchOption = enum {
     auto,
@@ -296,7 +297,9 @@ fn addSchemeCheckStep(
 }
 
 pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
+    const target = b.standardTargetOptions(.{
+        .default_target = if (builtin.os.tag == .windows) .{ .abi = .gnu } else .{},
+    });
     const optimize = b.standardOptimizeOption(.{});
 
     const arch_opt = b.option(
@@ -504,13 +507,15 @@ pub fn build(b: *std.Build) void {
     const cmpintmd_smoke_obj = addMicrocodeSmokeObj(b, "cmpintmd_smoke", .cmpintmd, target, optimize, zig_options_mod);
     const cmpint_smoke_obj = addMicrocodeSmokeObj(b, "cmpint_smoke", .cmpint, target, optimize, zig_options_mod);
     const microcode_smoke_mod = createMicrocodeSmokeModule(b, .none, target, optimize, zig_options_mod);
+    const is_aarch64_native = arch.is_native and arch.cc_arch_id == 15;
     const smoke_step = b.step("test-smoke", "Build and run standalone microcode Zig smoke tests");
     const smoke_specs = [_]struct {
         name: []const u8,
         src: []const u8,
         needs_cmpint: bool = false,
         needs_cmpintmd: bool = false,
-        needs_native: bool = false,
+        needs_cmpintmd_aarch64: bool = false,
+        needs_aarch64: bool = false,
         needs_fasl: bool = false,
         needs_gcloop: bool = false,
         needs_setjmp: bool = false,
@@ -518,7 +523,7 @@ pub fn build(b: *std.Build) void {
         .{
             .name = "jit-smoke",
             .src = "tests/microcode/jit-smoke.zig",
-            .needs_cmpintmd = true,
+            .needs_cmpintmd_aarch64 = true,
             .needs_setjmp = true,
         },
         .{
@@ -543,13 +548,13 @@ pub fn build(b: *std.Build) void {
             .src = "tests/microcode/trampoline-smoke.zig",
             .needs_cmpint = true,
             .needs_cmpintmd = true,
-            .needs_native = true,
+            .needs_aarch64 = true,
             .needs_gcloop = true,
         },
     };
 
     for (smoke_specs) |spec| {
-        if (spec.needs_native and !arch.is_native) continue;
+        if (spec.needs_aarch64 and !is_aarch64_native) continue;
         const smoke_exe = b.addExecutable(.{
             .name = spec.name,
             .root_module = b.createModule(.{
@@ -578,13 +583,13 @@ pub fn build(b: *std.Build) void {
                 .flags = c_flags,
             });
         }
-        if (spec.needs_cmpintmd) {
+        if (spec.needs_cmpintmd or (spec.needs_cmpintmd_aarch64 and is_aarch64_native)) {
             smoke_exe.root_module.addObject(cmpintmd_smoke_obj);
         }
         if (spec.needs_cmpint) {
             smoke_exe.root_module.addObject(cmpint_smoke_obj);
         }
-        if (spec.needs_native) {
+        if (spec.needs_aarch64) {
             if (cmpauxmd_s) |asm_file| {
                 smoke_exe.root_module.addCSourceFile(.{
                     .file = asm_file,

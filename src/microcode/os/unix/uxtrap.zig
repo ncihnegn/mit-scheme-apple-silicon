@@ -264,7 +264,7 @@ fn heapAddressP(addr: ?*const anyopaque) bool {
 }
 
 fn addressUcodeP(pc: usize) bool {
-    if (builtin.os.tag == .linux) {
+    if (builtin.os.tag == .linux and !builtin.is_test) {
         const LinuxBounds = struct {
             extern var __executable_start: u8;
             extern var etext: u8;

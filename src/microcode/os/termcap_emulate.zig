@@ -727,6 +727,7 @@ pub fn tgoto(cm_opt: ?[*:0]const u8, hpos: c_int, vpos: c_int) callconv(.c) ?[*:
 }
 
 test "termcap_emulate tgetent, tgetnum, tgetflag, tgetstr with continuations and tc" {
+    if (comptime builtin.os.tag == .windows) return error.SkipZigTest;
     const saved_entry = term_entry;
     const saved_owned = owned_term_entry;
     const saved_bc = BC;

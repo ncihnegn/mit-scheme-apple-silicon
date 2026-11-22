@@ -877,10 +877,9 @@ test "fasdump header transitions, fixups growth/restore, ccNewBlock, staged code
 
     // 4. writeCodeToFaslFile handles > 512-word staged writes cleanly
     const tmp = struct {
-        extern "c" fn tmpfile() fasl.FaslFileHandle;
         extern "c" fn rewind(fasl.FaslFileHandle) void;
     };
-    const f = tmp.tmpfile();
+    const f: fasl.FaslFileHandle = if (stubs.openTempFile("fasdump")) |fp| @ptrCast(fp) else null;
     try std.testing.expect(f != null);
     defer _ = fasl.close_fasl_output_file(f);
 

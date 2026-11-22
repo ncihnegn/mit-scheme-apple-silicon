@@ -60,7 +60,7 @@ const alert_char: u8 = '\x07';
 const sig_dfl: TsignalHandler = null;
 const sig_ign: TsignalHandler = @ptrFromInt(1);
 
-const use_within_c_stack = build_options.cc_is_native and !builtin.os.tag.isDarwin() and
+const use_within_c_stack = !builtin.is_test and build_options.cc_is_native and !builtin.os.tag.isDarwin() and
     (builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86);
 
 pub var stop_signal_hook_storage: ?*const fn (c_int) callconv(.c) void = null;

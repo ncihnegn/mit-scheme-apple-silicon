@@ -418,7 +418,6 @@ pub export fn faslhdr_utilities_end(h: *FaslHeader) callconv(.c) ?[*]obj.SchemeO
     return h.utilities_end;
 }
 
-extern "c" fn tmpfile() FaslFileHandle;
 extern "c" fn rewind(FaslFileHandle) void;
 
 test "fasl header encode/decode roundtrip, version checks, addressing, and utilities_end" {
@@ -462,7 +461,7 @@ test "fasl header encode/decode roundtrip, version checks, addressing, and utili
     try std.testing.expectEqual(fasl_file_bad_processor, check_fasl_cc_version(&h, 42, 14));
     try std.testing.expectEqual(fasl_file_bad_interface, check_fasl_cc_version(&h, 99, 15));
 
-    const f = tmpfile();
+    const f: FaslFileHandle = if (stubs.openTempFile("fasl")) |fp| @ptrCast(fp) else null;
     try std.testing.expect(f != null);
     defer _ = close_fasl_input_file(f);
 

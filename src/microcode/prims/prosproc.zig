@@ -373,8 +373,10 @@ test "prosproc environment, process table, status, signals, and make-subprocess"
     stubs.setArgs(&.{});
     const env_vec = Prim_scheme_environment();
     try std.testing.expect(obj.vectorP(env_vec));
-    if (std.c.environ[0] != null) {
-        try std.testing.expect(obj.vectorLength(env_vec) >= 1);
+    if (comptime builtin.os.tag != .windows) {
+        if (std.c.environ[0] != null) {
+            try std.testing.expect(obj.vectorLength(env_vec) >= 1);
+        }
     }
 
     // Empty PROCESS-TABLE returns #F

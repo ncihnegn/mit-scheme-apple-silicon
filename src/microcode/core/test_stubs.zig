@@ -1678,3 +1678,50 @@ fn mockTparam(
     outstring[s.len] = 0;
     return @ptrCast(outstring);
 }
+
+var temp_file_seq: std.atomic.Value(u32) = std.atomic.Value(u32).init(0);
+
+pub fn tempFilePath(buf: []u8, filename: []const u8) ?[:0]const u8 {
+    if (buf.len == 0) return null;
+    if (comptime builtin.os.tag == .windows) {
+        var dir: []const u8 = ".";
+        if (std.c.getenv("TEMP") orelse std.c.getenv("TMP")) |env_dir| {
+            const span = std.mem.span(env_dir);
+            if (span.len > 0) dir = span;
+        }
+        while (dir.len > 1 and (dir[dir.len - 1] == '\\' or dir[dir.len - 1] == '/')) {
+            dir = dir[0 .. dir.len - 1];
+        }
+        const out = std.fmt.bufPrint(buf[0 .. buf.len - 1], "{s}\\{s}", .{ dir, filename }) catch return null;
+        buf[out.len] = 0;
+        return buf[0..out.len :0];
+    } else {
+        const out = std.fmt.bufPrint(buf[0 .. buf.len - 1], "/tmp/{s}", .{filename}) catch return null;
+        buf[out.len] = 0;
+        return buf[0..out.len :0];
+    }
+}
+
+pub fn openTempFile(tag: []const u8) ?*std.c.FILE {
+    if (comptime builtin.os.tag == .windows) {
+        const WinTemp = struct {
+            extern "kernel32" fn GetCurrentProcessId() callconv(.winapi) u32;
+            extern "c" fn fopen([*:0]const u8, [*:0]const u8) ?*std.c.FILE;
+        };
+        const seq = temp_file_seq.fetchAdd(1, .monotonic);
+        var name_buf: [128]u8 = undefined;
+        const name = std.fmt.bufPrint(&name_buf, "mit-scheme-{s}-{d}-{d}.tmp", .{
+            tag,
+            WinTemp.GetCurrentProcessId(),
+            seq,
+        }) catch return null;
+        var path_buf: [512]u8 = undefined;
+        const path = tempFilePath(&path_buf, name) orelse return null;
+        return WinTemp.fopen(path.ptr, "w+bTD");
+    } else {
+        const PosixTemp = struct {
+            extern "c" fn tmpfile() ?*std.c.FILE;
+        };
+        return PosixTemp.tmpfile();
+    }
+}

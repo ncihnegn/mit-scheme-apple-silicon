@@ -343,7 +343,7 @@ pub fn x8664ResetHook() callconv(.c) void {
     installHooks(rsi_value, &specs, abi.declare_builtin);
 }
 
-pub fn exportAll() void {
+pub fn exportCore() void {
     @export(&readCcEntryType, .{ .name = "read_cc_entry_type" });
     @export(&writeCcEntryType, .{ .name = "write_cc_entry_type" });
     @export(&readCcEntryOffset, .{ .name = "read_cc_entry_offset" });
@@ -367,7 +367,15 @@ pub fn exportAll() void {
     @export(&trampolineEntryAddr, .{ .name = "trampoline_entry_addr" });
     @export(&trampolineReturnAddr, .{ .name = "trampoline_return_addr" });
     @export(&storeTrampolineInsns, .{ .name = "store_trampoline_insns" });
+}
+
+pub fn exportResetHook() void {
     @export(&x8664ResetHook, .{ .name = "x86_64_reset_hook" });
+}
+
+pub fn exportAll() void {
+    exportCore();
+    exportResetHook();
 }
 
 test "x86_64 cc_entry, jmp target decoding, closures, uuo, trampolines, and hook table" {

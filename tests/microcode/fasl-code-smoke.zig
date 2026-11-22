@@ -2,6 +2,7 @@
 // Derived from tests/microcode/fasl-code-smoke.c (GPL v2 or later).
 
 const std = @import("std");
+const builtin = @import("builtin");
 const abi = @import("microcode_smoke").prim_abi;
 const smoke = @import("smoke_common.zig");
 
@@ -11,9 +12,38 @@ comptime {
     smoke.exportMinimalCcHelpers();
 }
 
-extern "c" fn tmpfile() smoke.FaslFileHandle;
 extern "c" fn rewind(smoke.FaslFileHandle) void;
 extern "c" fn fclose(smoke.FaslFileHandle) c_int;
+
+fn openTempFaslFile(tag: []const u8) smoke.FaslFileHandle {
+    if (comptime builtin.os.tag == .windows) {
+        const WinTemp = struct {
+            extern "kernel32" fn GetCurrentProcessId() callconv(.winapi) u32;
+            extern "c" fn fopen([*:0]const u8, [*:0]const u8) smoke.FaslFileHandle;
+        };
+        var dir: []const u8 = ".";
+        if (std.c.getenv("TEMP") orelse std.c.getenv("TMP")) |env_dir| {
+            const span = std.mem.span(env_dir);
+            if (span.len > 0) dir = span;
+        }
+        while (dir.len > 1 and (dir[dir.len - 1] == '\\' or dir[dir.len - 1] == '/')) {
+            dir = dir[0 .. dir.len - 1];
+        }
+        var path_buf: [512]u8 = undefined;
+        const out = std.fmt.bufPrint(path_buf[0 .. path_buf.len - 1], "{s}\\mit-scheme-fasl-smoke-{s}-{d}.tmp", .{
+            dir,
+            tag,
+            WinTemp.GetCurrentProcessId(),
+        }) catch return null;
+        path_buf[out.len] = 0;
+        return WinTemp.fopen(path_buf[0..out.len :0].ptr, "w+bTD");
+    } else {
+        const PosixTemp = struct {
+            extern "c" fn tmpfile() smoke.FaslFileHandle;
+        };
+        return PosixTemp.tmpfile();
+    }
+}
 
 const sim_heap_words: usize = 4096;
 
@@ -203,7 +233,7 @@ pub fn main() u8 {
     {
         var out_h: smoke.FaslHeader = std.mem.zeroes(smoke.FaslHeader);
         var in_h: smoke.FaslHeader = std.mem.zeroes(smoke.FaslHeader);
-        const f = tmpfile();
+        const f = openTempFaslFile("v13");
         smoke.check(f != null, "tmpfile");
 
         out_h.version = smoke.fasl_version_code_space;
@@ -244,7 +274,7 @@ pub fn main() u8 {
         var out_h: smoke.FaslHeader = std.mem.zeroes(smoke.FaslHeader);
         var in_h: smoke.FaslHeader = undefined;
         @memset(std.mem.asBytes(&in_h), 0xff);
-        const f = tmpfile();
+        const f = openTempFaslFile("v10");
         smoke.check(f != null, "tmpfile");
 
         out_h.version = smoke.fasl_version_c_code;

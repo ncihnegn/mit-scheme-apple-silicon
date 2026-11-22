@@ -205,12 +205,12 @@ pub fn flushFatal() void {
 }
 
 test "outf streams formatted bytes including multi-chunk payloads to FILE" {
+    const stubs = @import("../core/test_stubs.zig");
     const TmpC = struct {
-        extern "c" fn tmpfile() ?*std.c.FILE;
         extern "c" fn rewind(*std.c.FILE) void;
         extern "c" fn fclose(*std.c.FILE) c_int;
     };
-    const fp = TmpC.tmpfile().?;
+    const fp = stubs.openTempFile("outf").?;
     defer _ = TmpC.fclose(fp);
 
     const ch = fileOutput(fp);

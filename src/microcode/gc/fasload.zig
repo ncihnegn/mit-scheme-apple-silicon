@@ -810,10 +810,9 @@ test "fasload reload cleanups, band name, relocation regions, primitives, intern
 
     // 6. readCodeFromFile handles > 512-word staged chunking cleanly
     const tmp = struct {
-        extern "c" fn tmpfile() fasl.FaslFileHandle;
         extern "c" fn rewind(fasl.FaslFileHandle) void;
     };
-    const f = tmp.tmpfile();
+    const f: fasl.FaslFileHandle = if (stubs.openTempFile("fasload")) |fp| @ptrCast(fp) else null;
     try std.testing.expect(f != null);
     defer _ = fasl.close_fasl_input_file(f);
 
