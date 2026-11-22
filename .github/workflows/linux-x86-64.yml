@@ -30,7 +30,7 @@ jobs:
   linux-x86-64-native:
     name: Linux x86-64 (Native + FFI Plugins)
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -42,7 +42,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential mit-scheme libncurses-dev libgdbm-dev libpq-dev libx11-dev pkg-config python3
+            build-essential libncurses-dev libgdbm-dev libpq-dev libx11-dev pkg-config curl ca-certificates python3
 
       - name: Build variants and run unit & smoke tests
         run: |
@@ -56,7 +56,7 @@ jobs:
         with:
           cache_prefix: linux-x86-64-stage2
           stage2_prefix: ${{ runner.temp }}/mit-scheme-stage2-x86-64
-          mode: build-scheme-apt
+          mode: build-scheme-svm1-12-1
           arch: x86-64
           force_full_bootstrap: ${{ inputs.force_full_bootstrap }}
 
@@ -94,18 +94,27 @@ jobs:
             --library-path src/lib
           (cd src/blowfish && MIT_SCHEME_EXE="${PWD}/../../zig-out/bin/mit-scheme" MITSCHEME_LIBRARY_PATH="${PWD}/../lib" sh ./blowfish-check.sh)
           (cd src/gdbm && MIT_SCHEME_EXE="${PWD}/../../zig-out/bin/mit-scheme" MITSCHEME_LIBRARY_PATH="${PWD}/../lib" sh ./gdbm-check.sh)
-          ./zig-out/bin/mit-scheme \
-            --library src/lib \
+          (cd src/pgsql && ../../zig-out/bin/mit-scheme \
+            --library ../lib \
+            --prepend-library . \
             --band all.com \
             --batch-mode \
             --no-init-file \
-            --eval "(begin (load-option 'pgsql) (let ((s ((access escape-pgsql-string (->environment '(pgsql))) \"a'b\"))) (if (not (string=? s \"a''b\")) (error \"pgsql failed:\" s))) (display \"PGSQL_FFI_OK\n\") (load-option 'x11) (display \"X11_FFI_OK\n\") (%exit))" \
-            </dev/null
+            --eval "(begin (load-option 'pgsql) (let ((s ((access escape-pgsql-string (->environment '(postgresql))) \"a'b\"))) (if (not (string=? s \"a''b\")) (error \"pgsql failed:\" s))) (display \"PGSQL_FFI_OK\n\") (%exit))" \
+            </dev/null)
+          (cd src/x11 && ../../zig-out/bin/mit-scheme \
+            --library ../lib \
+            --prepend-library . \
+            --band all.com \
+            --batch-mode \
+            --no-init-file \
+            --eval "(begin (load-option 'x11) (display \"X11_FFI_OK\n\") (%exit))" \
+            </dev/null)
 
   linux-x86-64-svm1:
     name: Linux x86-64 (SVM1 Bytecode VM)
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -117,7 +126,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential mit-scheme libncurses-dev python3
+            build-essential libncurses-dev curl ca-certificates python3
 
       - name: Build SVM1 microcode variants and run unit & smoke tests
         run: |
@@ -131,7 +140,7 @@ jobs:
         with:
           cache_prefix: linux-x86-64-svm1-stage2
           stage2_prefix: ${{ runner.temp }}/mit-scheme-stage2-svm1
-          mode: build-scheme-apt
+          mode: build-scheme-svm1-12-1
           arch: svm1-64le
           force_full_bootstrap: ${{ inputs.force_full_bootstrap }}
 

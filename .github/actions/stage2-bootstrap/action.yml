@@ -9,10 +9,10 @@ inputs:
     description: Install prefix path for the Stage 2 host
     required: true
   mode:
-    description: Bootstrap mode ('bootstrap-script' or 'build-scheme-apt')
+    description: Bootstrap mode ('bootstrap-script' or 'build-scheme-svm1-12-1')
     required: true
   arch:
-    description: Scheme architecture passed to tools/build-scheme.py (build-scheme-apt mode)
+    description: Scheme architecture passed to tools/build-scheme.py (build-scheme-svm1-12-1 mode)
     required: false
     default: ''
   force_full_bootstrap:
@@ -55,23 +55,70 @@ runs:
           --stage2-only \
           --stage2-prefix "${{ inputs.stage2_prefix }}"
 
-    - name: Build Stage 2 host (tools/build-scheme.py from APT mit-scheme)
-      if: ${{ inputs.mode == 'build-scheme-apt' && steps.stage2-cache.outputs.cache-hit != 'true' }}
+    - name: Restore MIT/GNU Scheme 12.1 svm1 bootstrap host cache
+      id: host-12-1-cache
+      if: ${{ inputs.mode == 'build-scheme-svm1-12-1' && steps.stage2-cache.outputs.cache-hit != 'true' }}
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ runner.temp }}/mit-scheme-host-12.1
+        key: ${{ runner.os }}-${{ runner.arch }}-host-12.1-svm1-v1
+
+    - name: Build MIT/GNU Scheme 12.1 svm1 bootstrap host
+      if: ${{ inputs.mode == 'build-scheme-svm1-12-1' && steps.stage2-cache.outputs.cache-hit != 'true' && steps.host-12-1-cache.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
-        ALL_COM=$(find /usr/lib /usr/local/lib -name all.com -path '*mit-scheme*' 2>/dev/null | head -n 1)
-        if [ -z "${ALL_COM}" ]; then
-          echo "error: could not find host mit-scheme all.com" >&2
+        HOST_TMP=$(mktemp -d)
+        trap 'rm -rf "${HOST_TMP}"' EXIT
+        curl -fL \
+          https://ftp.gnu.org/gnu/mit-scheme/stable.pkg/12.1/mit-scheme-12.1-svm1-64le.tar.gz \
+          -o "${HOST_TMP}/mit-scheme-12.1-svm1-64le.tar.gz"
+        tar -xzf "${HOST_TMP}/mit-scheme-12.1-svm1-64le.tar.gz" -C "${HOST_TMP}"
+        cd "${HOST_TMP}/mit-scheme-12.1/src"
+        ./configure --prefix="${{ runner.temp }}/mit-scheme-host-12.1" --enable-native-code=svm1-64le
+        sed -i 's/ -Werror//g' microcode/Makefile
+        make -j"$(nproc)"
+        make install
+
+    - name: Save MIT/GNU Scheme 12.1 svm1 bootstrap host cache
+      if: ${{ inputs.mode == 'build-scheme-svm1-12-1' && steps.stage2-cache.outputs.cache-hit != 'true' && steps.host-12-1-cache.outputs.cache-hit != 'true' }}
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ runner.temp }}/mit-scheme-host-12.1
+        key: ${{ steps.host-12-1-cache.outputs.cache-primary-key }}
+
+    - name: Build Stage 2 host (Stage 1 Zig svm1 + tools/build-scheme.py)
+      if: ${{ inputs.mode == 'build-scheme-svm1-12-1' && steps.stage2-cache.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: |
+        WORK_TMP=$(mktemp -d)
+        trap 'rm -rf "${WORK_TMP}"' EXIT
+        HOST_PREFIX="${{ runner.temp }}/mit-scheme-host-12.1"
+        HOST_LIB=$(ls -d "${HOST_PREFIX}"/lib/mit-scheme-* | head -n 1)
+        if [ -z "${HOST_LIB}" ] || [ ! -d "${HOST_LIB}" ]; then
+          echo "error: could not find 12.1 svm1 host library under ${HOST_PREFIX}/lib" >&2
           exit 1
         fi
-        HOST_LIB=$(dirname "${ALL_COM}")
+        echo "=== Stage 1: Building 13.x svm1 microcode for safe cross-bootstrap ==="
+        zig build -Darch=svm1_64le -Doptimize=ReleaseFast --prefix "${WORK_TMP}/stage1-svm1"
+        cp "${WORK_TMP}/stage1-svm1/bin/mit-scheme" "${WORK_TMP}/svm1-scheme"
+        chmod +x "${WORK_TMP}/svm1-scheme"
+        cat > "${WORK_TMP}/stage1-host-scheme" <<EOF
+        #!/bin/sh
+        : "\${MITSCHEME_LIBRARY_PATH:=${HOST_LIB}}"
+        export MITSCHEME_LIBRARY_PATH
+        exec "${WORK_TMP}/svm1-scheme" "\$@"
+        EOF
+        chmod +x "${WORK_TMP}/stage1-host-scheme"
+
+        echo "=== Stage 2: Cross-bootstrapping ${{ inputs.arch }} into ${{ inputs.stage2_prefix }} ==="
         python3 tools/build-scheme.py clean
         python3 tools/build-scheme.py build \
           --install \
           --arch "${{ inputs.arch }}" \
           --optimize ReleaseFast \
           --cross \
-          --host-scheme "$(command -v mit-scheme)" \
+          --plugins none \
+          --host-scheme "${WORK_TMP}/stage1-host-scheme" \
           --host-lib "${HOST_LIB}" \
           --prefix "${{ inputs.stage2_prefix }}" \
           --jobs "$(nproc)"
