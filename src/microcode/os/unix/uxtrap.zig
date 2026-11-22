@@ -207,12 +207,13 @@ var saved_signo: c_int = 0;
 var saved_info: ?*std.c.siginfo_t = null;
 var saved_scp: ?*Ucontext = null;
 
-fn sigcontextPc(scp: ?*const Ucontext) usize {
-    const uc = scp orelse return 0;
+pub fn sigcontextPc(scp: ?*const anyopaque) usize {
+    const uc: ?*const Ucontext = if (scp) |p| @ptrCast(@alignCast(p)) else null;
+    if (uc == null) return 0;
     if (builtin.os.tag.isDarwin()) {
-        return if (builtin.cpu.arch == .aarch64) @intCast(uc.uc_mcontext.ss.pc) else @intCast(uc.uc_mcontext.ss.rip);
+        return if (builtin.cpu.arch == .aarch64) @intCast(uc.?.uc_mcontext.ss.pc) else @intCast(uc.?.uc_mcontext.ss.rip);
     }
-    return if (builtin.cpu.arch == .aarch64) @intCast(uc.uc_mcontext.pc) else @bitCast(uc.uc_mcontext.gregs[16]);
+    return if (builtin.cpu.arch == .aarch64) @intCast(uc.?.uc_mcontext.pc) else @bitCast(uc.?.uc_mcontext.gregs[16]);
 }
 
 fn sigcontextSp(scp: ?*const Ucontext) usize {

@@ -13,6 +13,7 @@ const floenv = @import("../../arith/floenv.zig");
 const option = @import("../../core/option.zig");
 const osscheme = @import("../osscheme.zig");
 const ostty = @import("../ostty.zig");
+const uxtrap = @import("uxtrap.zig");
 const transact = @import("../../support/transact.zig");
 const wind = @import("../../support/wind.zig");
 const stubs = if (builtin.is_test) @import("../../core/test_stubs.zig") else struct {};
@@ -407,8 +408,38 @@ fn bodySaveThenTerminate(_: c_int, _: ?*std.c.siginfo_t, _: ?*anyopaque) void {
     osscheme.request_suspend_interrupt();
 }
 
-fn bodyTerminate(signo: c_int, _: ?*std.c.siginfo_t, _: ?*anyopaque) void {
+fn bodyTerminate(signo: c_int, info: ?*std.c.siginfo_t, pscp: ?*anyopaque) void {
+    reportFatalFault(signo, info, pscp);
     abi.termination_signal(findSignalName(signo));
+}
+
+/// Fault address from a kernel-generated `siginfo`, OS-portably.
+fn faultAddress(info: *std.c.siginfo_t) usize {
+    if (comptime builtin.os.tag.isDarwin()) {
+        return @intFromPtr(info.addr);
+    } else if (comptime builtin.os.tag == .linux) {
+        return @intFromPtr(info.fields.sigfault.addr);
+    }
+    return 0;
+}
+
+/// Prints the faulting instruction and fault address before terminating on a
+/// hardware fault, so the crash points at a symbolizable PC even when the
+/// hardware-trap handler is not installed (e.g. batch runs without a tty).
+fn reportFatalFault(signo: c_int, info: ?*std.c.siginfo_t, pscp: ?*anyopaque) void {
+    const faultp = switch (signo) {
+        sigNum("SEGV"), sigNum("BUS"), sigNum("ILL"), sigNum("FPE"), sigNum("TRAP") => true,
+        else => false,
+    };
+    if (!faultp or info == null or info.?.code <= 0) return; // only kernel-generated faults
+    const err = abi.cStderr();
+    writeFmt(err, "\n;;; {s} fault: pc=0x{x} addr=0x{x} si_code={d}\n", .{
+        std.mem.span(findSignalName(signo)),
+        uxtrap.sigcontextPc(pscp),
+        faultAddress(info.?),
+        info.?.code,
+    });
+    _ = abi.fflush(err);
 }
 
 fn bodyFpe(signo: c_int, info: ?*std.c.siginfo_t, pscp: ?*anyopaque) void {
