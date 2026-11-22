@@ -589,6 +589,84 @@ pub fn build(b: *std.Build) void {
         unit_test_step.dependOn(&b.addRunArtifact(starter_tests).step);
     }
 
+    // `zig build test-plugins`
+    const plugins_test_step = b.step("test-plugins", "Run Zig FFI plugin unit tests");
+    const blowfish_tests = b.addTest(.{
+        .name = "blowfish-plugin-unit",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/blowfish/blowfish_adapter.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    plugins_test_step.dependOn(&b.addRunArtifact(blowfish_tests).step);
+
+    const gdbm_c_tc = b.addTranslateC(.{
+        .root_source_file = b.path("src/gdbm/gdbm-shim.h"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    gdbm_c_tc.addIncludePath(b.path("tests/plugins/mock-include"));
+    gdbm_c_tc.addIncludePath(b.path("src/gdbm"));
+    const gdbm_c_mod = gdbm_c_tc.createModule();
+    const gdbm_adapter_mod = b.createModule(.{
+        .root_source_file = b.path("src/gdbm/gdbm_adapter.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    gdbm_adapter_mod.addImport("gdbm_c", gdbm_c_mod);
+    const gdbm_tests = b.addTest(.{
+        .name = "gdbm-plugin-unit",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tests/plugins/gdbm_mock_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    gdbm_tests.root_module.addImport("gdbm_c", gdbm_c_mod);
+    gdbm_tests.root_module.addImport("gdbm_adapter", gdbm_adapter_mod);
+    plugins_test_step.dependOn(&b.addRunArtifact(gdbm_tests).step);
+
+    const x11_c_tc = b.addTranslateC(.{
+        .root_source_file = b.path("src/x11/x11.h"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    x11_c_tc.addIncludePath(b.path("tests/plugins/mock-include"));
+    x11_c_tc.addIncludePath(b.path("src/x11"));
+    const x11_c_mod = x11_c_tc.createModule();
+    const x11_mod = b.createModule(.{
+        .root_source_file = b.path("src/x11/x11.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    x11_mod.addImport("x11_c", x11_c_mod);
+    const x11_tests = b.addTest(.{
+        .name = "x11-plugin-unit",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tests/plugins/x11_mock_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .sanitize_c = .off,
+        }),
+    });
+    x11_tests.root_module.addImport("x11_c", x11_c_mod);
+    x11_tests.root_module.addImport("x11", x11_mod);
+    x11_tests.root_module.addCSourceFile(.{
+        .file = b.path("src/microcode/scm_setjmp.c"),
+        .flags = &.{},
+    });
+    plugins_test_step.dependOn(&b.addRunArtifact(x11_tests).step);
+
+    unit_test_step.dependOn(plugins_test_step);
+
     // `zig build scheme`
     const scheme_step = b.step(
         "scheme",
