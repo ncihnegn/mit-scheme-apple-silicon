@@ -65,6 +65,8 @@ jobs:
                 'tools/build-scheme.py',
                 'src/microcode/*.zig',
                 'src/microcode/**/*.zig',
+                'src/microcode/outf.c',
+                'src/microcode/scm_setjmp.c',
                 'src/microcode/cmpauxmd/aarch64.S',
                 'src/compiler/**',
                 'src/runtime/**',

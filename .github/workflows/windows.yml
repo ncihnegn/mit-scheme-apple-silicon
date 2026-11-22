@@ -1,0 +1,66 @@
+name: Windows CI
+
+on:
+  push:
+    branches:
+      - master
+      - apple-silicon
+      - zig
+  pull_request:
+    branches:
+      - master
+      - apple-silicon
+      - zig
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  windows:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x86-64
+            os: windows-latest
+            target: x86_64-windows-gnu
+            arch: x86_64
+          - name: Windows ARM64
+            os: windows-11-arm
+            target: aarch64-windows-gnu
+            arch: aarch64le
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.1
+
+      - name: Build microcode variants
+        shell: pwsh
+        run: |
+          zig build -Dtarget=${{ matrix.target }} -Darch=${{ matrix.arch }} --release=fast
+          zig build -Dtarget=${{ matrix.target }} -Darch=${{ matrix.arch }} -Ddebugging=true
+          zig build -Dtarget=${{ matrix.target }} -Darch=svm1_64le --release=fast
+
+      - name: Run unit & plugin tests
+        shell: pwsh
+        run: |
+          zig build test-unit -Dtarget=${{ matrix.target }} -Darch=${{ matrix.arch }} --summary all
+          zig build test-unit -Dtarget=${{ matrix.target }} -Darch=svm1_64le --summary all
+
+      - name: Run smoke tests
+        shell: pwsh
+        run: |
+          zig build test-smoke -Dtarget=${{ matrix.target }} -Darch=${{ matrix.arch }} --summary all
+          zig build test-smoke -Dtarget=${{ matrix.target }} -Darch=svm1_64le --summary all

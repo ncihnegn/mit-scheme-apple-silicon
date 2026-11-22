@@ -5,10 +5,12 @@ on:
     branches:
       - master
       - apple-silicon
+      - zig
   pull_request:
     branches:
       - master
       - apple-silicon
+      - zig
   workflow_dispatch:
     inputs:
       force_full_bootstrap:
@@ -38,6 +40,11 @@ jobs:
         with:
           version: 0.17.1
 
+      - name: Check Zig formatting and run unit & plugin tests
+        run: |
+          zig fmt --check build.zig src/microcode src/blowfish src/gdbm src/x11 tests/microcode tests/plugins
+          zig build test-unit --summary all
+
       - name: Install Homebrew build dependencies
         run: |
           brew install mit-scheme
@@ -55,6 +62,8 @@ jobs:
                 'tools/build-scheme.py',
                 'src/microcode/*.zig',
                 'src/microcode/**/*.zig',
+                'src/microcode/outf.c',
+                'src/microcode/scm_setjmp.c',
                 'src/microcode/cmpauxmd/aarch64.S',
                 'src/compiler/**',
                 'src/runtime/**',
@@ -102,6 +111,11 @@ jobs:
           sudo apt-get install -y \
             build-essential libncurses-dev curl ca-certificates python3
 
+      - name: Check Zig formatting and run unit & plugin tests
+        run: |
+          zig fmt --check build.zig src/microcode src/blowfish src/gdbm src/x11 tests/microcode tests/plugins
+          zig build test-unit --summary all
+
       - name: Restore Stage 2 native aarch64le host cache
         id: stage2-cache
         if: ${{ inputs.force_full_bootstrap != true }}
@@ -115,6 +129,8 @@ jobs:
                 'tools/build-scheme.py',
                 'src/microcode/*.zig',
                 'src/microcode/**/*.zig',
+                'src/microcode/outf.c',
+                'src/microcode/scm_setjmp.c',
                 'src/microcode/cmpauxmd/aarch64.S',
                 'src/compiler/**',
                 'src/runtime/**',
