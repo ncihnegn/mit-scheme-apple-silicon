@@ -6,6 +6,7 @@ const std = @import("std");
 const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 const artutl = @import("artutl.zig");
 const bignum = @import("bignum.zig");
 const storage = @import("storage.zig");
@@ -44,11 +45,13 @@ fn computeInterruptHandlerMask(interrupt_masks: obj.SchemeObject, interrupt_numb
 }
 
 fn terminateNoInterruptHandler(masked_interrupts: usize) noreturn {
-    abi.outf_fatal(
-        "\nInterrupts = %#08zx, Mask = %#08zx, Masked = %#08zx\n",
-        abi.Registers[abi.regblock_int_code],
-        abi.Registers[abi.regblock_int_mask],
-        masked_interrupts,
+    outf.fatal(
+        "\nInterrupts = 0x{x:0>8}, Mask = 0x{x:0>8}, Masked = 0x{x:0>8}\n",
+        .{
+            abi.Registers[abi.regblock_int_code],
+            abi.Registers[abi.regblock_int_mask],
+            masked_interrupts,
+        },
     );
     abi.Microcode_Termination(abi.term_no_interrupt_handler);
 }
@@ -74,13 +77,13 @@ pub export fn setup_interrupt(masked_interrupts: usize) callconv(.c) void {
     const interrupt_number = computeInterruptNumber(masked_interrupts);
 
     if (!obj.vectorP(abi.fixed_objects)) {
-        abi.outf_fatal("\nInvalid fixed-objects vector");
+        outf.fatal("\nInvalid fixed-objects vector", .{});
         terminateNoInterruptHandler(masked_interrupts);
     }
     const interrupt_handlers = obj.vectorRef(abi.fixed_objects, abi.fixobj_system_interrupt_vector);
     const interrupt_masks = obj.vectorRef(abi.fixed_objects, abi.fixobj_interrupt_mask_vector);
     if (!(obj.vectorP(interrupt_handlers) and interrupt_number < obj.vectorLength(interrupt_handlers))) {
-        abi.outf_fatal("\nUnable to get interrupt handler.");
+        outf.fatal("\nUnable to get interrupt handler.", .{});
         terminateNoInterruptHandler(masked_interrupts);
     }
     const interrupt_mask = computeInterruptHandlerMask(interrupt_masks, interrupt_number);
@@ -103,18 +106,18 @@ pub export fn err_print(error_code: isize, where: abi.OutfChannel) callconv(.c) 
     else
         null;
     if (message) |msg| {
-        abi.outf(where, "Error code %#zx (%s).\n", error_code, msg);
+        outf.print(where, "Error code 0x{x} ({s}).\n", .{ @as(usize, @bitCast(error_code)), msg });
     } else {
-        abi.outf(where, "Unknown error code %#zx.\n", error_code);
+        outf.print(where, "Unknown error code 0x{x}.\n", .{@as(usize, @bitCast(error_code))});
     }
 }
 
 fn errorDeath(code: isize, message: [*:0]const u8) noreturn {
     death_blow = code;
-    abi.outf_fatal("Microcode Error: %s.\n", message);
-    err_print(code, abi.FATAL_OUTPUT);
-    abi.outf_error("\n**** Stack Trace ****\n\n");
-    abi.debug_stack_trace(abi.ERROR_OUTPUT);
+    outf.fatal("Microcode Error: {s}.\n", .{message});
+    err_print(code, outf.fatal_output);
+    outf.err("\n**** Stack Trace ****\n\n", .{});
+    abi.debug_stack_trace(outf.error_output);
     abi.termination_no_error_handler();
 }
 
@@ -424,14 +427,14 @@ pub export fn Do_Micro_Error(error_code: isize, from_pop_return_p: bool) callcon
 
     if (build_options.debugging) {
         if (storage.print_errors) {
-            err_print(error_code, abi.ERROR_OUTPUT);
+            err_print(error_code, outf.error_output);
             const ret = abi.Registers[abi.regblock_return];
             if (obj.objectDatum(ret) == abi.rc_internal_apply or
                 obj.objectDatum(ret) == abi.rc_internal_apply_val)
             {
                 const next_frame = abi.stackLoc(abi.cont_size);
                 abi.debug_print_expr(next_frame[1], "Procedure");
-                abi.outf_error("\n");
+                outf.err("\n", .{});
 
                 const args = next_frame + 2;
                 const n_args: usize = @intCast(obj.objectDatum(next_frame[0]) - 1);
@@ -441,22 +444,22 @@ pub export fn Do_Micro_Error(error_code: isize, from_pop_return_p: bool) callcon
                         buf[s.len] = 0;
                         break :blk @ptrCast(&buf);
                     } else |_| "Argument: ";
-                    abi.outf_error("%s", label);
+                    outf.err("{s}", .{label});
                     abi.debug_print_expr(args[idx], "");
-                    abi.outf_error("\n");
+                    outf.err("\n", .{});
                 }
             } else {
                 abi.debug_print_expr(abi.Registers[abi.regblock_expr], "Expression");
-                abi.outf_error("\n");
+                outf.err("\n", .{});
                 abi.debug_print_expr(abi.Registers[abi.regblock_env], "Environment");
-                abi.outf_error("\n");
+                outf.err("\n", .{});
             }
             abi.debug_print_expr(ret, "Return code");
-            abi.outf_error("\n");
+            outf.err("\n", .{});
         }
         if (storage.trace_on_error) {
-            abi.outf_error("\n\n**** Stack Trace ****\n\n");
-            abi.debug_stack_trace(abi.ERROR_OUTPUT);
+            outf.err("\n\n**** Stack Trace ****\n\n", .{});
+            abi.debug_stack_trace(outf.error_output);
         }
         const n_slots: usize = @intCast(storage.local_nslots_storage);
         for (0..n_slots) |idx| {

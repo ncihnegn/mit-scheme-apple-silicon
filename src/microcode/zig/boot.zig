@@ -6,6 +6,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 const obstack = @import("obstack.zig");
 const wind = @import("wind.zig");
 const transact = @import("transact.zig");
@@ -53,7 +54,7 @@ pub export fn obstack_chunk_alloc(size: usize) callconv(.c) ?*anyopaque {
     return malloc(size) orelse {
         const name: [*:0]const u8 = scheme_program_name orelse "mit-scheme";
         const size_int: c_int = @intCast(size);
-        abi.outf_fatal("\n%s: unable to allocate obstack chunk of %d bytes\n", name, size_int);
+        outf.fatal("\n{s}: unable to allocate obstack chunk of {d} bytes\n", .{ name, size_int });
         abi.Microcode_Termination(abi.term_exit);
     };
 }
@@ -100,10 +101,10 @@ fn startScheme() void {
     var expr: obj.SchemeObject = undefined;
 
     if (!abi.option_batch_mode and !abi.option_show_version and !abi.option_show_help) {
-        abi.outf_console("MIT/GNU Scheme running under %s\n", OS_Variant orelse "");
+        outf.console("MIT/GNU Scheme running under {s}\n", .{OS_Variant orelse ""});
         abi.OS_announcement();
-        abi.outf_console("\n");
-        abi.outf_flush_console();
+        outf.console("\n", .{});
+        outf.flushConsole();
     }
     utabmd.initialize_fixed_objects_vector();
 
@@ -144,7 +145,7 @@ fn startScheme() void {
     if (!(@intFromPtr(abi.stack_pointer) >= @intFromPtr(abi.stack_guard) and
         @intFromPtr(abi.Free) <= @intFromPtr(abi.heap_alloc_limit)))
     {
-        abi.outf_fatal("Configuration won't hold initial data.\n");
+        outf.fatal("Configuration won't hold initial data.\n", .{});
         abi.termination_init_error();
     }
     enterInterpreter();
@@ -152,7 +153,7 @@ fn startScheme() void {
 
 fn doEnterInterpreter() noreturn {
     abi.Interpret();
-    abi.outf_fatal("\nThe interpreter returned to top level!\n");
+    outf.fatal("\nThe interpreter returned to top level!\n", .{});
     abi.Microcode_Termination(abi.term_exit);
 }
 

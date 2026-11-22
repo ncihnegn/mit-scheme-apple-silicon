@@ -5,6 +5,7 @@
 const std = @import("std");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 const avltree = @import("avltree.zig");
 const transact = @import("transact.zig");
 const wind = @import("wind.zig");
@@ -79,8 +80,18 @@ pub export fn Prim_unimplemented() callconv(.c) obj.SchemeObject {
 }
 
 fn initializationError(reason: [*:0]const u8, item: [*:0]const u8) noreturn {
-    abi.outf_fatal("initialize_primitives: Error %s %s.\n", reason, item);
+    outf.fatal("initialize_primitives: Error {s} {s}.\n", .{ reason, item });
     abi.termination_init_error();
+}
+
+fn printTreeError(chan: outf.OutfChannel, msg: [*:0]const u8, noise: ?[*:0]const u8) void {
+    const slice = std.mem.span(msg);
+    if (std.mem.indexOf(u8, slice, "%s")) |pos| {
+        const arg: [*:0]const u8 = noise orelse "";
+        outf.print(chan, "{s}{s}{s}", .{ slice[0..pos], arg, slice[pos + 2 ..] });
+    } else {
+        outf.print(chan, "{s}", .{slice});
+    }
 }
 
 fn copyTable(
@@ -121,7 +132,7 @@ pub export fn initialize_primitives() callconv(.c) void {
     avltree.tree_error_message = null;
     prim_procedure_tree = avltree.tree_build(MAX_PRIMITIVE, @ptrCast(Primitive_Name_Table.?), 0);
     if (avltree.tree_error_message) |msg| {
-        abi.outf_fatal(msg, avltree.tree_error_noise);
+        printTreeError(outf.fatal_output, msg, avltree.tree_error_noise);
         initializationError("building", "prim_procedure_tree");
     }
 
@@ -132,7 +143,7 @@ pub export fn initialize_primitives() callconv(.c) void {
         } else {
             const old = make_primitive(entry.name, abi.unknown_primitive_arity);
             if (old == obj.sharp_f) {
-                abi.outf_fatal("Error declaring unknown primitive %s.\n", entry.name);
+                outf.fatal("Error declaring unknown primitive {s}.\n", .{entry.name});
                 initializationError("aliasing", entry.alias);
             }
             index = obj.primitiveNumber(old);
@@ -140,7 +151,7 @@ pub export fn initialize_primitives() callconv(.c) void {
 
         const updated = avltree.tree_insert(prim_procedure_tree, entry.alias, index);
         if (avltree.tree_error_message) |msg| {
-            abi.outf_fatal(msg, avltree.tree_error_noise);
+            printTreeError(outf.fatal_output, msg, avltree.tree_error_noise);
             initializationError("aliasing", entry.alias);
         }
         prim_procedure_tree = updated;
@@ -178,7 +189,7 @@ fn declarePrimitiveInternal(
         index = @intCast(new_idx);
         const inserted = avltree.tree_insert(prim_procedure_tree, name, new_idx);
         if (avltree.tree_error_message) |msg| {
-            abi.outf_error(msg, avltree.tree_error_noise);
+            printTreeError(outf.error_output, msg, avltree.tree_error_noise);
             avltree.tree_error_message = null;
             return obj.sharp_f;
         }

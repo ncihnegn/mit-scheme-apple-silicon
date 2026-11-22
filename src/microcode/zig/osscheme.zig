@@ -5,6 +5,7 @@
 const std = @import("std");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 
 pub export fn error_out_of_channels() callconv(.c) noreturn {
     abi.signal_error_from_primitive(abi.err_out_of_file_handles);
@@ -65,10 +66,10 @@ pub export fn set_interrupt_mask(mask: usize) callconv(.c) void {
 }
 
 pub export fn debug_back_trace(stream: abi.OutfChannel) callconv(.c) void {
-    abi.outf(stream, "*** Scheme Microcode Back Trace: ***\n");
+    outf.print(stream, "*** Scheme Microcode Back Trace: ***\n", .{});
     abi.debug_stack_trace(stream);
-    abi.outf(stream, "*** End of Back Trace ***\n");
-    abi.outf_flush(stream);
+    outf.print(stream, "*** End of Back Trace ***\n", .{});
+    outf.flush(stream);
 }
 
 pub export fn debug_examine_memory(address: isize, label: [*:0]const u8) callconv(.c) void {

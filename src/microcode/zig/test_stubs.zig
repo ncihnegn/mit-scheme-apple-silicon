@@ -3,6 +3,7 @@ const builtin = @import("builtin");
 const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 const storage = @import("storage.zig");
 const utils = @import("utils.zig");
 const boot = @import("boot.zig");
@@ -10,9 +11,7 @@ const option = @import("option.zig");
 const gcloop = @import("gcloop.zig");
 
 pub var signal_block_depth: i32 = 0;
-pub var fatal_count: usize = 0;
 pub var last_closed_channel: ?c_uint = null;
-pub var mock_outf_calls: usize = 0;
 pub var mock_trap_state: c_int = 4;
 pub var mock_under_emacs: c_int = 0;
 
@@ -103,8 +102,6 @@ pub var mock_last_marker_thunk: obj.SchemeObject = obj.sharp_f;
 pub var mock_int_mask_calls: usize = 0;
 pub var mock_last_compiled_mask: usize = 0;
 pub var mock_last_compiled_new_mask: usize = 0;
-pub export var ERROR_OUTPUT: abi.OutfChannel = .{ .type = 1, .cookie = null };
-pub export var FATAL_OUTPUT: abi.OutfChannel = .{ .type = 2, .cookie = null };
 pub var mock_cc_entry_bad: bool = false;
 pub var mock_cc_entry_type: abi.CcEntryType = .{
     .marker = .procedure,
@@ -119,9 +116,9 @@ pub export var Static_Primitive_Documentation_Table = [_]?[*:0]const u8{ "Return
 
 pub fn resetMockRuntime() void {
     signal_block_depth = 0;
-    fatal_count = 0;
     last_closed_channel = null;
-    mock_outf_calls = 0;
+    outf.test_call_count = 0;
+    outf.test_fatal_count = 0;
     mock_trap_state = 4;
     mock_under_emacs = 0;
     compiler_processor_type = abi.compiler_aarch64_type;
@@ -283,22 +280,6 @@ pub export fn unblock_signals() callconv(.c) void {
     signal_block_depth -= 1;
 }
 
-pub export fn outf_fatal(_: [*:0]const u8, ...) callconv(.c) void {
-    fatal_count += 1;
-}
-
-pub export fn outf_error(_: [*:0]const u8, ...) callconv(.c) void {
-    mock_outf_calls += 1;
-}
-
-pub export fn outf_error_line(_: [*:0]const u8, ...) callconv(.c) void {
-    mock_outf_calls += 1;
-}
-
-pub export fn outf_flush_error() callconv(.c) void {}
-
-pub export fn outf_flush_fatal() callconv(.c) void {}
-
 pub export fn OS_channel_close_noerror(ch: c_uint) callconv(.c) void {
     last_closed_channel = ch;
 }
@@ -332,12 +313,6 @@ fn mockReadCcEntryType(cet: *abi.CcEntryType, _: ?*anyopaque) callconv(.c) bool 
 pub export fn OS_tty_map_interrupt_char(c: u8) callconv(.c) u8 {
     return c;
 }
-
-pub export fn outf(_: abi.OutfChannel, _: [*:0]const u8, ...) callconv(.c) void {
-    mock_outf_calls += 1;
-}
-
-pub export fn outf_flush(_: abi.OutfChannel) callconv(.c) void {}
 
 pub export fn OS_get_entropy(buf: *[32]u8) callconv(.c) void {
     for (buf, 0..) |*slot, idx| {
@@ -532,8 +507,6 @@ pub export fn compiler_initialize(_: bool) callconv(.c) void {}
 pub export fn OS_initialize() callconv(.c) void {}
 pub export fn OS_announcement() callconv(.c) void {}
 pub export fn Interpret() callconv(.c) void {}
-pub export fn outf_console(_: [*:0]const u8, ...) callconv(.c) void {}
-pub export fn outf_flush_console() callconv(.c) void {}
 
 comptime {
     if (build_options.cc_support) {
@@ -1578,10 +1551,6 @@ pub export fn termination_trap() callconv(.c) noreturn {
 }
 pub export fn userio_choose_option(_: [*:0]const u8, _: [*:0]const u8, _: [*]const ?[*:0]const u8) callconv(.c) u8 {
     return 'N';
-}
-pub export var CONSOLE_OUTPUT: abi.OutfChannel = .{ .type = 0, .cookie = null };
-pub export fn FILE_OUTPUT(fp: *std.c.FILE) callconv(.c) abi.OutfChannel {
-    return .{ .type = 3, .cookie = @ptrCast(fp) };
 }
 pub export fn OS_ctty_int_char() callconv(.c) abi.CcT {
     return 7;

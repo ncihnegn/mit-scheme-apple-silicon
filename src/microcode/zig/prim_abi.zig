@@ -6,6 +6,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
+const outf = @import("outf.zig");
 
 pub const regblock_memtop: usize = 0;
 pub const regblock_int_mask: usize = 1;
@@ -235,10 +236,7 @@ pub const syserr_no_such_process: c_int = 31;
 pub const syserr_not_enough_space: c_int = 33;
 
 pub const PrimitiveProcedure = *const fn () callconv(.c) obj.SchemeObject;
-pub const OutfChannel = extern struct {
-    type: c_int,
-    cookie: ?*anyopaque,
-};
+pub const OutfChannel = outf.OutfChannel;
 
 pub const fixobj_non_object: usize = 0x00;
 pub const fixobj_system_interrupt_vector: usize = 0x01;
@@ -781,8 +779,6 @@ pub extern var current_gc_table: ?*anyopaque;
 pub extern var history_register: [*]obj.SchemeObject;
 pub extern var last_return_code: ?[*]obj.SchemeObject;
 pub extern var prev_restore_history_offset: usize;
-pub extern var ERROR_OUTPUT: OutfChannel;
-pub extern var FATAL_OUTPUT: OutfChannel;
 pub extern var trapping: bool;
 pub extern var constant_start: [*]obj.SchemeObject;
 pub extern var constant_alloc_next: [*]obj.SchemeObject;
@@ -813,39 +809,9 @@ pub extern var Primitive_Documentation_Table: ?[*]?[*:0]const u8;
 pub extern "c" fn error_wrong_type_arg(c_int) noreturn;
 pub extern "c" fn error_bad_range_arg(c_int) noreturn;
 
-pub extern "c" fn fflush(stream: ?*std.c.FILE) c_int;
-
-pub inline fn cStdout() *std.c.FILE {
-    if (builtin.os.tag.isDarwin()) {
-        return (struct {
-            extern "c" var __stdoutp: *std.c.FILE;
-        }).__stdoutp;
-    } else if (builtin.os.tag == .windows) {
-        const WinIo = struct {
-            extern "c" fn __acrt_iob_func(index: c_uint) *std.c.FILE;
-        };
-        return WinIo.__acrt_iob_func(1);
-    }
-    return (struct {
-        extern "c" var stdout: *std.c.FILE;
-    }).stdout;
-}
-
-pub inline fn cStderr() *std.c.FILE {
-    if (builtin.os.tag.isDarwin()) {
-        return (struct {
-            extern "c" var __stderrp: *std.c.FILE;
-        }).__stderrp;
-    } else if (builtin.os.tag == .windows) {
-        const WinIo = struct {
-            extern "c" fn __acrt_iob_func(index: c_uint) *std.c.FILE;
-        };
-        return WinIo.__acrt_iob_func(2);
-    }
-    return (struct {
-        extern "c" var stderr: *std.c.FILE;
-    }).stderr;
-}
+pub const fflush = outf.fflush;
+pub const cStdout = outf.cStdout;
+pub const cStderr = outf.cStderr;
 pub extern "c" fn error_external_return() noreturn;
 pub extern "c" fn signal_error_from_primitive(isize) noreturn;
 pub extern "c" fn signal_interrupt_from_primitive() noreturn;
@@ -857,14 +823,8 @@ pub extern "c" fn OS_realloc(?*anyopaque, usize) ?*anyopaque;
 pub extern "c" fn OS_free(?*anyopaque) void;
 pub extern "c" fn get_object_address(obj.SchemeObject) ?[*]obj.SchemeObject;
 pub extern "c" fn OS_tty_map_interrupt_char(u8) u8;
-pub extern "c" fn outf(OutfChannel, [*:0]const u8, ...) void;
-pub extern "c" fn outf_flush(OutfChannel) void;
 pub extern "c" fn debug_stack_trace(OutfChannel) void;
 pub extern "c" fn debug_print_expr(obj.SchemeObject, [*:0]const u8) void;
-pub extern "c" fn outf_fatal([*:0]const u8, ...) void;
-pub extern "c" fn outf_error([*:0]const u8, ...) void;
-pub extern "c" fn outf_error_line([*:0]const u8, ...) void;
-pub extern "c" fn outf_flush_error() void;
 pub extern "c" fn code_address_p(?*const anyopaque) bool;
 pub extern "c" fn record_primitive_entry(obj.SchemeObject) void;
 pub extern "c" fn gc_type_code(c_uint) c_int;
@@ -1197,7 +1157,6 @@ comptime {
 pub extern var compiler_utilities: obj.SchemeObject;
 pub extern var compiler_interface_version: c_uint;
 pub extern "c" fn OS_malloc_init(usize) ?*anyopaque;
-pub extern "c" fn outf_flush_fatal() void;
 pub extern "c" fn initialize_gc(usize, *?[*]obj.SchemeObject, *?[*]obj.SchemeObject, GcTospaceAllocator, GcAbortHandler) void;
 pub extern "c" fn save_tospace(GcWalkProc, ?*anyopaque) bool;
 pub extern "c" fn tospace_to_newspace(?*anyopaque) ?*anyopaque;
@@ -1286,8 +1245,6 @@ pub extern "c" fn plausible_cc_block_p([*]obj.SchemeObject) c_int;
 pub extern "c" fn pc_to_builtin_index(usize) c_int;
 pub extern "c" fn pc_to_utility_index(usize) c_int;
 pub extern "c" fn svm_export_instruction_pointer(usize) usize;
-pub extern var CONSOLE_OUTPUT: OutfChannel;
-pub extern "c" fn FILE_OUTPUT(*std.c.FILE) OutfChannel;
 pub extern "c" fn enter_interruption_extent() c_int;
 pub extern "c" fn exit_interruption_extent() void;
 pub extern "c" fn OS_ctty_int_char() CcT;
@@ -1304,8 +1261,6 @@ pub extern "c" fn userio_read_char_raw() u8;
 pub extern "c" fn OS_initialize() void;
 pub extern "c" fn OS_announcement() void;
 pub extern "c" fn Interpret() void;
-pub extern "c" fn outf_console([*:0]const u8, ...) void;
-pub extern "c" fn outf_flush_console() void;
 pub extern "c" fn OS_file_access([*:0]const u8, c_uint) c_int;
 pub extern "c" fn OS_working_dir_pathname() [*:0]const u8;
 pub extern "c" fn macosx_main_bundle_dir() ?[*:0]const u8;
@@ -1671,15 +1626,15 @@ pub inline fn requestGc(n_words: usize) void {
 
 pub fn primitiveGc(amount: usize) noreturn {
     const free_prim = Free_primitive orelse {
-        outf_fatal("\nMicrocode requested primitive GC outside primitive!\n");
+        outf.fatal("\nMicrocode requested primitive GC outside primitive!\n", .{});
         Microcode_Termination(term_exit);
     };
     if (@intFromPtr(free_prim) < @intFromPtr(heap_start)) {
-        outf_fatal("\nMicrocode requested primitive GC outside primitive!\n");
+        outf.fatal("\nMicrocode requested primitive GC outside primitive!\n", .{});
         Microcode_Termination(term_exit);
     }
     if (@intFromPtr(Free) < @intFromPtr(free_prim)) {
-        outf_fatal("\nFree has gone backwards!\n");
+        outf.fatal("\nFree has gone backwards!\n", .{});
         Microcode_Termination(term_exit);
     }
     const used_words: usize = @intCast((@intFromPtr(Free) - @intFromPtr(free_prim)) / @sizeOf(obj.SchemeObject));

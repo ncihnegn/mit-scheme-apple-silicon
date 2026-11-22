@@ -6,6 +6,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const build_options = @import("build_options");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 const boot = @import("boot.zig");
 const debug = @import("debug.zig");
 const floenv = @import("floenv.zig");
@@ -861,22 +862,22 @@ fn interactiveBackTrace() void {
     interactiveNewline();
     const filename = std.mem.sliceTo(&input_string, 0);
     if (filename.len == 0) {
-        osscheme.debug_back_trace(abi.CONSOLE_OUTPUT);
+        osscheme.debug_back_trace(outf.console_output);
         return;
     }
     transact.transaction_begin();
     const fname_z: [*:0]const u8 = @ptrCast(input_string[0..filename.len :0]);
     const to_dump = std.c.fopen(fname_z, "w") orelse {
-        abi.outf_error("Error opening \"%s\".\n", fname_z);
+        outf.err("Error opening \"{s}\".\n", .{fname_z});
         transact.transaction_abort();
         return;
     };
     transact.transaction_record_action(.tat_always, &etaFclose, @ptrCast(to_dump));
-    abi.outf_console("Writing the stack trace to file \"%s\" -- ", fname_z);
-    abi.outf_flush_console();
-    osscheme.debug_back_trace(abi.FILE_OUTPUT(to_dump));
-    abi.outf_console("Done.\n");
-    abi.outf_flush_console();
+    outf.console("Writing the stack trace to file \"{s}\" -- ", .{fname_z});
+    outf.flushConsole();
+    osscheme.debug_back_trace(outf.fileOutput(to_dump));
+    outf.console("Done.\n", .{});
+    outf.flushConsole();
     transact.transaction_commit();
 }
 

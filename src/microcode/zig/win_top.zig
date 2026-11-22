@@ -8,6 +8,7 @@ const builtin = @import("builtin");
 const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 const boot = @import("boot.zig");
 const code_arena = @import("code_arena.zig");
 const fasload = @import("fasload.zig");
@@ -196,8 +197,8 @@ pub fn osRestoreExternalState() callconv(.c) void {
 pub fn osGetEntropy(buf: *[32]u8) callconv(.c) void {
     const status = win.bcrypt.BCryptGenRandom(null, buf, 32, win.BCRYPT_USE_SYSTEM_PREFERRED_RNG);
     if (status < 0) {
-        abi.outf_fatal("\nOS_get_entropy: BCryptGenRandom failed (%d).\n", status);
-        abi.outf_flush_fatal();
+        outf.fatal("\nOS_get_entropy: BCryptGenRandom failed ({d}).\n", .{status});
+        outf.flushFatal();
         abi.termination_trap();
     }
 }

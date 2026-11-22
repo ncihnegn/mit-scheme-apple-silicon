@@ -489,10 +489,6 @@ pub fn build(b: *std.Build) void {
         if (spec.needs_gcloop) {
             smoke_exe.root_module.addObject(gcloop_smoke_obj);
         }
-        smoke_exe.root_module.addCSourceFile(.{
-            .file = b.path("src/microcode/outf.c"),
-            .flags = c_flags,
-        });
         if (spec.needs_setjmp) {
             smoke_exe.root_module.addCSourceFile(.{
                 .file = b.path("src/microcode/scm_setjmp.c"),

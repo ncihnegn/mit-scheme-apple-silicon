@@ -7,6 +7,7 @@ const builtin = @import("builtin");
 const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 const fasl = @import("fasl.zig");
 const memmag = @import("memmag.zig");
 const code_arena = @import("code_arena.zig");
@@ -144,24 +145,28 @@ fn initFaslFile(file_name: [*:0]const u8, band_p: bool, handle: *fasl.FaslFileHa
     }
 
     if (fasl.check_fasl_version(fh) != fasl.fasl_file_fine) {
-        abi.outf_error("\nBad version in FASL File: %s\n", file_name);
-        abi.outf_error("File has: version %u architecture %u.\n", fh.version, fh.arch);
-        abi.outf_error(
-            "Expected: version between %u and %u architecture %u.\n",
-            oldest_input_fasl_version,
-            newest_input_fasl_version,
-            fasl.currentFaslArch(),
+        outf.err("\nBad version in FASL File: {s}\n", .{file_name});
+        outf.err("File has: version {d} architecture {d}.\n", .{ fh.version, fh.arch });
+        outf.err(
+            "Expected: version between {d} and {d} architecture {d}.\n",
+            .{
+                oldest_input_fasl_version,
+                newest_input_fasl_version,
+                fasl.currentFaslArch(),
+            },
         );
         abi.signal_error_from_primitive(abi.err_fasl_file_bad_data);
     }
 
     if (fasl.check_fasl_cc_version(fh, abi.compiler_interface_version, abi.compiler_processor_type) != fasl.fasl_file_fine) {
-        abi.outf_error("\nBad compiled-code version in FASL File: %s\n", file_name);
-        abi.outf_error("File has: compiled-code interface %u; architecture %u.\n", fh.cc_version, fh.cc_arch);
-        abi.outf_error(
-            "Expected: compiled-code interface %u; architecture %u.\n",
-            abi.compiler_interface_version,
-            abi.compiler_processor_type,
+        outf.err("\nBad compiled-code version in FASL File: {s}\n", .{file_name});
+        outf.err("File has: compiled-code interface {d}; architecture {d}.\n", .{ fh.cc_version, fh.cc_arch });
+        outf.err(
+            "Expected: compiled-code interface {d}; architecture {d}.\n",
+            .{
+                abi.compiler_interface_version,
+                abi.compiler_processor_type,
+            },
         );
         abi.signal_error_from_primitive(abi.err_fasload_compiled_mismatch);
     }
@@ -273,16 +278,16 @@ fn terminateBandLoad(ap: ?*anyopaque) callconv(.c) void {
     }
 
     var abort_value = abi.abort_to_interpreter_argument();
-    abi.outf_fatal("\nload-band: ");
+    outf.fatal("\nload-band: ", .{});
     if (abort_value > 0) {
         const message: ?[*:0]const u8 = if (abort_value <= abi.max_error)
             storage.Error_Names[@intCast(abort_value)]
         else
             null;
         if (message) |msg| {
-            abi.outf_fatal("Error %#zx (%s)", @as(usize, @intCast(abort_value)), msg);
+            outf.fatal("Error 0x{x} ({s})", .{ @as(usize, @intCast(abort_value)), msg });
         } else {
-            abi.outf_fatal("Unknown error %#zx", @as(usize, @intCast(abort_value)));
+            outf.fatal("Unknown error 0x{x}", .{@as(usize, @intCast(abort_value))});
         }
     } else {
         abort_value = (-abort_value) - 1;
@@ -290,10 +295,10 @@ fn terminateBandLoad(ap: ?*anyopaque) callconv(.c) void {
             storage.Abort_Names[@intCast(abort_value)]
         else
             "UNKNOWN";
-        abi.outf_fatal("Abort %d (%s)", abort_value, msg);
+        outf.fatal("Abort {d} ({s})", .{ abort_value, msg });
     }
-    abi.outf_fatal(" past the point of no return.\n");
-    abi.outf_fatal("file name = \"%s\".\n", state.file_name);
+    outf.fatal(" past the point of no return.\n", .{});
+    outf.fatal("file name = \"{s}\".\n", .{state.file_name});
     abi.OS_free(@ptrCast(state.file_name));
 
     execute_reload_cleanups();
@@ -586,17 +591,19 @@ fn relocateAddress(vaddr: ?*anyopaque) *anyopaque {
     else if (caddr >= stack_start_addr and caddr < stack_end_addr)
         ptrAddr(new_stack_end) - (stack_end_addr - caddr)
     else {
-        abi.outf_fatal("Pointer out of range: %#zx\n", @as(usize, @intCast(caddr)));
-        abi.outf_fatal(
-            "Heap: %#zx-%#zx, Constant: %#zx-%#zx, Code: %#zx-%#zx, Stack: %#zx-%#zx\n",
-            @as(usize, @intCast(heap_start_addr)),
-            @as(usize, @intCast(heap_end_addr)),
-            @as(usize, @intCast(const_start_addr)),
-            @as(usize, @intCast(const_end_addr)),
-            @as(usize, @intCast(code_start_addr)),
-            @as(usize, @intCast(code_end_addr)),
-            @as(usize, @intCast(stack_start_addr)),
-            @as(usize, @intCast(stack_end_addr)),
+        outf.fatal("Pointer out of range: 0x{x}\n", .{caddr});
+        outf.fatal(
+            "Heap: 0x{x}-0x{x}, Constant: 0x{x}-0x{x}, Code: 0x{x}-0x{x}, Stack: 0x{x}-0x{x}\n",
+            .{
+                heap_start_addr,
+                heap_end_addr,
+                const_start_addr,
+                const_end_addr,
+                code_start_addr,
+                code_end_addr,
+                stack_start_addr,
+                stack_end_addr,
+            },
         );
         abi.signal_error_from_primitive(abi.err_fasl_file_bad_data);
     };

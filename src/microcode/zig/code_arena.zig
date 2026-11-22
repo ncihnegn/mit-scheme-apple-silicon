@@ -5,6 +5,7 @@
 const std = @import("std");
 const scheme_obj = @import("scheme_obj.zig");
 pub const jit = @import("jit.zig");
+const outf = @import("outf.zig");
 
 // Ensure jit (+ wind + obstack) exports are emitted when code_arena.zig is built via smoke_runtime.
 comptime {
@@ -22,8 +23,6 @@ extern "c" fn realloc(ptr: ?*anyopaque, size: usize) ?*anyopaque;
 extern "c" fn free(ptr: ?*anyopaque) void;
 extern "c" fn abort() noreturn;
 extern "c" fn exit(status: c_int) noreturn;
-extern "c" fn outf_fatal(fmt: [*:0]const u8, ...) void;
-extern "c" fn outf_flush_fatal() void;
 
 const CodeArenaChunk = struct {
     start: ?[*]SchemeObject = null,
@@ -85,16 +84,16 @@ fn initChunk(c: *CodeArenaChunk, requested_words: usize) void {
     const words: usize = if (requested_words == 0) 2048 else @intCast(requested_words);
 
     if (words > (std.math.maxInt(usize) - page_size) / @sizeOf(SchemeObject)) {
-        outf_fatal("Requested code arena size overflows address space.\n");
-        outf_flush_fatal();
+        outf.fatal("Requested code arena size overflows address space.\n", .{});
+        outf.flushFatal();
         exit(1);
     }
 
     const raw_bytes = words * @sizeOf(SchemeObject);
     const byte_size = ((raw_bytes + (page_size - 1)) / page_size) * page_size;
     const mapped = jit.jit_map_code_space(byte_size) orelse {
-        outf_fatal("Unable to allocate %zu-byte JIT code arena.\n", byte_size);
-        outf_flush_fatal();
+        outf.fatal("Unable to allocate {d}-byte JIT code arena.\n", .{byte_size});
+        outf.flushFatal();
         exit(1);
     };
 
@@ -112,8 +111,8 @@ fn initChunk(c: *CodeArenaChunk, requested_words: usize) void {
         c.start = null;
         c.alloc_next = null;
         c.end = null;
-        outf_fatal("Code arena exceeds tagged datum range.\n");
-        outf_flush_fatal();
+        outf.fatal("Code arena exceeds tagged datum range.\n", .{});
+        outf.flushFatal();
         exit(1);
     }
 
@@ -123,8 +122,8 @@ fn initChunk(c: *CodeArenaChunk, requested_words: usize) void {
         c.start = null;
         c.alloc_next = null;
         c.end = null;
-        outf_fatal("Unable to allocate code arena mark bitmap.\n");
-        outf_flush_fatal();
+        outf.fatal("Unable to allocate code arena mark bitmap.\n", .{});
+        outf.flushFatal();
         exit(1);
     };
     c.mark_bits = @ptrCast(@alignCast(bits));
@@ -153,8 +152,8 @@ pub export fn code_arena_setup(initial_words: usize) callconv(.c) void {
         jit.jit_unmap_code_space(@ptrCast(primary_chunk.start), primary_chunk.byte_size);
         if (primary_chunk.mark_bits) |mb| free(@ptrCast(mb));
         primary_chunk = .{};
-        outf_fatal("Unable to allocate code arena mark stack.\n");
-        outf_flush_fatal();
+        outf.fatal("Unable to allocate code arena mark stack.\n", .{});
+        outf.flushFatal();
         exit(1);
     };
     mark_stack = @ptrCast(@alignCast(ms_raw));
@@ -350,8 +349,8 @@ pub export fn code_arena_for_each_live_block(
                 len_usize == 0 or
                 len_usize > wordDiff(end, scan))
             {
-                outf_fatal("code_arena_for_each_live_block: corrupt header %#zx at %p\n", hdr, @as(?*const anyopaque, @ptrCast(scan)));
-                outf_flush_fatal();
+                outf.fatal("code_arena_for_each_live_block: corrupt header 0x{x} at 0x{x}\n", .{ hdr, @intFromPtr(scan) });
+                outf.flushFatal();
                 abort();
             }
 
@@ -393,8 +392,8 @@ fn bumpAllocInChunk(c: *CodeArenaChunk, alloc_words: usize) ?[*]SchemeObject {
 pub export fn code_arena_alloc(n_words: usize) callconv(.c) ?[*]SchemeObject {
     if (n_words == 0) return null;
     if (!primary_initialized_p) {
-        outf_fatal("code_arena_alloc: code arena not initialized.\n");
-        outf_flush_fatal();
+        outf.fatal("code_arena_alloc: code arena not initialized.\n", .{});
+        outf.flushFatal();
         abort();
     }
 
@@ -445,8 +444,8 @@ pub export fn code_arena_alloc(n_words: usize) callconv(.c) ?[*]SchemeObject {
     const min_words = @max(half_primary, code_arena_min_overflow_words);
     const overflow_words = @max(alloc_words + 1, min_words);
     const extra_raw = malloc(@sizeOf(CodeArenaChunk)) orelse {
-        outf_fatal("Unable to allocate overflow code arena chunk header.\n");
-        outf_flush_fatal();
+        outf.fatal("Unable to allocate overflow code arena chunk header.\n", .{});
+        outf.flushFatal();
         exit(1);
     };
     const extra: *CodeArenaChunk = @ptrCast(@alignCast(extra_raw));
@@ -471,8 +470,8 @@ pub export fn code_arena_mark_begin() callconv(.c) void {
 
 pub export fn code_arena_mark_block(block: ?[*]SchemeObject) callconv(.c) bool {
     const blk = block orelse {
-        outf_fatal("code_arena_mark_block: invalid block %p\n", @as(?*const anyopaque, null));
-        outf_flush_fatal();
+        outf.fatal("code_arena_mark_block: invalid block 0x0\n", .{});
+        outf.flushFatal();
         abort();
     };
     const c = findChunkForAddr(@ptrCast(blk));
@@ -480,15 +479,15 @@ pub export fn code_arena_mark_block(block: ?[*]SchemeObject) callconv(.c) bool {
         (@intFromPtr(blk) % @sizeOf(SchemeObject)) != 0 or
         scheme_obj.objectType(blk[0]) != scheme_obj.tc_manifest_vector)
     {
-        outf_fatal("code_arena_mark_block: invalid block %p\n", @as(?*const anyopaque, @ptrCast(blk)));
-        outf_flush_fatal();
+        outf.fatal("code_arena_mark_block: invalid block 0x{x}\n", .{@intFromPtr(blk)});
+        outf.flushFatal();
         abort();
     }
     const chunk = c.?;
     const len: usize = @intCast(1 + scheme_obj.objectDatum(blk[0]));
     if (len > wordDiff(chunk.alloc_next.?, blk)) {
-        outf_fatal("code_arena_mark_block: block %p exceeds chunk bounds\n", @as(?*const anyopaque, @ptrCast(blk)));
-        outf_flush_fatal();
+        outf.fatal("code_arena_mark_block: block 0x{x} exceeds chunk bounds\n", .{@intFromPtr(blk)});
+        outf.flushFatal();
         abort();
     }
 
@@ -502,8 +501,8 @@ pub export fn code_arena_mark_block(block: ?[*]SchemeObject) callconv(.c) bool {
     if (mark_stack_top == mark_stack_capacity) {
         const new_cap = mark_stack_capacity * 2;
         const grown = realloc(@ptrCast(mark_stack), new_cap * @sizeOf(?[*]SchemeObject)) orelse {
-            outf_fatal("code_arena_mark_block: mark stack overflow\n");
-            outf_flush_fatal();
+            outf.fatal("code_arena_mark_block: mark stack overflow\n", .{});
+            outf.flushFatal();
             exit(1);
         };
         mark_stack = @ptrCast(@alignCast(grown));
@@ -530,8 +529,8 @@ pub export fn code_arena_mark_stack_empty_p() callconv(.c) bool {
 
 pub export fn code_arena_pop_mark_stack() callconv(.c) ?[*]SchemeObject {
     if (mark_stack_top == 0) {
-        outf_fatal("code_arena_pop_mark_stack: stack underflow\n");
-        outf_flush_fatal();
+        outf.fatal("code_arena_pop_mark_stack: stack underflow\n", .{});
+        outf.flushFatal();
         abort();
     }
     mark_stack_top -= 1;
@@ -560,8 +559,8 @@ fn codeArenaCoalescePass(check_marks_p: bool) void {
                 words > wordDiff(end, scan))
             {
                 jit.jit_write_end();
-                outf_fatal("code_arena sweep: corrupt header %#zx at %p\n", hdr, @as(?*const anyopaque, @ptrCast(scan)));
-                outf_flush_fatal();
+                outf.fatal("code_arena sweep: corrupt header 0x{x} at 0x{x}\n", .{ hdr, @intFromPtr(scan) });
+                outf.flushFatal();
                 abort();
             }
 

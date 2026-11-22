@@ -5,6 +5,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 const fasload = @import("fasload.zig");
 const osscheme = @import("osscheme.zig");
 const transact = @import("transact.zig");
@@ -84,8 +85,8 @@ fn uxChannelCloseAll() callconv(.c) void {
 pub fn uxInitializeChannels() callconv(.c) void {
     const init_size: usize = 64;
     const raw = std.c.malloc(init_size * @sizeOf(abi.Channel)) orelse {
-        abi.outf_fatal("\nUnable to allocate channel table.\n");
-        abi.outf_flush_fatal();
+        outf.fatal("\nUnable to allocate channel table.\n", .{});
+        outf.flushFatal();
         abi.termination_init_error();
     };
     const table: [*]abi.Channel = @ptrCast(@alignCast(raw));

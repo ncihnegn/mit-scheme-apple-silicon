@@ -1,6 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 const osscheme = @import("osscheme.zig");
 const stubs = if (builtin.is_test) @import("test_stubs.zig") else struct {};
 
@@ -65,8 +66,8 @@ const baud_table = blk: {
 pub fn uxInitializeTerminals() callconv(.c) void {
     terminal_table_size = @intCast(abi.OS_channel_table_size);
     const raw = std.c.malloc(terminal_table_size * @sizeOf(TerminalState)) orelse {
-        abi.outf_fatal("\nUnable to allocate terminal table.\n");
-        abi.outf_flush_fatal();
+        outf.fatal("\nUnable to allocate terminal table.\n", .{});
+        outf.flushFatal();
         abi.termination_init_error();
     };
     const ptr: [*]TerminalState = @ptrCast(@alignCast(raw));

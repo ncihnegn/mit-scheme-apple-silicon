@@ -4,6 +4,7 @@
 
 const std = @import("std");
 pub const obstack = @import("obstack.zig");
+const outf = @import("outf.zig");
 
 // Ensure obstack exports are emitted when wind.zig is built standalone (e.g. test-smoke).
 comptime {
@@ -15,8 +16,6 @@ extern "c" fn free(ptr: ?*anyopaque) void;
 extern "c" fn abort() noreturn;
 extern "c" fn block_signals() void;
 extern "c" fn unblock_signals() void;
-extern "c" fn outf_fatal(fmt: [*:0]const u8, ...) void;
-extern "c" fn outf_flush_fatal() void;
 
 pub const ProtectorFn = *const fn (?*anyopaque) callconv(.c) void;
 pub const InitializerFn = *const fn (?*anyopaque) callconv(.c) void;
@@ -38,8 +37,8 @@ pub export var dstack_position: ?*anyopaque = null;
 var save_binding_location: ?*?*anyopaque = null;
 
 fn fatalError(procedure_name: [*:0]const u8, message: [*:0]const u8) noreturn {
-    outf_fatal("%s: %s\n", procedure_name, message);
-    outf_flush_fatal();
+    outf.fatal("{s}: {s}\n", .{ procedure_name, message });
+    outf.flushFatal();
     abort();
 }
 

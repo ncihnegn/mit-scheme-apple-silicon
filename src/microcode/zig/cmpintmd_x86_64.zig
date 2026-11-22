@@ -5,6 +5,7 @@
 const std = @import("std");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 
 pub const cc_entry_type_size: usize = 2;
 pub const cc_entry_offset_size: usize = 2;
@@ -217,7 +218,7 @@ pub fn installHooks(
     var offset: usize = compiler_regblock_n_fixed * @sizeOf(obj.SchemeObject);
     for (hooks, 0..) |hook, idx| {
         if (idx == 2 and offset != rsi_trampoline_to_interface_offset) {
-            abi.outf_fatal("\nx86_64_reset_hook: RSI_TRAMPOLINE_TO_INTERFACE_OFFSET\n");
+            outf.fatal("\nx86_64_reset_hook: RSI_TRAMPOLINE_TO_INTERFACE_OFFSET\n", .{});
             abi.Microcode_Termination(abi.term_exit);
         }
         writeUnaligned(usize, @intFromPtr(rsi_value + offset), @intCast(hook.addr));

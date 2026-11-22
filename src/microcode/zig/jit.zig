@@ -7,6 +7,7 @@ const builtin = @import("builtin");
 const build_options = @import("build_options");
 pub const wind = @import("wind.zig");
 const win = @import("win_api.zig");
+const outf = @import("outf.zig");
 
 // Ensure wind + obstack exports are emitted when jit.zig is built standalone.
 comptime {
@@ -21,8 +22,6 @@ const is_windows: bool = builtin.os.tag == .windows;
 
 extern "c" fn munmap(addr: *anyopaque, len: usize) c_int;
 extern "c" fn abort() noreturn;
-extern "c" fn outf_fatal(fmt: [*:0]const u8, ...) void;
-extern "c" fn outf_flush_fatal() void;
 
 const darwin_ext = struct {
     extern "c" fn pthread_jit_write_protect_np(enabled: c_int) void;
@@ -34,8 +33,8 @@ pub export var jit_write_depth: c_uint = 0;
 var cached_page_size: usize = 0;
 
 fn fatalError(message: [*:0]const u8) noreturn {
-    outf_fatal("%s", message);
-    outf_flush_fatal();
+    outf.fatal("{s}", .{message});
+    outf.flushFatal();
     abort();
 }
 

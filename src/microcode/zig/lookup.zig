@@ -6,6 +6,7 @@ const std = @import("std");
 const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 const intern = @import("intern.zig");
 
 const space_per_uuo_link: usize = 10;
@@ -29,7 +30,7 @@ inline fn mapFromUnassigned(value: obj.SchemeObject) obj.SchemeObject {
 
 inline fn dieIfError(result: isize) void {
     if (result != abi.prim_done) {
-        abi.outf_fatal("\nRan out of guaranteed space!\n");
+        outf.fatal("\nRan out of guaranteed space!\n", .{});
         abi.Microcode_Termination(abi.term_exit);
     }
 }

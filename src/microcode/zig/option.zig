@@ -8,6 +8,7 @@ const build_options = @import("build_options");
 const abi = @import("prim_abi.zig");
 const boot = @import("boot.zig");
 const fasl = @import("fasl.zig");
+const outf = @import("outf.zig");
 
 extern "c" fn getenv(name: [*:0]const u8) ?[*:0]const u8;
 extern "c" fn strtoull(nptr: [*:0]const u8, endptr: *[*]const u8, base: c_int) c_ulonglong;
@@ -120,7 +121,7 @@ pub export fn print_help() callconv(.c) void {
     else
         "";
 
-    abi.outf_fatal(
+    outf.fatal(
         "Usage: mit-scheme --OPTION ARG ... --OPTION ARG ...\n\n" ++
             "This machine accepts the following command-line options.  The options\n" ++
             "may appear in any order, but they must all appear before any options\n" ++
@@ -130,12 +131,12 @@ pub export fn print_help() callconv(.c) void {
             "  list of directories that is searched to find various library files,\n" ++
             "  such as bands.  If this option is not given, the value of the\n" ++
             "  environment variable MITSCHEME_LIBRARY_PATH is used; if that isn't\n" ++
-            "  defined, \"%s\" is used.\n\n" ++
+            "  defined, \"{s}\" is used.\n\n" ++
             "--band FILENAME\n" ++
             "  Specifies the initial band to be loaded.  Searches for FILENAME in\n" ++
             "  the working directory and the library directories.  If this option\n" ++
             "  is not given, the environment variable MITSCHEME_BAND is used, or\n" ++
-            "  if that is not defined, \"%s\".\n" ++
+            "  if that is not defined, \"{s}\".\n" ++
             "  If this option is not given, the working directory is not searched.\n\n" ++
             "--fasl FILENAME\n" ++
             "  Specifies that a cold load should be performed, using FILENAME as\n" ++
@@ -176,13 +177,15 @@ pub export fn print_help() callconv(.c) void {
             "--nocore\n" ++
             "  Specifies that Scheme should not generate a core dump under any\n" ++
             "  circumstances.\n" ++
-            "%s\n" ++
+            "{s}\n" ++
             "--prepend-library DIRNAME\n" ++
             "  Adds DIRNAME to the front of the library search path.  This option\n" ++
             "  takes one value and can be specified once.\n",
-        default_library_path_z.ptr,
-        default_std_band,
-        macosx_doc,
+        .{
+            default_library_path_z.ptr,
+            default_std_band,
+            macosx_doc,
+        },
     );
 }
 
@@ -340,7 +343,7 @@ fn parseOptions(argc: c_int, argv: [*]?[*:0]const u8) void {
                         }
                     } else {
                         const prog = boot.scheme_program_name orelse "mit-scheme";
-                        abi.outf_fatal("%s: option --%s requires an argument.\n", prog, opt);
+                        outf.fatal("{s}: option --{s} requires an argument.\n", .{ prog, opt });
                         abi.termination_init_error();
                     }
                 } else {
@@ -417,14 +420,14 @@ fn standardStringOption(option: ?[*:0]const u8, variable: [*:0]const u8, defval:
 
 fn parseNumericString(
     raw: [*:0]const u8,
-    comptime err_fmt: [*:0]const u8,
+    comptime err_fmt: []const u8,
     ctx_name: [*:0]const u8,
 ) usize {
     var end_ptr: [*]const u8 = undefined;
     const n = strtoull(raw, &end_ptr, 0);
     if (@intFromPtr(end_ptr) == @intFromPtr(raw) or end_ptr[0] != 0) {
         const prog = boot.scheme_program_name orelse "mit-scheme";
-        abi.outf_fatal(err_fmt, prog, ctx_name, raw);
+        outf.fatal(err_fmt, .{ prog, ctx_name, raw });
         abi.termination_init_error();
     }
     return @intCast(n);
@@ -437,11 +440,11 @@ fn standardNumericOption(
     defval: usize,
 ) usize {
     if (optval) |val| {
-        return parseNumericString(val, "%s: illegal argument for option --%s: %s\n", option);
+        return parseNumericString(val, "{s}: illegal argument for option --{s}: {s}\n", option);
     }
     if (variable) |vname| {
         if (getenv(vname)) |t| {
-            return parseNumericString(t, "%s: illegal value for environment variable %s: %s\n", vname);
+            return parseNumericString(t, "{s}: illegal value for environment variable {s}: {s}\n", vname);
         }
     }
     return defval;
@@ -607,19 +610,19 @@ pub export fn search_path_for_file(
 
     const prog = boot.scheme_program_name orelse "mit-scheme";
     const kind: [*:0]const u8 = if (default_p) "default" else "file";
-    abi.outf_fatal("%s: can't find a readable %s", prog, kind);
+    outf.fatal("{s}: can't find a readable {s}", .{ prog, kind });
     if (option) |opt| {
-        abi.outf_fatal(" for option --%s", opt);
+        outf.fatal(" for option --{s}", .{opt});
     }
-    abi.outf_fatal(".\n");
-    abi.outf_fatal("\tsearched for file %s in these directories:\n", filename);
+    outf.fatal(".\n", .{});
+    outf.fatal("\tsearched for file {s} in these directories:\n", .{filename});
     if (!default_p) {
-        abi.outf_fatal("\t.\n");
+        outf.fatal("\t.\n", .{});
     }
     if (option_library_path) |path| {
         var i: usize = 0;
         while (path[i]) |elem| : (i += 1) {
-            abi.outf_fatal("\t%s\n", elem);
+            outf.fatal("\t{s}\n", .{elem});
         }
     }
     abi.termination_init_error();
@@ -637,7 +640,7 @@ fn standardFilenameOption(
         if (fileReadable(val)) return stringCopy(val);
         if (fileAbsolute(val)) {
             if (fail_p) {
-                abi.outf_fatal("%s: can't read file %s for option --%s.\n", prog, val, option);
+                outf.fatal("{s}: can't read file {s} for option --{s}.\n", .{ prog, val, option });
                 abi.termination_init_error();
             }
             return stringCopy(val);
@@ -648,7 +651,7 @@ fn standardFilenameOption(
     const filename = getenv(variable) orelse defval;
     if (fileAbsolute(filename)) {
         if (!fileReadable(filename) and fail_p) {
-            abi.outf_fatal("%s: can't read default file %s for option --%s.\n", prog, filename, option);
+            outf.fatal("{s}: can't read default file {s} for option --{s}.\n", .{ prog, filename, option });
             abi.termination_init_error();
         }
         return stringCopy(filename);
@@ -658,7 +661,7 @@ fn standardFilenameOption(
 
 fn conflictingOptions(option1: [*:0]const u8, option2: [*:0]const u8) noreturn {
     const prog = boot.scheme_program_name orelse "mit-scheme";
-    abi.outf_fatal("%s: can't specify both options --%s and --%s.\n", prog, option1, option2);
+    outf.fatal("{s}: can't specify both options --{s} and --{s}.\n", .{ prog, option1, option2 });
     abi.termination_init_error();
 }
 
@@ -687,34 +690,34 @@ fn readBandSizes(
 
 fn describeBooleanOption(name: [*:0]const u8, value: bool) void {
     const label: [*:0]const u8 = if (value) "yes" else "no";
-    abi.outf_fatal("  %s: %s\n", name, label);
+    outf.fatal("  {s}: {s}\n", .{ name, label });
 }
 
 fn describeStringOption(name: [*:0]const u8, value: [*:0]const u8) void {
-    abi.outf_fatal("  %s: %s\n", name, value);
+    outf.fatal("  {s}: {s}\n", .{ name, value });
 }
 
 fn describeSizeOption(name: [*:0]const u8, value: usize) void {
     const v: c_uint = @truncate(value);
-    abi.outf_fatal("  %s size: %d\n", name, v);
+    outf.fatal("  {s} size: {d}\n", .{ name, v });
 }
 
 fn describePathOption(name: [*:0]const u8, value: ?[*]?[*:0]const u8) void {
-    abi.outf_fatal("  %s: ", name);
+    outf.fatal("  {s}: ", .{name});
     if (value) |path| {
         if (path[0]) |first| {
-            abi.outf_fatal("%s", first);
+            outf.fatal("{s}", .{first});
             var i: usize = 1;
             while (path[i]) |elem| : (i += 1) {
-                abi.outf_fatal(":%s", elem);
+                outf.fatal(":{s}", .{elem});
             }
         }
     }
-    abi.outf_fatal("\n");
+    outf.fatal("\n", .{});
 }
 
 fn describeOptions() void {
-    abi.outf_fatal("Summary of configuration options:\n");
+    outf.fatal("Summary of configuration options:\n", .{});
     describeSizeOption("heap", option_heap_size);
     describeSizeOption("constant-space", option_constant_size);
     describeSizeOption("stack", option_stack_size);
@@ -730,16 +733,16 @@ fn describeOptions() void {
     describeBooleanOption("disable core dump", option_disable_core_dump);
     describeBooleanOption("suppress noise", option_batch_mode);
     if (option_unused_argc == 0) {
-        abi.outf_fatal("  no unused arguments\n");
+        outf.fatal("  no unused arguments\n", .{});
     } else if (option_unused_argv) |unused| {
-        abi.outf_fatal("  unused arguments:");
+        outf.fatal("  unused arguments:", .{});
         const count: usize = if (option_unused_argc > 0) @intCast(option_unused_argc) else 0;
         for (0..count) |i| {
             if (unused[i]) |arg| {
-                abi.outf_fatal(" %s", arg);
+                outf.fatal(" {s}", .{arg});
             }
         }
-        abi.outf_fatal("\n");
+        outf.fatal("\n", .{});
     }
 }
 
@@ -791,7 +794,7 @@ pub export fn read_command_line_options(argc: c_int, argv: [*]?[*:0]const u8) ca
         }
         if (!fileReadable(fasl_file)) {
             const prog = boot.scheme_program_name orelse "mit-scheme";
-            abi.outf_fatal("%s: can't read option file: --fasl %s\n", prog, fasl_file);
+            outf.fatal("{s}: can't read option file: --fasl {s}\n", .{ prog, fasl_file });
             abi.termination_init_error();
         }
     } else {
@@ -836,8 +839,8 @@ pub export fn read_command_line_options(argc: c_int, argv: [*]?[*:0]const u8) ca
     }
 
     if (option_show_version) {
-        abi.outf_console("%s\n", package_string_z.ptr);
-        abi.outf_flush_console();
+        outf.console("{s}\n", .{package_string_z.ptr});
+        outf.flushConsole();
     }
     if (option_show_help) {
         option_batch_mode = true;

@@ -16,12 +16,9 @@ const memmag = @import("memmag.zig");
 const fasload = @import("fasload.zig");
 const debug = @import("debug.zig");
 const interp = @import("interp.zig");
+const outf = @import("outf.zig");
 
 const min_heap_delta: usize = 50;
-
-extern "c" fn outf_console([*:0]const u8, ...) void;
-extern "c" fn outf_flush_console() void;
-extern "c" fn outf_flush_fatal() void;
 
 inline fn bytesToBlocks(n: usize) usize {
     return (n + 1023) / 1024;
@@ -30,7 +27,7 @@ inline fn bytesToBlocks(n: usize) usize {
 pub fn initExitScheme() callconv(.c) void {}
 
 fn attemptTerminationBackout(code: c_int) void {
-    abi.outf_flush_error();
+    outf.flushError();
     if (boot.critical_section_name != null or
         code == abi.term_halt or
         !obj.vectorP(abi.fixed_objects))
@@ -70,39 +67,39 @@ fn terminationPrefix(code: c_int) void {
     if (code == abi.term_halt) {
         if (!abi.option_batch_mode) {
             const idx: usize = @intCast((@intFromPtr(abi.Free) >> 3) % storage.term_halt_messages.len);
-            outf_console("\n%s\n", storage.term_halt_messages[idx]);
-            outf_flush_console();
+            outf.console("\n{s}\n", .{storage.term_halt_messages[idx]});
+            outf.flushConsole();
         }
     } else {
-        abi.outf_fatal("\n");
+        outf.fatal("\n", .{});
         const msg: ?[*:0]const u8 = if (code >= 0 and code <= abi.max_termination)
             storage.term_messages[@intCast(code)]
         else
             null;
         if (msg) |m| {
-            abi.outf_fatal("%s", m);
+            outf.fatal("{s}", .{m});
         } else {
-            abi.outf_fatal("Unknown termination code %#x", code);
+            outf.fatal("Unknown termination code 0x{x}", .{code});
         }
         if (boot.critical_section_name) |cs_name| {
-            abi.outf_fatal(" within critical section \"%s\"", cs_name);
+            outf.fatal(" within critical section \"{s}\"", .{cs_name});
         }
-        abi.outf_fatal(".\n");
+        outf.fatal(".\n", .{});
     }
 }
 
 fn terminationSuffix(value: c_int) noreturn {
     edwinAutoSave();
     deleteTempFiles();
-    outf_flush_fatal();
+    outf.flushFatal();
     memmag.reset_memory();
     std.c.exit(value);
 }
 
 fn terminationSuffixTrace() noreturn {
     if (build_options.debugging and storage.trace_on_error) {
-        abi.outf_error("\n\n**** Stack trace ****\n\n");
-        debug.debug_stack_trace(abi.ERROR_OUTPUT);
+        outf.err("\n\n**** Stack trace ****\n\n", .{});
+        debug.debug_stack_trace(outf.error_output);
     }
     terminationSuffix(1);
 }
@@ -125,7 +122,7 @@ pub fn terminationInitError() callconv(.c) noreturn {
 pub fn terminationEndOfComputation() callconv(.c) noreturn {
     terminationPrefix(abi.term_end_of_computation);
     debug.debug_print_expr(abi.Registers[abi.regblock_val], "Final result");
-    outf_console("\n");
+    outf.console("\n", .{});
     terminationSuffix(0);
 }
 
@@ -140,23 +137,25 @@ pub fn terminationNoErrorHandler() callconv(.c) noreturn {
         var heap_size: usize = 0;
         var const_size: usize = 0;
         fasload.get_band_parameters(&heap_size, &const_size);
-        abi.outf_fatal("Try again with values at least as large as\n");
-        abi.outf_fatal("  --heap %zu\n", min_heap_delta + bytesToBlocks(heap_size));
-        abi.outf_fatal("  --constant %zu\n", bytesToBlocks(const_size));
+        outf.fatal("Try again with values at least as large as\n", .{});
+        outf.fatal("  --heap {d}\n", .{min_heap_delta + bytesToBlocks(heap_size)});
+        outf.fatal("  --constant {d}\n", .{bytesToBlocks(const_size)});
     }
     terminationSuffix(1);
 }
 
 pub fn terminationGcOutOfSpace() callconv(.c) noreturn {
     terminationPrefix(abi.term_gc_out_of_space);
-    abi.outf_fatal("You are out of space at the end of a garbage collection!\n");
-    abi.outf_fatal(
-        "Free = %#zx; heap_alloc_limit = %#zx; heap_end = %#zx\n",
-        @as(usize, @intCast(@intFromPtr(abi.Free))),
-        @as(usize, @intCast(@intFromPtr(abi.heap_alloc_limit))),
-        @as(usize, @intCast(@intFromPtr(abi.heap_end))),
+    outf.fatal("You are out of space at the end of a garbage collection!\n", .{});
+    outf.fatal(
+        "Free = 0x{x}; heap_alloc_limit = 0x{x}; heap_end = 0x{x}\n",
+        .{
+            @intFromPtr(abi.Free),
+            @intFromPtr(abi.heap_alloc_limit),
+            @intFromPtr(abi.heap_end),
+        },
     );
-    abi.outf_fatal("# words needed = %zu; # words available = %zu\n", abi.gc_space_needed, abi.heapAvailable());
+    outf.fatal("# words needed = {d}; # words available = {d}\n", .{ abi.gc_space_needed, abi.heapAvailable() });
     terminationSuffixTrace();
 }
 
@@ -167,7 +166,7 @@ pub fn terminationEof() callconv(.c) noreturn {
 pub fn terminationSignal(signal_name: ?[*:0]const u8) callconv(.c) noreturn {
     if (signal_name) |name| {
         terminationPrefix(abi.term_signal);
-        abi.outf_fatal("Killed by %s.\n", name);
+        outf.fatal("Killed by {s}.\n", .{name});
     } else {
         attemptTerminationBackout(abi.term_signal);
     }
@@ -184,7 +183,7 @@ const AutoSaveCtx = struct {
 
 fn autoSaveWriteBody(raw: ?*anyopaque) callconv(.c) void {
     const ctx: *const AutoSaveCtx = @ptrCast(@alignCast(raw.?));
-    abi.outf_error_line("Auto-saving file \"%s\"", ctx.namestring);
+    outf.errLine("Auto-saving file \"{s}\"", .{ctx.namestring});
     const channel = abi.OS_open_output_file(ctx.namestring);
     const front_len = @intFromPtr(ctx.gap_start) - @intFromPtr(ctx.start);
     if (front_len > 0) {

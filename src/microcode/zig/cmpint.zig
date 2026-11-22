@@ -7,6 +7,7 @@ const builtin = @import("builtin");
 const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 
 pub const compiler_interface_version_value: c_uint = 4;
 
@@ -424,7 +425,7 @@ fn makeCompilerUtilities() obj.SchemeObject {
     h1 = obj.objectNewType(obj.tc_manifest_vector, h1);
 
     const block = abi.code_arena_alloc(n_words) orelse {
-        abi.outf_fatal("Can't allocate compiler_utilities.\n");
+        outf.fatal("Can't allocate compiler_utilities.\n", .{});
         abi.Microcode_Termination(abi.term_no_space);
     };
 
@@ -439,7 +440,7 @@ fn makeCompilerUtilities() obj.SchemeObject {
     if (fillTrampoline(block, 0, &cet, abi.trampoline_k_return_to_interpreter) or
         fillTrampoline(block, 1, &cet, abi.trampoline_k_reflect_to_interface))
     {
-        abi.outf_fatal("\nError in make_compiler_utilities\n");
+        outf.fatal("\nError in make_compiler_utilities\n", .{});
         abi.Microcode_Termination(abi.term_compiler_death);
     }
 
@@ -454,7 +455,7 @@ fn makeCompilerUtilities() obj.SchemeObject {
             abi.write_cc_entry_offset(&ceo, addr) or
             abi.store_trampoline_to_interface_insns(addr))
         {
-            abi.outf_fatal("\nError in make_compiler_utilities\n");
+            outf.fatal("\nError in make_compiler_utilities\n", .{});
             abi.Microcode_Termination(abi.term_compiler_death);
         }
     }
@@ -479,7 +480,7 @@ pub fn compilerReset(new_block: obj.SchemeObject) callconv(.c) void {
         obj.memoryRef(new_block, 0) == h1 and
         obj.memoryRef(new_block, 1) == h2))
     {
-        abi.outf_fatal("\nThe world image being restored is incompatible with this microcode.\n");
+        outf.fatal("\nThe world image being restored is incompatible with this microcode.\n", .{});
         abi.Microcode_Termination(abi.term_compiler_death);
     }
 
@@ -2465,7 +2466,7 @@ pub fn declareBuiltin(builtin_addr: usize, name: [*:0]const u8) callconv(.c) voi
             builtin_names = if (n_ptr) |p| @ptrCast(@alignCast(p)) else null;
         }
         if (builtins == null or builtin_names == null) {
-            abi.outf_fatal("declare_builtin: malloc/realloc failed (size = %d).\n", s_builtins);
+            outf.fatal("declare_builtin: malloc/realloc failed (size = {d}).\n", .{s_builtins});
             abi.termination_init_error();
         }
     }

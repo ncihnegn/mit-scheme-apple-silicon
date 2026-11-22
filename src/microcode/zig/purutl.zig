@@ -5,6 +5,7 @@
 const std = @import("std");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 
 // DEFINE_PRIMITIVE ("PRIMITIVE-IMPURIFY", Prim_impurify, 1, 1,
 //   "(OBJECT)\n\
@@ -41,7 +42,7 @@ pub export fn copy_to_constant_space(source: [*]const obj.SchemeObject, n_words:
     else
         0;
     if (n_words > avail_words) {
-        abi.outf_fatal("\nInsufficient constant space!\n");
+        outf.fatal("\nInsufficient constant space!\n", .{});
         abi.Microcode_Termination(abi.term_no_space);
     }
     const result = abi.constant_alloc_next;

@@ -3,6 +3,7 @@ const builtin = @import("builtin");
 const build_options = @import("build_options");
 
 pub const chacha = @import("chacha.zig");
+pub const outf = @import("outf.zig");
 pub const win_api = @import("win_api.zig");
 pub const keccak = @import("keccak.zig");
 pub const md5 = @import("md5.zig");
@@ -223,6 +224,7 @@ comptime {
 test "microcode zig scaffold" {
     try std.testing.expect(true);
     std.testing.refAllDecls(@This());
+    _ = outf;
     _ = win_api;
     _ = chacha;
     _ = keccak;

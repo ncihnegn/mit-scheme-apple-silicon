@@ -7,6 +7,7 @@ const builtin = @import("builtin");
 const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 const storage = @import("storage.zig");
 const utils = @import("utils.zig");
 const code_arena = @import("code_arena.zig");
@@ -54,9 +55,9 @@ const primes = [_]usize{
 };
 
 fn allocationTooLarge() noreturn {
-    abi.outf_fatal("Requested allocation is too large.\n");
-    abi.outf_fatal("Try again with a smaller argument to '--heap'.\n");
-    abi.outf_flush_fatal();
+    outf.fatal("Requested allocation is too large.\n", .{});
+    outf.fatal("Try again with a smaller argument to '--heap'.\n", .{});
+    outf.flushFatal();
     reset_memory();
     exit(1);
 }
@@ -68,8 +69,8 @@ pub export fn setup_memory(
     code_size: usize,
 ) callconv(.c) void {
     if (heap_size == 0 or stack_size == 0) {
-        abi.outf_fatal("Configuration won't hold initial data.\n");
-        abi.outf_flush_fatal();
+        outf.fatal("Configuration won't hold initial data.\n", .{});
+        outf.flushFatal();
         exit(1);
     }
 
@@ -80,8 +81,8 @@ pub export fn setup_memory(
 
     const total_words: usize = @intCast(total_words_u128);
     const raw = abi.OS_malloc_init(total_words * @sizeOf(obj.SchemeObject)) orelse {
-        abi.outf_fatal("Not enough memory for this configuration.\n");
-        abi.outf_flush_fatal();
+        outf.fatal("Not enough memory for this configuration.\n", .{});
+        outf.flushFatal();
         exit(1);
     };
     const block_start: [*]obj.SchemeObject = @ptrCast(@alignCast(raw));
@@ -165,8 +166,8 @@ fn allocateTospace(
         const bytes: usize = @as(usize, @intCast(n_words)) * @sizeOf(obj.SchemeObject);
         const raw = if (start_r.*) |prev| realloc(@ptrCast(prev), bytes) else malloc(bytes);
         const p: [*]obj.SchemeObject = @ptrCast(@alignCast(raw orelse {
-            abi.outf_fatal("Unable to allocate temporary heap for GC.\n");
-            abi.outf_flush_fatal();
+            outf.fatal("Unable to allocate temporary heap for GC.\n", .{});
+            outf.flushFatal();
             exit(1);
         }));
         start_r.* = p;
@@ -200,12 +201,14 @@ pub export fn Prim_garbage_collect() callconv(.c) obj.SchemeObject {
 
     abi.stackCheckFatal("GC");
     if (@intFromPtr(abi.Free) > @intFromPtr(abi.heap_end)) {
-        abi.outf_fatal("\nGC has been delayed too long!\n");
-        abi.outf_fatal(
-            "Free = %#zx; heap_alloc_limit = %#zx; heap_end = %#zx\n",
-            @as(usize, @intFromPtr(abi.Free)),
-            @as(usize, @intFromPtr(abi.heap_alloc_limit)),
-            @as(usize, @intFromPtr(abi.heap_end)),
+        outf.fatal("\nGC has been delayed too long!\n", .{});
+        outf.fatal(
+            "Free = 0x{x}; heap_alloc_limit = 0x{x}; heap_end = 0x{x}\n",
+            .{
+                @intFromPtr(abi.Free),
+                @intFromPtr(abi.heap_alloc_limit),
+                @intFromPtr(abi.heap_end),
+            },
         );
         abi.Microcode_Termination(abi.term_no_space);
     }
@@ -334,8 +337,8 @@ fn saveTospaceCopy(
 }
 
 pub export fn stack_death(name: [*:0]const u8) callconv(.c) noreturn {
-    abi.outf_fatal("\n%s: The stack has overflowed and overwritten adjacent memory.\n", name);
-    abi.outf_fatal("This was probably caused by a runaway recursion.\n");
+    outf.fatal("\n{s}: The stack has overflowed and overwritten adjacent memory.\n", .{name});
+    outf.fatal("This was probably caused by a runaway recursion.\n", .{});
     abi.Microcode_Termination(abi.term_stack_overflow);
 }
 

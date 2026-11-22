@@ -6,6 +6,7 @@ const std = @import("std");
 const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 const fasl = @import("fasl.zig");
 const code_arena = @import("code_arena.zig");
 const transact = @import("transact.zig");
@@ -251,11 +252,9 @@ fn saveGcVars() void {
 
 inline fn compareGcVar(name: [*:0]const u8, saved: ?[*]obj.SchemeObject, current: ?[*]obj.SchemeObject) void {
     if (ptrAddr(saved) != ptrAddr(current)) {
-        abi.outf_error(
-            "GC variable changed: %s: %p -> %p\n",
-            name,
-            @as(?*const anyopaque, @ptrCast(saved)),
-            @as(?*const anyopaque, @ptrCast(current)),
+        outf.err(
+            "GC variable changed: {s}: 0x{x} -> 0x{x}\n",
+            .{ name, ptrAddr(saved), ptrAddr(current) },
         );
     }
 }
@@ -305,7 +304,7 @@ fn compareMemoryChecksum() void {
         var digest: [md5.hash_len]u8 = undefined;
         computeMemoryChecksum(&digest);
         if (!std.mem.eql(u8, &digest, &fasdump_original_digest)) {
-            abi.outf_error("Memory mismatch after fasdump.");
+            outf.err("Memory mismatch after fasdump.", .{});
         }
     }
 }

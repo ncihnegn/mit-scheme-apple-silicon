@@ -7,6 +7,7 @@ const builtin = @import("builtin");
 const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 const boot = @import("boot.zig");
 const utils = @import("utils.zig");
 const artutl = @import("artutl.zig");
@@ -440,7 +441,7 @@ pub export fn cstack_lpop(tos: [*]u8, bytes: c_int) callconv(.c) [*]u8 {
     const base_addr = @intFromPtr(boot.ffi_obstack.object_base.?);
     const n: usize = @intCast(bytes);
     if (tos_addr < base_addr + n) {
-        abi.outf_error_line("\ninternal error: C stack exhausted.\tCould not pop %d bytes.", bytes);
+        outf.errLine("\ninternal error: C stack exhausted.\tCould not pop {d} bytes.", .{bytes});
         abi.signal_error_from_primitive(abi.err_external_return);
     }
     return @ptrFromInt(tos_addr - n);
@@ -448,7 +449,7 @@ pub export fn cstack_lpop(tos: [*]u8, bytes: c_int) callconv(.c) [*]u8 {
 
 pub export fn cstack_pop(tos: [*]u8) callconv(.c) void {
     if (@intFromPtr(tos) < @intFromPtr(boot.ffi_obstack.object_base.?)) {
-        abi.outf_error_line("\ninternal error: C stack over-popped.");
+        outf.errLine("\ninternal error: C stack over-popped.", .{});
         abi.signal_error_from_primitive(abi.err_external_return);
     }
     boot.ffi_obstack.next_free = tos;
@@ -476,7 +477,7 @@ pub export fn Prim_c_call() callconv(.c) SCM {
 pub export fn alienate_float_environment() callconv(.c) void {
     const s = fenv_plat.setDefaultEnv();
     if (s != 0) {
-        abi.outf_error_line("\nError status from fesetenv: %d", s);
+        outf.errLine("\nError status from fesetenv: {d}", .{s});
     }
 }
 
@@ -484,7 +485,7 @@ pub export fn callout_seal(tramp: CalloutTrampIn) callconv(.c) void {
     if (c_call_continue == obj.sharp_f) {
         c_call_continue = primutl.find_primitive_cname("C-CALL-CONTINUE", false, false, abi.lexpr_primitive_arity);
         if (c_call_continue == obj.sharp_f) {
-            abi.outf_error_line("\nNo C-CALL-CONTINUE primitive!");
+            outf.errLine("\nNo C-CALL-CONTINUE primitive!", .{});
             abi.signal_error_from_primitive(abi.err_external_return);
         }
     }
@@ -501,7 +502,7 @@ pub export fn callout_unseal(expected: CalloutTrampIn) callconv(.c) void {
     const found = cstackLpopVal(CalloutTrampIn, &tos);
     const depth = cstackLpopVal(c_int, &tos);
     if (found != expected or depth != cstack_depth) {
-        abi.outf_error_line("\ninternal error: slipped in 1st part of callout");
+        outf.errLine("\ninternal error: slipped in 1st part of callout", .{});
         abi.signal_error_from_primitive(abi.err_external_return);
     }
     cstack_pop(tos);
@@ -520,7 +521,7 @@ pub export fn Prim_c_call_continue() callconv(.c) SCM {
     const tramp = cstackLpopVal(CalloutTrampIn, &tos);
     const depth = cstackLpopVal(c_int, &tos);
     if (depth != cstack_depth) {
-        abi.outf_error_line("\ninternal error: slipped in 2nd part of callout");
+        outf.errLine("\ninternal error: slipped in 2nd part of callout", .{});
         abi.signal_error_from_primitive(abi.err_external_return);
     }
     return tramp();
@@ -531,7 +532,7 @@ pub export fn callout_lunseal(expected: CalloutTrampIn) callconv(.c) [*]u8 {
     const found = cstackLpopVal(CalloutTrampIn, &tos);
     const depth = cstackLpopVal(c_int, &tos);
     if (depth != cstack_depth or found != expected) {
-        abi.outf_error_line("\ninternal error: slipped in 2nd tramp of callout");
+        outf.errLine("\ninternal error: slipped in 2nd tramp of callout", .{});
         abi.signal_error_from_primitive(abi.err_external_return);
     }
     return tos;
@@ -550,7 +551,7 @@ pub export fn callback_run_kernel(callback_id: c_long, kernel: CallbackKernel) c
     if (run_callback == obj.sharp_f) {
         run_callback = primutl.find_primitive_cname("RUN-CALLBACK", false, false, 0);
         if (run_callback == obj.sharp_f) {
-            abi.outf_error_line("\nWarning: punted callback #%ld.  Missing primitive!", callback_id);
+            outf.errLine("\nWarning: punted callback #{d}.  Missing primitive!", .{callback_id});
             abi.Registers[abi.regblock_val] = obj.ulongToFixnum(0);
             return;
         }
@@ -589,7 +590,7 @@ pub export fn callback_run_kernel(callback_id: c_long, kernel: CallbackKernel) c
     if (frame_slipped) {
         abi.Registers[abi.regblock_primitive] = c_call_continue;
         abi.Registers[abi.regblock_lexpr_actuals] = 0;
-        abi.outf_error_line("\nWarning: stack slipped in callback.");
+        outf.errLine("\nWarning: stack slipped in callback.", .{});
         abi.signal_error_from_primitive(abi.err_stack_has_slipped);
     }
 
@@ -609,7 +610,7 @@ pub export fn Prim_run_callback() callconv(.c) SCM {
     const kernel = cstackLpopVal(CallbackKernel, &tos);
     const depth = cstackLpopVal(c_int, &tos);
     if (depth != cstack_depth) {
-        abi.outf_error_line("\nWarning: C data stack slipped in run-callback!");
+        outf.errLine("\nWarning: C data stack slipped in run-callback!", .{});
         abi.signal_error_from_primitive(abi.err_external_return);
     }
     kernel();
@@ -621,7 +622,7 @@ pub export fn callback_lunseal(expected: CallbackKernel) callconv(.c) [*]u8 {
     const found = cstackLpopVal(CallbackKernel, &tos);
     const depth = cstackLpopVal(c_int, &tos);
     if (depth != cstack_depth or found != expected) {
-        abi.outf_error_line("\ninternal error: slipped in callback kernel");
+        outf.errLine("\ninternal error: slipped in callback kernel", .{});
         abi.signal_error_from_primitive(abi.err_external_return);
     }
     return tos;
@@ -630,7 +631,7 @@ pub export fn callback_lunseal(expected: CallbackKernel) callconv(.c) [*]u8 {
 fn validCallbackHandler() SCM {
     const handler = obj.vectorRef(abi.fixed_objects, abi.fixobj_callback_handler);
     if (!utils.interpreter_applicable_p(handler)) {
-        abi.outf_error_line("\nWarning: bogus callback handler: 0x%x.", @as(c_uint, @truncate(@as(u64, @intCast(handler)))));
+        outf.errLine("\nWarning: bogus callback handler: 0x{x}.", .{@as(c_uint, @truncate(@as(u64, @intCast(handler))))});
         utils.Do_Micro_Error(abi.err_inapplicable_object, true);
         abi.abort_to_interpreter(abi.prim_apply);
     }
@@ -770,16 +771,16 @@ pub export fn long_value() callconv(.c) c_long {
         return @intCast(obj.charToAscii(value));
     }
     if (!obj.integerP(value)) {
-        abi.outf_error_line("\nWarning: Callback did not return an integer!");
+        outf.errLine("\nWarning: Callback did not return an integer!", .{});
         return 0;
     }
     if (!artutl.integer_to_long_p(value)) {
-        abi.outf_error_line("\nWarning: Callback returned an integer larger than a C long!");
+        outf.errLine("\nWarning: Callback returned an integer larger than a C long!", .{});
         return 0;
     }
     const v = artutl.integer_to_long(value);
     if (v < std.math.minInt(c_long) or v > std.math.maxInt(c_long)) {
-        abi.outf_error_line("\nWarning: Callback returned an integer larger than a C long!");
+        outf.errLine("\nWarning: Callback returned an integer larger than a C long!", .{});
         return 0;
     }
     return @intCast(v);
@@ -791,16 +792,16 @@ pub export fn ulong_value() callconv(.c) c_ulong {
         return @intCast(obj.charToAscii(value));
     }
     if (!obj.integerP(value)) {
-        abi.outf_error_line("\nWarning: Callback did not return an integer!");
+        outf.errLine("\nWarning: Callback did not return an integer!", .{});
         return 0;
     }
     if (!artutl.integer_to_ulong_p(value)) {
-        abi.outf_error_line("\nWarning: Callback returned an integer larger than a C unsigned long!");
+        outf.errLine("\nWarning: Callback returned an integer larger than a C unsigned long!", .{});
         return 0;
     }
     const v = artutl.integer_to_ulong(value);
     if (v > std.math.maxInt(c_ulong)) {
-        abi.outf_error_line("\nWarning: Callback returned an integer larger than a C unsigned long!");
+        outf.errLine("\nWarning: Callback returned an integer larger than a C unsigned long!", .{});
         return 0;
     }
     return @intCast(v);
@@ -809,11 +810,11 @@ pub export fn ulong_value() callconv(.c) c_ulong {
 pub export fn double_value() callconv(.c) f64 {
     const value = abi.Registers[abi.regblock_val];
     if (!obj.realP(value)) {
-        abi.outf_error_line("\nWarning: Callback did not return a real.");
+        outf.errLine("\nWarning: Callback did not return a real.", .{});
         return 0.0;
     }
     if (!utils.real_number_to_double_p(value)) {
-        abi.outf_error_line("\nWarning: Callback returned a real larger than a C double!");
+        outf.errLine("\nWarning: Callback returned a real larger than a C double!", .{});
         return 0.0;
     }
     return utils.real_number_to_double(value);
@@ -827,7 +828,7 @@ pub export fn pointer_value() callconv(.c) ?*anyopaque {
     if (is_alien(value) != 0) {
         return alien_address(value);
     }
-    abi.outf_error_line("\nWarning: Callback did not return a pointer.");
+    outf.errLine("\nWarning: Callback did not return a pointer.", .{});
     return null;
 }
 
@@ -859,8 +860,8 @@ pub export fn Prim_outf_error() callconv(.c) SCM {
     const arg = abi.argRef(1);
     if (abi.string_p(arg)) {
         const cstr: [*:0]const u8 = @ptrCast(obj.legacyStringLoc(arg, 0));
-        abi.outf_error("%s", cstr);
-        abi.outf_flush_error();
+        outf.err("{s}", .{cstr});
+        outf.flushError();
     } else {
         abi.error_wrong_type_arg(1);
     }

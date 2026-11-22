@@ -7,6 +7,7 @@ const builtin = @import("builtin");
 const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 const boot = @import("boot.zig");
 const code_arena = @import("code_arena.zig");
 const jit = @import("jit.zig");
@@ -619,7 +620,7 @@ fn continueFromTrap(signo: c_int, info: ?*const std.c.siginfo_t, scp: ?*const Uc
                 abi.addressInHeapP(abi.Free) and alignedP(abi.Free))
             {
                 if (build_options.debugging and storage.gc_debug) {
-                    abi.outf_error_line(";Warning: trap at 0x%zx assumed a primitive", pc);
+                    outf.errLine(";Warning: trap at 0x{x} assumed a primitive", .{pc});
                 }
                 new_sp = abi.stack_pointer;
                 recovery_info.state = state_primitive;
@@ -642,10 +643,11 @@ fn continueFromTrap(signo: c_int, info: ?*const std.c.siginfo_t, scp: ?*const Uc
 
     if (!(new_sp != null and abi.addressInHeapP(abi.Free) and alignedP(abi.Free))) {
         if (build_options.debugging and storage.gc_debug) {
-            abi.outf_error_line(if (new_sp == null)
-                ";Warning: bogus stack_pointer in continue_from_trap"
-            else
-                ";Warning: bogus Free in continue_from_trap");
+            if (new_sp == null) {
+                outf.errLine(";Warning: bogus stack_pointer in continue_from_trap", .{});
+            } else {
+                outf.errLine(";Warning: bogus Free in continue_from_trap", .{});
+            }
         }
         abi.Free = abi.heap_alloc_limit;
     }

@@ -4,6 +4,7 @@
 
 const std = @import("std");
 pub const wind = @import("wind.zig");
+const outf = @import("outf.zig");
 
 // Ensure wind + obstack exports are emitted when transact.zig is built standalone (e.g. test-smoke).
 comptime {
@@ -11,8 +12,6 @@ comptime {
 }
 
 extern "c" fn abort() noreturn;
-extern "c" fn outf_fatal(fmt: [*:0]const u8, ...) void;
-extern "c" fn outf_flush_fatal() void;
 
 pub const TransactionActionType = enum(c_int) {
     tat_abort = 0,
@@ -42,8 +41,8 @@ const Action = struct {
 var current_transaction: ?*Transaction = null;
 
 fn fatalError(procedure_name: [*:0]const u8, message: [*:0]const u8) noreturn {
-    outf_fatal("%s: %s\n", procedure_name, message);
-    outf_flush_fatal();
+    outf.fatal("{s}: {s}\n", .{ procedure_name, message });
+    outf.flushFatal();
     abort();
 }
 

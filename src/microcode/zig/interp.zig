@@ -7,6 +7,7 @@ const builtin = @import("builtin");
 const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 const boot = @import("boot.zig");
 const obstack = @import("obstack.zig");
 const wind = @import("wind.zig");
@@ -166,7 +167,7 @@ pub fn unbindInterpreterState(s: *InterpreterState) callconv(.c) void {
 pub fn abortToInterpreter(argument: isize) callconv(.c) noreturn {
     std.debug.assert(argument != 0);
     const state = interpreter_state orelse {
-        abi.outf_fatal("abort_to_interpreter: Interpreter not set up.\n");
+        outf.fatal("abort_to_interpreter: Interpreter not set up.\n", .{});
         term.terminationInitError();
     };
     const arg_cint: c_int = @intCast(argument);
@@ -471,8 +472,8 @@ inline fn applyPrimitive(proc: obj.SchemeObject) Action {
     applyPrimitiveExternal(proc);
     if (build_options.debugging and storage.primitive_debug) {
         debug.debug_print_expr(getVal(), "Primitive Result");
-        abi.outf_error("\n");
-        abi.outf_flush_error();
+        outf.err("\n", .{});
+        outf.flushError();
     }
     abi.popPrimitiveFrame(@intCast(n_args));
     return .@"return";
@@ -484,7 +485,7 @@ pub fn applyPrimitiveExternal(proc: obj.SchemeObject) callconv(.c) void {
     abi.Free_primitive = abi.Free;
     setVal(primutl.Primitive_Procedure_Table.?[@intCast(obj.primitiveNumber(proc))]());
     if (position != wind.dstack_position) {
-        abi.outf_fatal("\nPrimitive slipped the dynamic stack: %s\n", primitiveName(proc));
+        outf.fatal("\nPrimitive slipped the dynamic stack: {s}\n", .{primitiveName(proc)});
         abi.Microcode_Termination(abi.term_exit);
     }
     setPrimitive(obj.sharp_f);
@@ -774,7 +775,7 @@ inline fn returnHardwareTrap() Action {
     else
         obj.sharp_f;
     if (handler == obj.sharp_f) {
-        abi.outf_fatal("There is no trap handler for recovery!\n");
+        outf.fatal("There is no trap handler for recovery!\n", .{});
         term.terminationTrap();
     }
     abi.stackCheck(3);

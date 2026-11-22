@@ -6,6 +6,7 @@ const std = @import("std");
 const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 
 pub const SpRecord = extern struct {
     sp: ?[*]obj.SchemeObject,
@@ -32,7 +33,7 @@ comptime {
 pub fn addAPopReturnBreakpoint(sp: [*]obj.SchemeObject) callconv(.c) bool {
     const old = sp_list;
     const raw = std.c.malloc(@sizeOf(SpRecord)) orelse {
-        abi.outf_error("Could not allocate a breakpoint structure\n");
+        outf.err("Could not allocate a breakpoint structure\n", .{});
         sp_list = old;
         return false;
     };
@@ -46,7 +47,7 @@ pub fn addAPopReturnBreakpoint(sp: [*]obj.SchemeObject) callconv(.c) bool {
 
 pub fn handlePopReturnBreak() callconv(.c) void {
     const old_stack = abi.stack_pointer;
-    abi.outf_error("Pop Return Break: SP = %#zx\n", @as(usize, @intCast(@intFromPtr(abi.stack_pointer))));
+    outf.err("Pop Return Break: SP = 0x{x}\n", .{@intFromPtr(abi.stack_pointer)});
     _ = Print_One_Continuation_Frame(abi.Registers[abi.regblock_return]);
     abi.stack_pointer = old_stack;
 }
@@ -78,7 +79,7 @@ test "bkpt add and fire pop-return breakpoint in debugging mode" {
         try std.testing.expect(addAPopReturnBreakpoint(target_sp));
         try std.testing.expect(sp_list != null);
         popReturnBreakPoint();
-        try std.testing.expect(stubs.mock_outf_calls > 0);
+        try std.testing.expect(outf.test_call_count > 0);
         try std.testing.expectEqual(target_sp, abi.stack_pointer);
         try std.testing.expect(sp_list == null);
     } else {

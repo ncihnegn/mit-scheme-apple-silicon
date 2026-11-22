@@ -7,6 +7,7 @@ const builtin = @import("builtin");
 const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 
 const is_apple_jit: bool = builtin.os.tag.isDarwin() and builtin.cpu.arch == .aarch64;
 const embedded_closure_addrs_p: bool = build_options.cc_is_native;
@@ -114,15 +115,15 @@ fn gcDeath(comptime fmt: []const u8, args: anytype) noreturn {
 }
 
 pub export fn std_gc_death(msg: [*:0]const u8) callconv(.c) noreturn {
-    abi.outf_fatal("\n%s\n", msg);
+    outf.fatal("\n{s}\n", .{msg});
     if (current_scan) |scan| {
-        abi.outf_fatal("scan = 0x%zx", @as(usize, @intCast(@intFromPtr(scan))));
+        outf.fatal("scan = 0x{x}", .{@intFromPtr(scan)});
         if (tospace_next) |to| {
-            abi.outf_fatal("; to = 0x%zx", @as(usize, @intCast(@intFromPtr(to))));
+            outf.fatal("; to = 0x{x}", .{@intFromPtr(to)});
         }
-        abi.outf_fatal("\n");
+        outf.fatal("\n", .{});
     }
-    abi.outf_flush_fatal();
+    outf.flushFatal();
     if (gc_abort_handler) |abort_fn| {
         abort_fn();
     }
@@ -167,8 +168,8 @@ fn handleGcTrap(scan: [*]obj.SchemeObject, object: obj.SchemeObject) void {
         else
             false;
         if (object == gc_trap or scan_hit or to_hit) {
-            abi.outf_fatal("\nhandle_gc_trap: trap.\n");
-            abi.outf_flush_fatal();
+            outf.fatal("\nhandle_gc_trap: trap.\n", .{});
+            outf.flushFatal();
             std.c.abort();
         }
     }

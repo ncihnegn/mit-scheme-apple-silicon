@@ -5,6 +5,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const abi = @import("prim_abi.zig");
+const outf = @import("outf.zig");
 const osscheme = @import("osscheme.zig");
 const transact = @import("transact.zig");
 const utils = @import("utils.zig");
@@ -95,8 +96,8 @@ fn grabSignalMask() void {
 pub fn uxInitializeProcesses() callconv(.c) void {
     const init_size: usize = 64;
     const raw = std.c.malloc(init_size * @sizeOf(abi.Process)) orelse {
-        abi.outf_fatal("\nUnable to allocate process table.\n");
-        abi.outf_flush_fatal();
+        outf.fatal("\nUnable to allocate process table.\n", .{});
+        outf.flushFatal();
         abi.termination_init_error();
     };
     process_table_ptr = @ptrCast(@alignCast(raw));
