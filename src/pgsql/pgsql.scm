@@ -119,7 +119,11 @@ USA.
       (string-length bytes)))
 
 (define-integrable (pq-clear handle)
-  (C-call "PQclear" handle))
+  (if (not (alien-null? handle))
+      (without-interruption
+       (lambda ()
+	 (C-call "PQclear" handle)
+	 (alien-null! handle)))))
 
 (define-integrable (peek-cstring alien)
   (let ((bv (c-peek-cstring alien)))
@@ -196,7 +200,11 @@ USA.
   (peek-cstring (C-call "PQfname" (make-alien 'char) handle index)))
 
 (define-integrable (pq-finish handle)
-  (C-call "PQfinish" handle))
+  (if (not (alien-null? handle))
+      (without-interruption
+       (lambda ()
+	 (C-call "PQfinish" handle)
+	 (alien-null! handle)))))
 
 (define-integrable (pq-freemem handle)
   (if (not (alien-null? handle))
