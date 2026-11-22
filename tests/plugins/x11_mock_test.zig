@@ -744,7 +744,7 @@ pub export fn XWMGeometry(
 }
 
 test "x11 display, graphics, color, image, and setjmp IO error recovery" {
-    const xd = x11.base.x_open_display(@constCast(":0")).?;
+    const xd = x11.base.x_open_display(":0").?;
     try std.testing.expectEqual(@as(c_int, 7), x11.base.x_display_descriptor(xd));
 
     var dims: [2]c_int = undefined;
@@ -797,7 +797,7 @@ test "x11 display, graphics, color, image, and setjmp IO error recovery" {
     try std.testing.expectEqual(@as(c_uint, 10), x11.term.xterm_x_size(tw));
     try std.testing.expectEqual(@as(c_uint, 5), x11.term.xterm_y_size(tw));
     try std.testing.expectEqual(@as(c_int, 0), x11.term.xterm_write_char(tw, 0, 0, 'A', 0));
-    try std.testing.expectEqual(@as(c_int, 0), x11.term.xterm_write_substring(tw, 1, 0, @constCast("BCDE"), 0, 4, 0));
+    try std.testing.expectEqual(@as(c_int, 0), x11.term.xterm_write_substring(tw, 1, 0, "BCDE", 0, 4, 0));
     try std.testing.expectEqual(@as(c_int, 0), x11.term.xterm_scroll_lines_up(tw, 0, 5, 0, 3, 1));
     try std.testing.expectEqual(@as(c_int, 0), x11.term.xterm_scroll_lines_down(tw, 0, 5, 0, 3, 1));
     var saved: [20]u8 = @splat(0);

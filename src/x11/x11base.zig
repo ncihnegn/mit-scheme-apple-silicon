@@ -26,7 +26,48 @@ var x_default_font: ?[*:0]u8 = null;
 
 const AllocationTable = struct {
     items: ?[*]?*anyopaque = null,
-    length: c_int = 0,
+    length: usize = 0,
+
+    fn init(self: *AllocationTable) void {
+        self.length = 0;
+    }
+
+    fn slice(self: *const AllocationTable) []?*anyopaque {
+        const items = self.items orelse return &.{};
+        return items[0..self.length];
+    }
+
+    fn allocate(self: *AllocationTable, item: *anyopaque) c_uint {
+        if (self.items) |items| {
+            for (items[0..self.length], 0..) |*slot, i| {
+                if (slot.* == null) {
+                    slot.* = item;
+                    return @intCast(i);
+                }
+            }
+        }
+        const old_len = self.length;
+        const new_len = if (old_len == 0) 4 else old_len * 2;
+        const byte_size = @sizeOf(?*anyopaque) * new_len;
+        const raw = (if (self.items) |items|
+            std.c.realloc(@ptrCast(items), byte_size)
+        else
+            std.c.malloc(byte_size)) orelse @panic("x11: out of memory");
+        const new_items: [*]?*anyopaque = @ptrCast(@alignCast(raw));
+        new_items[old_len] = item;
+        @memset(new_items[old_len + 1 .. new_len], null);
+        self.items = new_items;
+        self.length = new_len;
+        return @intCast(old_len);
+    }
+
+    fn deallocate(self: *AllocationTable, index: c_uint) void {
+        if (self.items) |items| {
+            if (index < self.length) {
+                items[index] = null;
+            }
+        }
+    }
 };
 
 var x_display_table: AllocationTable = .{};
@@ -35,51 +76,12 @@ var x_image_table: AllocationTable = .{};
 var x_visual_table: AllocationTable = .{};
 var x_colormap_table: AllocationTable = .{};
 
-fn allocationTableInitialize(table: *AllocationTable) void {
-    table.length = 0;
-}
-
-fn allocateTableIndex(table: *AllocationTable, item: *anyopaque) c_uint {
-    const length: usize = @intCast(table.length);
-    var new_length: usize = 0;
-    var new_items: [*]?*anyopaque = undefined;
-
-    if (length == 0) {
-        new_length = 4;
-        const raw = std.c.malloc(@sizeOf(?*anyopaque) * new_length) orelse @panic("x11: out of memory");
-        new_items = @ptrCast(@alignCast(raw));
-    } else {
-        const items = table.items.?;
-        for (0..length) |i| {
-            if (items[i] == null) {
-                items[i] = item;
-                return @intCast(i);
-            }
-        }
-        new_length = length * 2;
-        const raw = std.c.realloc(@ptrCast(items), @sizeOf(?*anyopaque) * new_length) orelse @panic("x11: out of memory");
-        new_items = @ptrCast(@alignCast(raw));
-    }
-
-    new_items[length] = item;
-    for ((length + 1)..new_length) |i| {
-        new_items[i] = null;
-    }
-    table.items = new_items;
-    table.length = @intCast(new_length);
-    return @intCast(length);
-}
-
 fn xWindowToXw(display: ?*c.Display, window: c.Window) ?*c.struct_xwindow {
-    const len: usize = @intCast(x_window_table.length);
-    if (len == 0) return null;
-    const items = x_window_table.items orelse return null;
-    for (0..len) |i| {
-        if (items[i]) |ptr| {
-            const xw: *c.struct_xwindow = @ptrCast(@alignCast(ptr));
-            if (xw.xd.*.display == display and xw.window == window) {
-                return xw;
-            }
+    for (x_window_table.slice()) |entry| {
+        const ptr = entry orelse continue;
+        const xw: *c.struct_xwindow = @ptrCast(@alignCast(ptr));
+        if (xw.xd.*.display == display and xw.window == window) {
+            return xw;
         }
     }
     return null;
@@ -88,46 +90,40 @@ fn xWindowToXw(display: ?*c.Display, window: c.Window) ?*c.struct_xwindow {
 pub export fn allocate_x_image(image: ?*c.XImage) callconv(.c) ?*c.struct_ximage {
     const raw = std.c.malloc(@sizeOf(c.struct_ximage)) orelse return null;
     const xi: *c.struct_ximage = @ptrCast(@alignCast(raw));
-    xi.allocation_index = allocateTableIndex(&x_image_table, xi);
+    xi.allocation_index = x_image_table.allocate(xi);
     xi.image = image;
     return xi;
 }
 
 pub export fn deallocate_x_image(xi: *c.struct_ximage) callconv(.c) void {
-    if (x_image_table.items) |items| {
-        items[xi.allocation_index] = null;
-    }
+    x_image_table.deallocate(xi.allocation_index);
     std.c.free(xi);
 }
 
 pub export fn allocate_x_visual(visual: ?*c.Visual) callconv(.c) ?*c.struct_xvisual {
     const raw = std.c.malloc(@sizeOf(c.struct_xvisual)) orelse return null;
     const xv: *c.struct_xvisual = @ptrCast(@alignCast(raw));
-    xv.allocation_index = allocateTableIndex(&x_visual_table, xv);
+    xv.allocation_index = x_visual_table.allocate(xv);
     xv.visual = visual;
     return xv;
 }
 
 pub export fn x_visual_deallocate(xv: *c.struct_xvisual) callconv(.c) void {
-    if (x_visual_table.items) |items| {
-        items[xv.allocation_index] = null;
-    }
+    x_visual_table.deallocate(xv.allocation_index);
     std.c.free(xv);
 }
 
 pub export fn allocate_x_colormap(colormap: c.Colormap, xd: *c.struct_xdisplay) callconv(.c) ?*c.struct_xcolormap {
     const raw = std.c.malloc(@sizeOf(c.struct_xcolormap)) orelse return null;
     const xcm: *c.struct_xcolormap = @ptrCast(@alignCast(raw));
-    xcm.allocation_index = allocateTableIndex(&x_colormap_table, xcm);
+    xcm.allocation_index = x_colormap_table.allocate(xcm);
     xcm.colormap = colormap;
     xcm.xd = xd;
     return xcm;
 }
 
 pub export fn deallocate_x_colormap(xcm: *c.struct_xcolormap) callconv(.c) void {
-    if (x_colormap_table.items) |items| {
-        items[xcm.allocation_index] = null;
-    }
+    x_colormap_table.deallocate(xcm.allocation_index);
     std.c.free(xcm);
 }
 
@@ -178,37 +174,28 @@ fn anyXErrorsP(display: ?*c.Display) bool {
 fn xDecodeColor(
     display: ?*c.Display,
     color_map: c.Colormap,
-    color_name: [*c]const u8,
-    color_return: *c_ulong,
-) bool {
+    color_name: ?[*:0]const u8,
+) ?c_ulong {
     var cdef: c.XColor = std.mem.zeroes(c.XColor);
     if (c.XParseColor(display, color_map, color_name, &cdef) != 0 and
         c.XAllocColor(display, color_map, &cdef) != 0)
     {
-        color_return.* = cdef.pixel;
-        return true;
+        return cdef.pixel;
     }
-    return false;
+    return null;
 }
 
-fn xwColormap(xw: *c.struct_xwindow, cm: *c.Colormap) bool {
+fn xwColormap(xw: *c.struct_xwindow) ?c.Colormap {
     var a: c.XWindowAttributes = undefined;
     if (c.XGetWindowAttributes(xw.xd.*.display, xw.window, &a) == 0) {
-        return false;
+        return null;
     }
-    cm.* = a.colormap;
-    return true;
+    return a.colormap;
 }
 
-fn colorPixel(
-    color: [*c]const u8,
-    display: ?*c.Display,
-    xw: *c.struct_xwindow,
-    result: *c_ulong,
-) bool {
-    var cm: c.Colormap = 0;
-    if (!xwColormap(xw, &cm)) return false;
-    return xDecodeColor(display, cm, color, result);
+fn resolveColorPixel(xw: *c.struct_xwindow, color: ?[*:0]const u8) ?c_ulong {
+    const cm = xwColormap(xw) orelse return null;
+    return xDecodeColor(xw.xd.*.display, cm, color);
 }
 
 fn xSetMouseColors(
@@ -229,47 +216,41 @@ fn xSetMouseColors(
 
 pub export fn x_get_default(
     display: ?*c.Display,
-    resource_name: [*c]const u8,
-    resource_class: [*c]const u8,
-    property_name: [*c]const u8,
-    property_class: [*c]const u8,
-    sdefault: [*c]const u8,
-) callconv(.c) [*c]const u8 {
-    if (c.XGetDefault(display, resource_name, property_name)) |r| return r;
-    if (c.XGetDefault(display, resource_class, property_name)) |r| return r;
-    if (c.XGetDefault(display, resource_name, property_class)) |r| return r;
-    if (c.XGetDefault(display, resource_class, property_class)) |r| return r;
+    resource_name: ?[*:0]const u8,
+    resource_class: ?[*:0]const u8,
+    property_name: ?[*:0]const u8,
+    property_class: ?[*:0]const u8,
+    sdefault: ?[*:0]const u8,
+) callconv(.c) ?[*:0]const u8 {
+    if (@as(?[*:0]const u8, c.XGetDefault(display, resource_name, property_name))) |r| return r;
+    if (@as(?[*:0]const u8, c.XGetDefault(display, resource_class, property_name))) |r| return r;
+    if (@as(?[*:0]const u8, c.XGetDefault(display, resource_name, property_class))) |r| return r;
+    if (@as(?[*:0]const u8, c.XGetDefault(display, resource_class, property_class))) |r| return r;
     return sdefault;
 }
 
 fn xDefaultColor(
     display: ?*c.Display,
-    resource_name: [*c]const u8,
-    resource_class: [*c]const u8,
-    property_name: [*c]const u8,
-    property_class: [*c]const u8,
+    resource_name: ?[*:0]const u8,
+    resource_class: ?[*:0]const u8,
+    property_name: ?[*:0]const u8,
+    property_class: ?[*:0]const u8,
     default_color: c_ulong,
 ) c_ulong {
-    const color_name = x_get_default(display, resource_name, resource_class, property_name, property_class, null);
-    var result: c_ulong = 0;
-    if (color_name != null and
-        xDecodeColor(display, x11.defaultColormap(display, x11.defaultScreen(display)), color_name, &result))
-    {
-        return result;
-    }
-    return default_color;
+    const color_name = x_get_default(display, resource_name, resource_class, property_name, property_class, null) orelse
+        return default_color;
+    return xDecodeColor(display, x11.defaultColormap(display, x11.defaultScreen(display)), color_name) orelse
+        default_color;
 }
 
 pub export fn x_default_attributes(
     display: ?*c.Display,
-    resource_name: [*c]const u8,
-    resource_class: [*c]const u8,
+    resource_name: ?[*:0]const u8,
+    resource_class: ?[*:0]const u8,
     attributes: *c.struct_drawing_attributes,
 ) callconv(.c) c_int {
     const screen_number = x11.defaultScreen(display);
-    const font_name: [*c]const u8 = if (x_default_font) |df|
-        df
-    else
+    const font_name = x_default_font orelse
         x_get_default(display, resource_name, resource_class, "font", "Font", X_DEFAULT_FONT);
 
     attributes.font = c.XLoadQueryFont(display, font_name);
@@ -277,17 +258,15 @@ pub export fn x_default_attributes(
         return 1;
     }
 
-    if (x_get_default(display, resource_name, resource_class, "borderWidth", "BorderWidth", null)) |s| {
-        attributes.border_width = c.atoi(s);
-    } else {
-        attributes.border_width = 0;
-    }
+    attributes.border_width = if (x_get_default(display, resource_name, resource_class, "borderWidth", "BorderWidth", null)) |s|
+        c.atoi(s)
+    else
+        0;
 
-    if (x_get_default(display, resource_name, resource_class, "internalBorder", "BorderWidth", null)) |s| {
-        attributes.internal_border_width = c.atoi(s);
-    } else {
-        attributes.internal_border_width = attributes.border_width;
-    }
+    attributes.internal_border_width = if (x_get_default(display, resource_name, resource_class, "internalBorder", "BorderWidth", null)) |s|
+        c.atoi(s)
+    else
+        attributes.border_width;
 
     const white_pixel = x11.whitePixel(display, screen_number);
     const black_pixel = x11.blackPixel(display, screen_number);
@@ -381,7 +360,7 @@ pub export fn x_make_window(
     const raw = std.c.malloc(size) orelse return null;
     const xw: *c.struct_xwindow = @ptrCast(@alignCast(raw));
     xw.* = std.mem.zeroes(c.struct_xwindow);
-    xw.allocation_index = allocateTableIndex(&x_window_table, xw);
+    xw.allocation_index = x_window_table.allocate(xw);
     xw.xd = xd;
     xw.window = window;
     xw.x_size = @intCast(x_size);
@@ -426,9 +405,7 @@ fn closeWindowBody(ctx: ?*anyopaque) callconv(.c) void {
 }
 
 pub export fn x_close_window_internal(xw: *c.struct_xwindow) callconv(.c) void {
-    if (x_window_table.items) |items| {
-        items[xw.allocation_index] = null;
-    }
+    x_window_table.deallocate(xw.allocation_index);
     _ = scm_setjmp_try(&x_close_window_jmp_buf, &closeWindowBody, xw);
     _ = c.XSetIOErrorHandler(&xIoErrorHandler);
     std.c.free(xw);
@@ -499,40 +476,28 @@ fn xInitializeDisplayModifierMasks(xd: *c.struct_xdisplay) void {
 }
 
 pub export fn x_close_display(xd: *c.struct_xdisplay) callconv(.c) void {
-    const len: usize = @intCast(x_window_table.length);
-    if (len > 0) {
-        if (x_window_table.items) |items| {
-            for (0..len) |i| {
-                if (items[i]) |ptr| {
-                    const xw: *c.struct_xwindow = @ptrCast(@alignCast(ptr));
-                    if (xw.xd == xd) {
-                        x_close_window_internal(xw);
-                    }
-                }
-            }
+    for (x_window_table.slice()) |entry| {
+        const ptr = entry orelse continue;
+        const xw: *c.struct_xwindow = @ptrCast(@alignCast(ptr));
+        if (xw.xd == xd) {
+            x_close_window_internal(xw);
         }
     }
-    if (x_display_table.items) |items| {
-        items[xd.allocation_index] = null;
-    }
+    x_display_table.deallocate(xd.allocation_index);
     _ = c.XCloseDisplay(xd.display);
 }
 
 pub export fn x_close_all_displays() callconv(.c) void {
-    const len: usize = @intCast(x_display_table.length);
-    if (len == 0) return;
-    const items = x_display_table.items orelse return;
-    for (0..len) |i| {
-        if (items[i]) |ptr| {
-            const xd: *c.struct_xdisplay = @ptrCast(@alignCast(ptr));
-            x_close_display(xd);
-        }
+    for (x_display_table.slice()) |entry| {
+        const ptr = entry orelse continue;
+        const xd: *c.struct_xdisplay = @ptrCast(@alignCast(ptr));
+        x_close_display(xd);
     }
 }
 
 // Window Manager Properties
 
-fn xwSetClassHint(xw: *c.struct_xwindow, name: [*c]const u8, class_name: [*c]const u8) c_int {
+fn xwSetClassHint(xw: *c.struct_xwindow, name: ?[*:0]const u8, class_name: ?[*:0]const u8) c_int {
     const class_hint = c.XAllocClassHint() orelse return 1;
     class_hint.*.res_name = @constCast(name);
     class_hint.*.res_class = @constCast(class_name);
@@ -550,7 +515,7 @@ pub export fn xw_set_wm_input_hint(xw: *c.struct_xwindow, input_hint: c_int) cal
     return 0;
 }
 
-pub export fn xw_set_wm_name(xw: *c.struct_xwindow, name: [*c]const u8) callconv(.c) c_int {
+pub export fn xw_set_wm_name(xw: *c.struct_xwindow, name: ?[*:0]const u8) callconv(.c) c_int {
     var property: c.XTextProperty = undefined;
     var name_mut: [*c]u8 = @constCast(name);
     if (c.XStringListToTextProperty(&name_mut, 1, &property) == 0) return 1;
@@ -558,7 +523,7 @@ pub export fn xw_set_wm_name(xw: *c.struct_xwindow, name: [*c]const u8) callconv
     return 0;
 }
 
-pub export fn xw_set_wm_icon_name(xw: *c.struct_xwindow, name: [*c]const u8) callconv(.c) c_int {
+pub export fn xw_set_wm_icon_name(xw: *c.struct_xwindow, name: ?[*:0]const u8) callconv(.c) c_int {
     var property: c.XTextProperty = undefined;
     var name_mut: [*c]u8 = @constCast(name);
     if (c.XStringListToTextProperty(&name_mut, 1, &property) == 0) return 1;
@@ -570,18 +535,18 @@ pub export fn x_window_set_input_hint(xw: *c.struct_xwindow, input_hint: c_int) 
     return xw_set_wm_input_hint(xw, input_hint);
 }
 
-pub export fn x_window_set_name(xw: *c.struct_xwindow, name: [*c]const u8) callconv(.c) c_int {
+pub export fn x_window_set_name(xw: *c.struct_xwindow, name: ?[*:0]const u8) callconv(.c) c_int {
     return xw_set_wm_name(xw, name);
 }
 
-pub export fn x_window_set_icon_name(xw: *c.struct_xwindow, name: [*c]const u8) callconv(.c) c_int {
+pub export fn x_window_set_icon_name(xw: *c.struct_xwindow, name: ?[*:0]const u8) callconv(.c) c_int {
     return xw_set_wm_icon_name(xw, name);
 }
 
 pub export fn xw_make_window_map(
     xw: *c.struct_xwindow,
-    resource_name: [*c]const u8,
-    resource_class: [*c]const u8,
+    resource_name: ?[*:0]const u8,
+    resource_class: ?[*:0]const u8,
     map_p: c_int,
 ) callconv(.c) c_int {
     const code = xwSetClassHint(xw, resource_name, resource_class);
@@ -788,10 +753,10 @@ pub export fn x_modifier_mask_to_bucky_bits(mask: c_uint, xw: *c.struct_xwindow)
 var compose_status: c.XComposeStatus = std.mem.zeroes(c.XComposeStatus);
 
 pub export fn x_lookup_string(
-    event: [*c]c.XKeyEvent,
-    buffer_return: [*c]u8,
+    event: *c.XKeyEvent,
+    buffer_return: [*]u8,
     bytes_buffer: c_int,
-    keysym_return: [*c]c.KeySym,
+    keysym_return: ?*c.KeySym,
 ) callconv(.c) c_int {
     return c.XLookupString(event, buffer_return, bytes_buffer, keysym_return, &compose_status);
 }
@@ -888,9 +853,9 @@ fn xdProcessEvents(
 // Open/Close Primitives
 
 fn initializeOnce() void {
-    allocationTableInitialize(&x_display_table);
-    allocationTableInitialize(&x_window_table);
-    allocationTableInitialize(&x_image_table);
+    x_display_table.init();
+    x_window_table.init();
+    x_image_table.init();
     x_error_info.message[0] = 0;
     x_error_info.terminate_p = 1;
     x_error_info.code = 0;
@@ -903,7 +868,7 @@ pub export fn x_set_debug(value: c_int) callconv(.c) void {
     x_debug = value;
 }
 
-pub export fn x_open_display(display_name: [*c]u8) callconv(.c) ?*c.struct_xdisplay {
+pub export fn x_open_display(display_name: ?[*:0]const u8) callconv(.c) ?*c.struct_xdisplay {
     if (!initialization_done) initializeOnce();
 
     const raw = std.c.malloc(@sizeOf(c.struct_xdisplay)) orelse return null;
@@ -918,7 +883,7 @@ pub export fn x_open_display(display_name: [*c]u8) callconv(.c) ?*c.struct_xdisp
         std.c.free(xd);
         return null;
     }
-    xd.allocation_index = allocateTableIndex(&x_display_table, xd);
+    xd.allocation_index = x_display_table.allocate(xd);
     xd.server_ping_timer = 0;
     xd.wm_protocols = c.XInternAtom(xd.display, "WM_PROTOCOLS", c.False);
     xd.wm_delete_window = c.XInternAtom(xd.display, "WM_DELETE_WINDOW", c.False);
@@ -928,11 +893,10 @@ pub export fn x_open_display(display_name: [*c]u8) callconv(.c) ?*c.struct_xdisp
     return xd;
 }
 
-pub export fn x_display_get_size(xd: *c.struct_xdisplay, screen: c_long, results: [*c]c_int) callconv(.c) void {
+pub export fn x_display_get_size(xd: *c.struct_xdisplay, screen: c_long, results: *[2]c_int) callconv(.c) void {
     const display = xd.display;
     const scr: c_int = @intCast(screen);
-    results[0] = x11.displayWidth(display, scr);
-    results[1] = x11.displayHeight(display, scr);
+    results.* = .{ x11.displayWidth(display, scr), x11.displayHeight(display, scr) };
 }
 
 pub export fn x_close_window(xw: *c.struct_xwindow) callconv(.c) void {
@@ -941,18 +905,19 @@ pub export fn x_close_window(xw: *c.struct_xwindow) callconv(.c) void {
     _ = c.XFlush(display);
 }
 
-pub export fn x_set_default_font(xd: *c.struct_xdisplay, name: [*c]const u8) callconv(.c) c_int {
+pub export fn x_set_default_font(xd: *c.struct_xdisplay, name: ?[*:0]const u8) callconv(.c) c_int {
+    const font_name = name orelse return 1;
     const display = xd.display;
-    const font = c.XLoadQueryFont(display, name) orelse return 1;
+    const font = c.XLoadQueryFont(display, font_name) orelse return 1;
     _ = c.XFreeFont(display, font);
     if (x_default_font) |prev| {
         std.c.free(prev);
     }
-    const len = std.mem.len(@as([*:0]const u8, @ptrCast(name)));
+    const len = std.mem.len(font_name);
     const raw = std.c.malloc(len + 1) orelse return 1;
-    const copy: [*]u8 = @ptrCast(raw);
-    @memcpy(copy[0 .. len + 1], @as([*]const u8, @ptrCast(name))[0 .. len + 1]);
-    x_default_font = @ptrCast(copy);
+    const copy: [*:0]u8 = @ptrCast(raw);
+    @memcpy(copy[0 .. len + 1], font_name[0 .. len + 1]);
+    x_default_font = copy;
     return 0;
 }
 
@@ -1058,13 +1023,13 @@ pub export fn x_display_sync(xd: *c.struct_xdisplay, discard: c.Bool) callconv(.
 
 pub export fn x_display_get_default(
     xd: *c.struct_xdisplay,
-    resource_name: [*c]u8,
-    class_name: [*c]u8,
-) callconv(.c) [*c]u8 {
+    resource_name: ?[*:0]const u8,
+    class_name: ?[*:0]const u8,
+) callconv(.c) ?[*:0]u8 {
     return c.XGetDefault(xd.display, resource_name, class_name);
 }
 
-pub export fn x_window_query_pointer(xw: *c.struct_xwindow, result: [*c]c_int) callconv(.c) c_int {
+pub export fn x_window_query_pointer(xw: *c.struct_xwindow, result: *[5]c_int) callconv(.c) c_int {
     var root: c.Window = 0;
     var child: c.Window = 0;
     var root_x: c_int = 0;
@@ -1085,11 +1050,7 @@ pub export fn x_window_query_pointer(xw: *c.struct_xwindow, result: [*c]c_int) c
     ) == 0) {
         return 0;
     }
-    result[0] = root_x;
-    result[1] = root_y;
-    result[2] = win_x;
-    result[3] = win_y;
-    result[4] = @bitCast(keys_buttons);
+    result.* = .{ root_x, root_y, win_x, win_y, @bitCast(keys_buttons) };
     return 1;
 }
 
@@ -1106,16 +1067,14 @@ pub export fn x_window_set_foreground_color_pixel(xw: *c.struct_xwindow, pixel: 
     _ = c.XSetBackground(display, xw.reverse_gc, pixel);
 }
 
-pub export fn x_window_set_foreground_color_name(xw: *c.struct_xwindow, color: [*c]u8) callconv(.c) void {
-    var pixel: c_ulong = 0;
-    if (!colorPixel(color, xw.xd.*.display, xw, &pixel)) return;
+pub export fn x_window_set_foreground_color_name(xw: *c.struct_xwindow, color: ?[*:0]const u8) callconv(.c) void {
+    const pixel = resolveColorPixel(xw, color) orelse return;
     x_window_set_foreground_color_pixel(xw, pixel);
 }
 
 pub export fn x_window_set_background_color_pixel(xw: *c.struct_xwindow, pixel: c_ulong) callconv(.c) c_int {
     const display = xw.xd.*.display;
-    var cm: c.Colormap = 0;
-    if (!xwColormap(xw, &cm)) return 0;
+    const cm = xwColormap(xw) orelse return 0;
     xw.attributes.background_pixel = pixel;
     _ = c.XSetWindowBackground(display, xw.window, pixel);
     _ = c.XSetBackground(display, xw.normal_gc, pixel);
@@ -1125,9 +1084,8 @@ pub export fn x_window_set_background_color_pixel(xw: *c.struct_xwindow, pixel: 
     return 1;
 }
 
-pub export fn x_window_set_background_color_name(xw: *c.struct_xwindow, color: [*c]u8) callconv(.c) void {
-    var pixel: c_ulong = 0;
-    if (!colorPixel(color, xw.xd.*.display, xw, &pixel)) return;
+pub export fn x_window_set_background_color_name(xw: *c.struct_xwindow, color: ?[*:0]const u8) callconv(.c) void {
+    const pixel = resolveColorPixel(xw, color) orelse return;
     _ = x_window_set_background_color_pixel(xw, pixel);
 }
 
@@ -1136,9 +1094,8 @@ pub export fn x_window_set_border_color_pixel(xw: *c.struct_xwindow, pixel: c_ul
     _ = c.XSetWindowBorder(xw.xd.*.display, xw.window, pixel);
 }
 
-pub export fn x_window_set_border_color_name(xw: *c.struct_xwindow, color: [*c]u8) callconv(.c) void {
-    var pixel: c_ulong = 0;
-    if (!colorPixel(color, xw.xd.*.display, xw, &pixel)) return;
+pub export fn x_window_set_border_color_name(xw: *c.struct_xwindow, color: ?[*:0]const u8) callconv(.c) void {
+    const pixel = resolveColorPixel(xw, color) orelse return;
     x_window_set_border_color_pixel(xw, pixel);
 }
 
@@ -1147,32 +1104,28 @@ pub export fn x_window_set_cursor_color_pixel(xw: *c.struct_xwindow, pixel: c_ul
     _ = c.XSetBackground(xw.xd.*.display, xw.cursor_gc, pixel);
 }
 
-pub export fn x_window_set_cursor_color_name(xw: *c.struct_xwindow, color: [*c]u8) callconv(.c) void {
-    var pixel: c_ulong = 0;
-    if (!colorPixel(color, xw.xd.*.display, xw, &pixel)) return;
+pub export fn x_window_set_cursor_color_name(xw: *c.struct_xwindow, color: ?[*:0]const u8) callconv(.c) void {
+    const pixel = resolveColorPixel(xw, color) orelse return;
     x_window_set_cursor_color_pixel(xw, pixel);
 }
 
 pub export fn x_window_set_mouse_color_pixel(xw: *c.struct_xwindow, pixel: c_ulong) callconv(.c) c_int {
     const display = xw.xd.*.display;
-    var cm: c.Colormap = 0;
-    if (!xwColormap(xw, &cm)) return 0;
+    const cm = xwColormap(xw) orelse return 0;
     xw.attributes.mouse_pixel = pixel;
     xSetMouseColors(display, cm, xw.mouse_cursor, pixel, xw.attributes.background_pixel);
     return 1;
 }
 
-pub export fn x_window_set_mouse_color_name(xw: *c.struct_xwindow, color: [*c]u8) callconv(.c) void {
-    var pixel: c_ulong = 0;
-    if (!colorPixel(color, xw.xd.*.display, xw, &pixel)) return;
+pub export fn x_window_set_mouse_color_name(xw: *c.struct_xwindow, color: ?[*:0]const u8) callconv(.c) void {
+    const pixel = resolveColorPixel(xw, color) orelse return;
     _ = x_window_set_mouse_color_pixel(xw, pixel);
 }
 
 pub export fn x_window_set_mouse_shape(xw: *c.struct_xwindow, shape: c_int) callconv(.c) c_int {
     const display = xw.xd.*.display;
-    var cm: c.Colormap = 0;
     if (shape < 0 or shape >= @divTrunc(c.XC_num_glyphs, 2)) return 0;
-    if (!xwColormap(xw, &cm)) return 0;
+    const cm = xwColormap(xw) orelse return 0;
     const old_cursor = xw.mouse_cursor;
     const mouse_cursor = c.XCreateFontCursor(display, @intCast(2 * shape));
     xSetMouseColors(display, cm, mouse_cursor, xw.attributes.mouse_pixel, xw.attributes.background_pixel);
@@ -1182,7 +1135,7 @@ pub export fn x_window_set_mouse_shape(xw: *c.struct_xwindow, shape: c_int) call
     return 1;
 }
 
-pub export fn x_window_set_font(xw: *c.struct_xwindow, font_name: [*c]u8) callconv(.c) c_int {
+pub export fn x_window_set_font(xw: *c.struct_xwindow, font_name: ?[*:0]const u8) callconv(.c) c_int {
     const display = xw.xd.*.display;
     const font = c.XLoadQueryFont(display, font_name) orelse return 0;
     _ = c.XFreeFont(display, xw.attributes.font);
@@ -1252,17 +1205,18 @@ pub export fn x_window_lower(xw: *c.struct_xwindow) callconv(.c) void {
     _ = c.XLowerWindow(xw.xd.*.display, xw.window);
 }
 
-pub export fn x_window_get_size(xw: *c.struct_xwindow, dimens: [*c]c_int) callconv(.c) void {
+pub export fn x_window_get_size(xw: *c.struct_xwindow, dimens: *[2]c_int) callconv(.c) void {
     _ = getWmDecorGeometry(xw);
     const extra = 2 * xw.wm_decor_border_width;
-    dimens[0] = @intCast(xw.wm_decor_pixel_width + extra);
-    dimens[1] = @intCast(xw.wm_decor_pixel_height + extra);
+    dimens.* = .{
+        @intCast(xw.wm_decor_pixel_width + extra),
+        @intCast(xw.wm_decor_pixel_height + extra),
+    };
 }
 
-pub export fn x_window_get_position(xw: *c.struct_xwindow, coord_return: [*c]c_int) callconv(.c) void {
+pub export fn x_window_get_position(xw: *c.struct_xwindow, coord_return: *[2]c_int) callconv(.c) void {
     _ = getWmDecorGeometry(xw);
-    coord_return[0] = xw.wm_decor_x;
-    coord_return[1] = xw.wm_decor_y;
+    coord_return.* = .{ xw.wm_decor_x, xw.wm_decor_y };
 }
 
 pub export fn x_window_set_position(xw: *c.struct_xwindow, x_in: c_int, y_in: c_int) callconv(.c) void {
@@ -1301,7 +1255,7 @@ fn checkExpectedMove(xw: *c.struct_xwindow) void {
 
 // Font Structure Primitives
 
-pub export fn x_font_structure_by_name(xd: *c.struct_xdisplay, font_name: [*c]const u8) callconv(.c) ?*c.XFontStruct {
+pub export fn x_font_structure_by_name(xd: *c.struct_xdisplay, font_name: ?[*:0]const u8) callconv(.c) ?*c.XFontStruct {
     return c.XLoadQueryFont(xd.display, font_name);
 }
 
@@ -1315,20 +1269,20 @@ pub export fn x_free_font(xd: *c.struct_xdisplay, font: ?*c.XFontStruct) callcon
 
 pub export fn x_list_fonts(
     xd: *c.struct_xdisplay,
-    pattern: [*c]u8,
+    pattern: ?[*:0]const u8,
     limit: c_long,
-    actual_count: [*c]c_int,
+    actual_count: *c_int,
 ) callconv(.c) [*c][*c]u8 {
     return c.XListFonts(xd.display, pattern, @intCast(limit), actual_count);
 }
 
 // Atoms
 
-pub export fn x_intern_atom(xd: *c.struct_xdisplay, name: [*c]const u8, soft_p: c_int) callconv(.c) c.Atom {
+pub export fn x_intern_atom(xd: *c.struct_xdisplay, name: ?[*:0]const u8, soft_p: c_int) callconv(.c) c.Atom {
     return c.XInternAtom(xd.display, name, soft_p);
 }
 
-pub export fn x_get_atom_name(xd: *c.struct_xdisplay, atom: c.Atom, name_return: [*c][*c]u8) callconv(.c) c_int {
+pub export fn x_get_atom_name(xd: *c.struct_xdisplay, atom: c.Atom, name_return: *[*c]u8) callconv(.c) c_int {
     const display = xd.display;
     name_return.* = c.XGetAtomName(display, atom);
     return xErrorCode(display);
@@ -1344,10 +1298,10 @@ pub export fn x_get_window_property(
     long_length: c_long,
     del: c.Bool,
     req_type: c.Atom,
-    actual_type_return: [*c]c.Atom,
-    actual_format_return: [*c]c_int,
-    nitems_return: [*c]c_ulong,
-    bytes_after_return: [*c]c_ulong,
+    actual_type_return: ?*c.Atom,
+    actual_format_return: *c_int,
+    nitems_return: ?*c_ulong,
+    bytes_after_return: ?*c_ulong,
     prop_return: [*c][*c]u8,
 ) callconv(.c) c_int {
     const display = xd.display;
@@ -1388,7 +1342,7 @@ pub export fn x_change_property(
     prop_type: c.Atom,
     format: c_int,
     mode: c_int,
-    data: [*c]u8,
+    data: [*]const u8,
     dlen: c_ulong,
 ) callconv(.c) c_int {
     const display = xd.display;

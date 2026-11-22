@@ -13,12 +13,20 @@ pub const Blowfish = extern struct {
     S: [4][256]u32,
 };
 
-inline fn be32dec(buf: [*]const u8) u32 {
-    return std.mem.readInt(u32, buf[0..4], .big);
+inline fn readBe32(buf: *const [4]u8) u32 {
+    return std.mem.readInt(u32, buf, .big);
 }
 
-inline fn be32enc(buf: [*]u8, v: u32) void {
-    std.mem.writeInt(u32, buf[0..4], v, .big);
+inline fn writeBe32(buf: *[4]u8, v: u32) void {
+    std.mem.writeInt(u32, buf, v, .big);
+}
+
+inline fn encryptIvBlock(B: *const Blowfish, iv: *[BLOWFISH_BLOCKLEN]u8) void {
+    var L = readBe32(iv[0..4]);
+    var R = readBe32(iv[4..8]);
+    blowfishEncrypt32(B, &L, &R);
+    writeBe32(iv[0..4], L);
+    writeBe32(iv[4..8], R);
 }
 
 inline fn F(B: *const Blowfish, x: u32) u32 {
@@ -80,18 +88,16 @@ pub export fn blowfish_init(B: *Blowfish, key: [*]const u8, keylen: usize) callc
     // Iterate encryption of (0, 0) under the current subkeys to replace P and S.
     var L: u32 = 0;
     var R: u32 = 0;
-    var i: usize = 0;
-    while (i < 18) : (i += 2) {
+    for (0..9) |i| {
         blowfishEncrypt32(B, &L, &R);
-        B.P[i + 0] = L;
-        B.P[i + 1] = R;
+        B.P[2 * i + 0] = L;
+        B.P[2 * i + 1] = R;
     }
     for (0..4) |si| {
-        var j: usize = 0;
-        while (j < 256) : (j += 2) {
+        for (0..128) |j| {
             blowfishEncrypt32(B, &L, &R);
-            B.S[si][j + 0] = L;
-            B.S[si][j + 1] = R;
+            B.S[si][2 * j + 0] = L;
+            B.S[si][2 * j + 1] = R;
         }
     }
 }
@@ -105,11 +111,11 @@ pub export fn blowfish_encrypt(
     in: *const [BLOWFISH_BLOCKLEN]u8,
     out: *[BLOWFISH_BLOCKLEN]u8,
 ) callconv(.c) void {
-    var L = be32dec(in[0..4].ptr);
-    var R = be32dec(in[4..8].ptr);
+    var L = readBe32(in[0..4]);
+    var R = readBe32(in[4..8]);
     blowfishEncrypt32(B, &L, &R);
-    be32enc(out[0..4].ptr, L);
-    be32enc(out[4..8].ptr, R);
+    writeBe32(out[0..4], L);
+    writeBe32(out[4..8], R);
 }
 
 pub export fn blowfish_decrypt(
@@ -117,11 +123,11 @@ pub export fn blowfish_decrypt(
     in: *const [BLOWFISH_BLOCKLEN]u8,
     out: *[BLOWFISH_BLOCKLEN]u8,
 ) callconv(.c) void {
-    var L = be32dec(in[0..4].ptr);
-    var R = be32dec(in[4..8].ptr);
+    var L = readBe32(in[0..4]);
+    var R = readBe32(in[4..8]);
     blowfishDecrypt32(B, &L, &R);
-    be32enc(out[0..4].ptr, L);
-    be32enc(out[4..8].ptr, R);
+    writeBe32(out[0..4], L);
+    writeBe32(out[4..8], R);
 }
 
 pub export fn blowfish_encrypt_cbc(
@@ -133,19 +139,20 @@ pub export fn blowfish_encrypt_cbc(
 ) callconv(.c) void {
     std.debug.assert((n % 8) == 0);
 
-    var L = be32dec(iv[0..4].ptr);
-    var R = be32dec(iv[4..8].ptr);
+    var L = readBe32(iv[0..4]);
+    var R = readBe32(iv[4..8]);
 
     for (0..(n / 8)) |i| {
-        L ^= be32dec(in + 8 * i + 0);
-        R ^= be32dec(in + 8 * i + 4);
+        const off = 8 * i;
+        L ^= readBe32(in[off..][0..4]);
+        R ^= readBe32(in[off + 4 ..][0..4]);
         blowfishEncrypt32(B, &L, &R);
-        be32enc(out + 8 * i + 0, L);
-        be32enc(out + 8 * i + 4, R);
+        writeBe32(out[off..][0..4], L);
+        writeBe32(out[off + 4 ..][0..4], R);
     }
 
-    be32enc(iv[0..4].ptr, L);
-    be32enc(iv[4..8].ptr, R);
+    writeBe32(iv[0..4], L);
+    writeBe32(iv[4..8], R);
 }
 
 pub export fn blowfish_decrypt_cbc(
@@ -160,29 +167,29 @@ pub export fn blowfish_decrypt_cbc(
     var i: usize = n / 8;
     if (i == 0) return;
 
-    const L0 = be32dec(in + 8 * i - 8);
-    const R0 = be32dec(in + 8 * i - 4);
+    const L0 = readBe32((in + 8 * i - 8)[0..4]);
+    const R0 = readBe32((in + 8 * i - 4)[0..4]);
     var L = L0;
     var R = R0;
     while (i > 1) {
         i -= 1;
         blowfishDecrypt32(B, &L, &R);
-        const L_ = be32dec(in + 8 * i - 8);
-        const R_ = be32dec(in + 8 * i - 4);
+        const L_ = readBe32((in + 8 * i - 8)[0..4]);
+        const R_ = readBe32((in + 8 * i - 4)[0..4]);
         L ^= L_;
         R ^= R_;
-        be32enc(out + 8 * i + 0, L);
-        be32enc(out + 8 * i + 4, R);
+        writeBe32((out + 8 * i)[0..4], L);
+        writeBe32((out + 8 * i + 4)[0..4], R);
         L = L_;
         R = R_;
     }
     blowfishDecrypt32(B, &L, &R);
-    L ^= be32dec(iv[0..4].ptr);
-    R ^= be32dec(iv[4..8].ptr);
-    be32enc(out + 0, L);
-    be32enc(out + 4, R);
-    be32enc(iv[0..4].ptr, L0);
-    be32enc(iv[4..8].ptr, R0);
+    L ^= readBe32(iv[0..4]);
+    R ^= readBe32(iv[4..8]);
+    writeBe32(out[0..4], L);
+    writeBe32(out[4..8], R);
+    writeBe32(iv[0..4], L0);
+    writeBe32(iv[4..8], R0);
 }
 
 pub export fn blowfish_encrypt_cfb64(
@@ -195,13 +202,7 @@ pub export fn blowfish_encrypt_cfb64(
 ) callconv(.c) c_uint {
     var off: c_uint = off_in;
     for (0..n) |i| {
-        if (off == 0) {
-            var L = be32dec(iv[0..4].ptr);
-            var R = be32dec(iv[4..8].ptr);
-            blowfishEncrypt32(B, &L, &R);
-            be32enc(iv[0..4].ptr, L);
-            be32enc(iv[4..8].ptr, R);
-        }
+        if (off == 0) encryptIvBlock(B, iv);
         const idx: usize = @intCast(off);
         const cbyte = in[i] ^ iv[idx];
         iv[idx] = cbyte;
@@ -221,13 +222,7 @@ pub export fn blowfish_decrypt_cfb64(
 ) callconv(.c) c_uint {
     var off: c_uint = off_in;
     for (0..n) |i| {
-        if (off == 0) {
-            var L = be32dec(iv[0..4].ptr);
-            var R = be32dec(iv[4..8].ptr);
-            blowfishEncrypt32(B, &L, &R);
-            be32enc(iv[0..4].ptr, L);
-            be32enc(iv[4..8].ptr, R);
-        }
+        if (off == 0) encryptIvBlock(B, iv);
         const idx: usize = @intCast(off);
         const t = in[i];
         out[i] = t ^ iv[idx];
@@ -247,13 +242,7 @@ pub export fn blowfish_encrypt_ofb64(
 ) callconv(.c) c_uint {
     var off: c_uint = off_in;
     for (0..n) |i| {
-        if (off == 0) {
-            var L = be32dec(iv[0..4].ptr);
-            var R = be32dec(iv[4..8].ptr);
-            blowfishEncrypt32(B, &L, &R);
-            be32enc(iv[0..4].ptr, L);
-            be32enc(iv[4..8].ptr, R);
-        }
+        if (off == 0) encryptIvBlock(B, iv);
         const idx: usize = @intCast(off);
         out[i] = in[i] ^ iv[idx];
         off = (off + 1) & 7;

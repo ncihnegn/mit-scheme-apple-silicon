@@ -20,9 +20,9 @@ pub export fn x_window_visual(xw: *c.struct_xwindow) callconv(.c) ?*c.struct_xvi
 pub export fn x_get_visual_info(
     xd: *c.struct_xdisplay,
     mask: c_long,
-    info: [*c]c.XVisualInfo,
-    items_return: [*c][*c]c.XVisualInfo,
-    nitems_return: [*c]c_int,
+    info: ?*c.XVisualInfo,
+    items_return: *?[*]c.XVisualInfo,
+    nitems_return: *c_int,
 ) callconv(.c) void {
     items_return.* = c.XGetVisualInfo(xd.display, mask, info, nitems_return);
 }
@@ -74,16 +74,9 @@ pub export fn x_allocate_color(
     return -1;
 }
 
-pub export fn x_store_color(
-    xcm: *c.struct_xcolormap,
-    pixel: c_int,
-    red: c_int,
-    green: c_int,
-    blue: c_int,
-) callconv(.c) void {
+fn makeXColor(pixel: c_int, red: c_int, green: c_int, blue: c_int) c.XColor {
     var col: c.XColor = std.mem.zeroes(c.XColor);
     col.pixel = @intCast(@as(c_uint, @bitCast(pixel)));
-    col.flags = 0;
     if (red != -1) {
         col.red = @intCast(red);
         col.flags |= c.DoRed;
@@ -96,12 +89,23 @@ pub export fn x_store_color(
         col.blue = @intCast(blue);
         col.flags |= c.DoBlue;
     }
+    return col;
+}
+
+pub export fn x_store_color(
+    xcm: *c.struct_xcolormap,
+    pixel: c_int,
+    red: c_int,
+    green: c_int,
+    blue: c_int,
+) callconv(.c) void {
+    var col = makeXColor(pixel, red, green, blue);
     _ = c.XStoreColor(xcm.xd.*.display, xcm.colormap, &col);
 }
 
 pub export fn x_store_colors(
     xcm: *c.struct_xcolormap,
-    color_vector: [*c]c_int,
+    color_vector: [*]const c_int,
     n_colors: c_ulong,
 ) callconv(.c) void {
     const count: usize = @intCast(n_colors);
@@ -109,46 +113,28 @@ pub export fn x_store_colors(
         _ = c.XStoreColors(xcm.xd.*.display, xcm.colormap, null, 0);
         return;
     }
-    const raw = std.c.malloc(count * @sizeOf(c.XColor)) orelse return;
-    defer std.c.free(raw);
-    const colors: [*]c.XColor = @ptrCast(@alignCast(raw));
+    const colors = std.heap.c_allocator.alloc(c.XColor, count) catch return;
+    defer std.heap.c_allocator.free(colors);
 
-    var vi: usize = 0;
-    for (0..count) |i| {
-        var col: c.XColor = std.mem.zeroes(c.XColor);
-        const px_u: c_uint = @bitCast(color_vector[vi]);
-        col.pixel = @intCast(px_u);
-        vi += 1;
-        const red = color_vector[vi];
-        const green = color_vector[vi + 1];
-        const blue = color_vector[vi + 2];
-        vi += 3;
-        if (red != -1) {
-            col.red = @intCast(red);
-            col.flags |= c.DoRed;
-        }
-        if (green != -1) {
-            col.green = @intCast(green);
-            col.flags |= c.DoGreen;
-        }
-        if (blue != -1) {
-            col.blue = @intCast(blue);
-            col.flags |= c.DoBlue;
-        }
-        colors[i] = col;
+    for (colors, 0..) |*col, i| {
+        const base_idx = i * 4;
+        col.* = makeXColor(
+            color_vector[base_idx],
+            color_vector[base_idx + 1],
+            color_vector[base_idx + 2],
+            color_vector[base_idx + 3],
+        );
     }
-    _ = c.XStoreColors(xcm.xd.*.display, xcm.colormap, colors, @intCast(count));
+    _ = c.XStoreColors(xcm.xd.*.display, xcm.colormap, colors.ptr, @intCast(count));
 }
 
 pub export fn x_query_color(
     xcm: *c.struct_xcolormap,
     pixel: c_ulong,
-    results: [*c]c_uint,
+    results: *[3]c_uint,
 ) callconv(.c) void {
     var col: c.XColor = std.mem.zeroes(c.XColor);
     col.pixel = pixel;
     _ = c.XQueryColor(xcm.xd.*.display, xcm.colormap, &col);
-    results[0] = col.red;
-    results[1] = col.green;
-    results[2] = col.blue;
+    results.* = .{ col.red, col.green, col.blue };
 }

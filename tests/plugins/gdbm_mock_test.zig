@@ -125,7 +125,7 @@ pub export fn gdbm_strerror(_: c.gdbm_error) callconv(.c) [*c]const u8 {
 test "gdbm_adapter open failure records NOLOCK and errno_gdbm" {
     mock_open_should_fail = true;
     mock_gdbm_errno_val = c.GDBM_NO_ERROR;
-    const args = adapter.do_gdbm_open(@constCast("missing.db"), 0, c.GDBM_READER, 0o600).?;
+    const args = adapter.do_gdbm_open("missing.db", 0, c.GDBM_READER, 0o600).?;
     defer std.c.free(args);
 
     try std.testing.expectEqual(@as(c.GDBM_FILE, null), args.dbf);
@@ -140,25 +140,25 @@ test "gdbm_adapter full key/content CRUD lifecycle" {
     mock_sync_count = 0;
     mock_reorg_count = 0;
 
-    const ver = std.mem.span(@as([*:0]const u8, @ptrCast(adapter.get_gdbm_version())));
+    const ver = std.mem.span(adapter.get_gdbm_version().?);
     try std.testing.expectEqualStrings("GDBM mock 1.23", ver);
 
-    const args = adapter.do_gdbm_open(@constCast("test.db"), 0, c.GDBM_WRCREAT, 0o644).?;
+    const args = adapter.do_gdbm_open("test.db", 0, c.GDBM_WRCREAT, 0o644).?;
     try std.testing.expect(args.dbf != null);
 
     // Allocate, reuse smaller size, then grow
-    const kptr1 = adapter.alloc_gdbm_key(args, 8);
+    const kptr1 = adapter.alloc_gdbm_key(args, 8).?;
     @memcpy(kptr1[0..5], "alpha");
     _ = adapter.alloc_gdbm_key(args, 5);
     try std.testing.expectEqual(@as(c_int, 8), args.key_allocation);
     try std.testing.expectEqual(@as(c_int, 5), args.key.dsize);
 
-    const kptr2 = adapter.alloc_gdbm_key(args, 16);
+    const kptr2 = adapter.alloc_gdbm_key(args, 16).?;
     try std.testing.expectEqual(@as(c_int, 16), args.key_allocation);
     @memcpy(kptr2[0..5], "hello");
     args.key.dsize = 5;
 
-    const vptr = adapter.alloc_gdbm_content(args, 5);
+    const vptr = adapter.alloc_gdbm_content(args, 5).?;
     @memcpy(vptr[0..5], "world");
 
     try std.testing.expectEqual(@as(c_int, 0), adapter.do_gdbm_store(args, c.GDBM_REPLACE));

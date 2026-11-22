@@ -19,8 +19,8 @@ const XTermExtra = extern struct {
     y_size: c_uint,
     cursor_x: c_uint,
     cursor_y: c_uint,
-    character_map: [*c]u8,
-    highlight_map: [*c]u8,
+    character_map: [*]u8,
+    highlight_map: [*]u8,
     cursor_visible_p: u8,
     cursor_enabled_p: u8,
 };
@@ -51,7 +51,7 @@ inline fn xtermYPixel(xw: *c.struct_xwindow, y: c_uint) c_int {
     return @as(c_int, @intCast(y)) * x11.fontHeight(xw.attributes.font.?) + xw.attributes.internal_border_width;
 }
 
-inline fn drawChars(xw: *c.struct_xwindow, x: c_uint, y: c_uint, s: [*c]const u8, n: c_uint, gc: c.GC) void {
+inline fn drawChars(xw: *c.struct_xwindow, x: c_uint, y: c_uint, s: [*]const u8, n: c_uint, gc: c.GC) void {
     const font = xw.attributes.font.?;
     _ = c.XDrawImageString(
         xw.xd.*.display,
@@ -174,8 +174,8 @@ fn xtermDumpContents(
     const char_map = extra.character_map;
     const hl_map = extra.highlight_map;
     if (x_start < x_end) {
-        var yi = y_start;
-        while (yi < y_end) : (yi += 1) {
+        for (y_start..y_end) |yu| {
+            const yi: c_uint = @intCast(yu);
             const row_idx = charIndex(xw, 0, yi);
             const line_char = char_map + row_idx;
             const line_hl = hl_map + row_idx;
@@ -266,8 +266,7 @@ pub export fn xterm_reconfigure(
 
         var new_idx: usize = 0;
         var old_idx: usize = 0;
-        var new_y: c_uint = 0;
-        while (new_y < min_y_csize) : (new_y += 1) {
+        for (0..min_y_csize) |_| {
             @memcpy(new_char_map[new_idx .. new_idx + min_x_csize], extra.character_map[old_idx .. old_idx + min_x_csize]);
             @memcpy(new_hl_map[new_idx .. new_idx + min_x_csize], extra.highlight_map[old_idx .. old_idx + min_x_csize]);
             new_idx += min_x_csize;
@@ -281,7 +280,7 @@ pub export fn xterm_reconfigure(
                 old_idx += @intCast(x_clipped);
             }
         }
-        while (new_y < y_csize) : (new_y += 1) {
+        for (min_y_csize..y_csize) |_| {
             @memset(new_char_map[new_idx .. new_idx + x_csize], BLANK_CHAR);
             @memset(new_hl_map[new_idx .. new_idx + x_csize], DEFAULT_HL);
             new_idx += x_csize;
@@ -347,14 +346,14 @@ pub export fn xterm_map_y_size(xw: *c.struct_xwindow, height: c_uint) callconv(.
 
 pub export fn xterm_open_window(
     xd: *c.struct_xdisplay,
-    geometry: [*c]u8,
-    resource_name_in: [*c]const u8,
-    resource_class_in: [*c]const u8,
+    geometry: ?[*:0]const u8,
+    resource_name_in: ?[*:0]const u8,
+    resource_class_in: ?[*:0]const u8,
     map_p: c_int,
 ) callconv(.c) ?*c.struct_xwindow {
     const display = xd.display;
-    const resource_name = if (resource_name_in != null) resource_name_in else RESOURCE_NAME;
-    const resource_class = if (resource_class_in != null) resource_class_in else RESOURCE_CLASS;
+    const resource_name = resource_name_in orelse RESOURCE_NAME;
+    const resource_class = resource_class_in orelse RESOURCE_CLASS;
 
     var attributes: c.struct_drawing_attributes = undefined;
     if (base.x_default_attributes(display, resource_name, resource_class, &attributes) != 0) {
@@ -378,9 +377,7 @@ pub export fn xterm_open_window(
     var y_pos: c_int = 0;
     var x_size: c_int = 0;
     var y_size: c_int = 0;
-    const geom_str: [*c]const u8 = if (geometry != null)
-        geometry
-    else
+    const geom_str = geometry orelse
         base.x_get_default(display, resource_name, resource_class, "geometry", "Geometry", null);
 
     _ = c.XWMGeometry(
@@ -519,7 +516,7 @@ pub export fn xterm_write_char(
     if (hl >= 2) return 3;
     const idx = charIndex(xw, x, y);
     const map_ptr = extra.character_map + idx;
-    map_ptr.* = @truncate(@as(c_uint, @bitCast(ch)));
+    map_ptr[0] = @truncate(@as(c_uint, @bitCast(ch)));
     extra.highlight_map[idx] = @truncate(hl);
     drawChars(xw, x, y, map_ptr, 1, hlGc(xw, hl));
     if (extra.cursor_x == x and extra.cursor_y == y) {
@@ -533,7 +530,7 @@ pub export fn xterm_write_substring(
     xw: *c.struct_xwindow,
     x: c_uint,
     y: c_uint,
-    string: [*c]u8,
+    string: [*]const u8,
     start: c_uint,
     end: c_uint,
     hl: c_uint,
@@ -567,16 +564,15 @@ fn clearRectangle(
 ) void {
     const extra = xwExtra(xw);
     const x_length = x_end - x_start;
-    var y = y_start;
-    while (y < y_end) : (y += 1) {
-        const idx = charIndex(xw, x_start, y);
+    for (y_start..y_end) |yu| {
+        const idx = charIndex(xw, x_start, @intCast(yu));
         @memset(extra.character_map[idx .. idx + x_length], BLANK_CHAR);
         @memset(extra.highlight_map[idx .. idx + x_length], @truncate(hl));
     }
     if (hl != 0) {
         const hl_gc = hlGc(xw, hl);
-        y = y_start;
-        while (y < y_end) : (y += 1) {
+        for (y_start..y_end) |yu| {
+            const y: c_uint = @intCast(yu);
             const idx = charIndex(xw, x_start, y);
             drawChars(xw, x_start, y, extra.character_map + idx, x_length, hl_gc);
         }
@@ -747,7 +743,7 @@ pub export fn xterm_save_contents(
     x_end: c_uint,
     y_start: c_uint,
     y_end: c_uint,
-    contents: [*c]u8,
+    contents: [*]u8,
 ) callconv(.c) c_int {
     const extra = xwExtra(xw);
     if (x_end > extra.x_size) return 1;
@@ -757,9 +753,8 @@ pub export fn xterm_save_contents(
 
     const x_length = x_end - x_start;
     var out_idx: usize = 0;
-    var y = y_start;
-    while (y < y_end) : (y += 1) {
-        const idx = charIndex(xw, x_start, y);
+    for (y_start..y_end) |yu| {
+        const idx = charIndex(xw, x_start, @intCast(yu));
         for (0..x_length) |dx| {
             contents[out_idx] = extra.character_map[idx + dx];
             contents[out_idx + 1] = extra.highlight_map[idx + dx];
@@ -775,7 +770,7 @@ pub export fn xterm_restore_contents(
     x_end: c_uint,
     y_start: c_uint,
     y_end: c_uint,
-    contents: [*c]u8,
+    contents: [*]const u8,
 ) callconv(.c) c_int {
     const extra = xwExtra(xw);
     if (x_end > extra.x_size) return 1;
@@ -787,9 +782,8 @@ pub export fn xterm_restore_contents(
     const string_length = 2 * x_length * (y_end - y_start);
     if (string_length > 0) {
         var in_idx: usize = 0;
-        var y = y_start;
-        while (y < y_end) : (y += 1) {
-            const idx = charIndex(xw, x_start, y);
+        for (y_start..y_end) |yu| {
+            const idx = charIndex(xw, x_start, @intCast(yu));
             for (0..x_length) |dx| {
                 extra.character_map[idx + dx] = contents[in_idx];
                 extra.highlight_map[idx + dx] = contents[in_idx + 1];

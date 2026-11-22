@@ -42,37 +42,45 @@ fn fatalError(msg: [*c]const u8) callconv(.c) void {
     error_external_return();
 }
 
-fn allocDatum(d: *c.datum, allocation: *c_int, size: c_int) [*c]u8 {
-    var bytes: [*c]u8 = undefined;
-    if (size <= allocation.*) {
-        bytes = d.dptr;
-    } else {
-        if (d.dptr != null) {
-            std.c.free(d.dptr);
-        }
-        const raw = std.c.malloc(@intCast(size));
-        bytes = @ptrCast(raw);
-        d.dptr = bytes;
-        allocation.* = if (raw != null) size else 0;
+fn freeDatum(d: *c.datum) void {
+    if (d.dptr != null) {
+        std.c.free(d.dptr);
+        d.dptr = null;
     }
+    d.dsize = 0;
+}
+
+fn allocDatum(d: *c.datum, allocation: *c_int, size: c_int) ?[*]u8 {
+    if (size <= allocation.*) {
+        d.dsize = size;
+        return @ptrCast(d.dptr);
+    }
+    freeDatum(d);
+    const raw = std.c.malloc(@intCast(size)) orelse {
+        allocation.* = 0;
+        return null;
+    };
+    const bytes: [*]u8 = @ptrCast(raw);
+    d.dptr = bytes;
     d.dsize = size;
+    allocation.* = size;
     return bytes;
 }
 
-pub export fn alloc_gdbm_key(args: *c.gdbm_args, size: c_int) callconv(.c) [*c]u8 {
+pub export fn alloc_gdbm_key(args: *c.gdbm_args, size: c_int) callconv(.c) ?[*]u8 {
     return allocDatum(&args.key, &args.key_allocation, size);
 }
 
-pub export fn alloc_gdbm_content(args: *c.gdbm_args, size: c_int) callconv(.c) [*c]u8 {
+pub export fn alloc_gdbm_content(args: *c.gdbm_args, size: c_int) callconv(.c) ?[*]u8 {
     return allocDatum(&args.content, &args.content_allocation, size);
 }
 
-pub export fn get_gdbm_version() callconv(.c) [*c]const u8 {
+pub export fn get_gdbm_version() callconv(.c) ?[*:0]const u8 {
     return c.gdbm_version;
 }
 
 pub export fn do_gdbm_open(
-    name: [*c]u8,
+    name: ?[*:0]const u8,
     block_size: c_int,
     read_write_in: c_int,
     mode: c_int,
@@ -85,14 +93,15 @@ pub export fn do_gdbm_open(
         read_write |= c.GDBM_NOLOCK;
     }
 
-    args.key = .{ .dptr = null, .dsize = 0 };
-    args.key_allocation = 0;
-    args.content = .{ .dptr = null, .dsize = 0 };
-    args.content_allocation = 0;
-    args.errno_gdbm = 0;
-    args.errno_sys = 0;
-    args.dbf = c.gdbm_open(name, block_size, read_write, mode, @ptrCast(&fatalError));
-
+    args.* = .{
+        .key = .{ .dptr = null, .dsize = 0 },
+        .key_allocation = 0,
+        .content = .{ .dptr = null, .dsize = 0 },
+        .content_allocation = 0,
+        .errno_gdbm = 0,
+        .errno_sys = 0,
+        .dbf = c.gdbm_open(name, block_size, read_write, mode, @ptrCast(&fatalError)),
+    };
     if (args.dbf == null) {
         recordErrnos(args);
     }
@@ -101,12 +110,8 @@ pub export fn do_gdbm_open(
 
 pub export fn do_gdbm_close(args: *c.gdbm_args) callconv(.c) void {
     _ = c.gdbm_close(args.dbf);
-    if (args.key.dptr != null) {
-        std.c.free(args.key.dptr);
-    }
-    if (args.content.dptr != null) {
-        std.c.free(args.content.dptr);
-    }
+    freeDatum(&args.key);
+    freeDatum(&args.content);
     std.c.free(args);
 }
 
@@ -119,11 +124,9 @@ pub export fn do_gdbm_store(args: *c.gdbm_args, flag: c_int) callconv(.c) c_int 
 }
 
 pub export fn do_gdbm_fetch(args: *c.gdbm_args) callconv(.c) void {
-    if (args.content.dptr != null) {
-        std.c.free(args.content.dptr);
-    }
+    freeDatum(&args.content);
     args.content = c.gdbm_fetch(args.dbf, args.key);
-    args.content_allocation = args.content.dsize;
+    args.content_allocation = if (args.content.dptr != null) args.content.dsize else 0;
 }
 
 pub export fn do_gdbm_exists(args: *c.gdbm_args) callconv(.c) c_int {
@@ -135,9 +138,7 @@ pub export fn do_gdbm_delete(args: *c.gdbm_args) callconv(.c) c_int {
 }
 
 pub export fn do_gdbm_firstkey(args: *c.gdbm_args) callconv(.c) void {
-    if (args.key.dptr != null) {
-        std.c.free(args.key.dptr);
-    }
+    freeDatum(&args.key);
     args.key = c.gdbm_firstkey(args.dbf);
     args.key_allocation = if (args.key.dptr != null) args.key.dsize else 0;
 }
@@ -147,9 +148,7 @@ pub export fn do_gdbm_nextkey(args: *c.gdbm_args) callconv(.c) c_int {
     if (next.dptr == null) {
         return 1;
     }
-    if (args.key.dptr != null) {
-        std.c.free(args.key.dptr);
-    }
+    freeDatum(&args.key);
     args.key = next;
     args.key_allocation = next.dsize;
     return 0;

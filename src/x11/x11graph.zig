@@ -173,12 +173,9 @@ pub export fn x_graphics_set_vdc_extent(
     resetVirtualDeviceCoordinates(xw);
 }
 
-pub export fn x_graphics_vdc_extent(xw: *c.struct_xwindow, results: [*c]f32) callconv(.c) void {
+pub export fn x_graphics_vdc_extent(xw: *c.struct_xwindow, results: *[4]f32) callconv(.c) void {
     const extra = xwExtra(xw);
-    results[0] = extra.x_left;
-    results[1] = extra.y_bottom;
-    results[2] = extra.x_right;
-    results[3] = extra.y_top;
+    results.* = .{ extra.x_left, extra.y_bottom, extra.x_right, extra.y_top };
 }
 
 pub export fn x_graphics_reset_clip_rectangle(xw: *c.struct_xwindow) callconv(.c) void {
@@ -243,14 +240,14 @@ fn wmSetSizeHint(xw: *c.struct_xwindow, geometry_mask: c_int, x: c_int, y: c_int
 
 pub export fn x_graphics_open_window(
     xd: *c.struct_xdisplay,
-    geometry: [*c]u8,
-    resource_name_in: [*c]const u8,
-    resource_class_in: [*c]const u8,
+    geometry: ?[*:0]const u8,
+    resource_name_in: ?[*:0]const u8,
+    resource_class_in: ?[*:0]const u8,
     map_p: c_int,
 ) callconv(.c) ?*c.struct_xwindow {
     const display = xd.display;
-    const resource_name = if (resource_name_in != null) resource_name_in else RESOURCE_NAME;
-    const resource_class = if (resource_class_in != null) resource_class_in else RESOURCE_CLASS;
+    const resource_name = resource_name_in orelse RESOURCE_NAME;
+    const resource_class = resource_class_in orelse RESOURCE_CLASS;
 
     var attributes: c.struct_drawing_attributes = undefined;
     if (base.x_default_attributes(display, resource_name, resource_class, &attributes) != 0) {
@@ -275,9 +272,7 @@ pub export fn x_graphics_open_window(
     var y_pos: c_int = -1;
     var x_size: c_int = 512;
     var y_size: c_int = 384;
-    const geom_str: [*c]const u8 = if (geometry != null)
-        geometry
-    else
+    const geom_str = geometry orelse
         base.x_get_default(display, resource_name, resource_class, "geometry", "Geometry", null);
 
     const geometry_mask = c.XGeometry(
@@ -444,10 +439,10 @@ pub export fn x_graphics_draw_string(
     xw: *c.struct_xwindow,
     x: f32,
     y: f32,
-    string: [*c]u8,
+    string: [*:0]const u8,
 ) callconv(.c) void {
     const ibw: c_uint = @intCast(xw.attributes.internal_border_width);
-    const len: c_int = @intCast(std.mem.len(@as([*:0]const u8, @ptrCast(string))));
+    const len: c_int = @intCast(std.mem.len(string));
     _ = c.XDrawString(
         xw.xd.*.display,
         xw.window,
@@ -463,10 +458,10 @@ pub export fn x_graphics_draw_image_string(
     xw: *c.struct_xwindow,
     x: f32,
     y: f32,
-    string: [*c]u8,
+    string: [*:0]const u8,
 ) callconv(.c) void {
     const ibw: c_uint = @intCast(xw.attributes.internal_border_width);
-    const len: c_int = @intCast(std.mem.len(@as([*:0]const u8, @ptrCast(string))));
+    const len: c_int = @intCast(std.mem.len(string));
     _ = c.XDrawImageString(
         xw.xd.*.display,
         xw.window,
@@ -489,10 +484,10 @@ pub export fn x_graphics_set_function(xw: *c.struct_xwindow, function: c_uint) c
 
 fn transformPoints(
     xw: *c.struct_xwindow,
-    x_vector: [*c]f64,
-    y_vector: [*c]f64,
+    x_vector: [*]const f64,
+    y_vector: [*]const f64,
     n_points: c_uint,
-    points: [*c]c.XPoint,
+    points: [*]c.XPoint,
 ) void {
     const border: c_uint = @intCast(xw.attributes.internal_border_width);
     for (0..n_points) |i| {
@@ -506,17 +501,17 @@ fn transformPoints(
 
 pub export fn x_graphics_draw_points(
     xw: *c.struct_xwindow,
-    x_vector: [*c]f64,
-    y_vector: [*c]f64,
+    x_vector: [*]const f64,
+    y_vector: [*]const f64,
     n_points_in: c_uint,
-    points_in: [*c]c.XPoint,
+    points_in: [*]c.XPoint,
 ) callconv(.c) void {
     transformPoints(xw, x_vector, y_vector, n_points_in, points_in);
     var n_points = n_points_in;
     var points = points_in;
     const dpy = xw.xd.*.display;
     while (n_points > 0) {
-        const this_send = if (n_points <= 4093) n_points else 4093;
+        const this_send = @min(n_points, 4093);
         n_points -= this_send;
         _ = c.XDrawPoints(dpy, xw.window, xw.normal_gc, points, @intCast(this_send), c.CoordModeOrigin);
         points += this_send;
@@ -525,17 +520,17 @@ pub export fn x_graphics_draw_points(
 
 pub export fn x_graphics_draw_lines(
     xw: *c.struct_xwindow,
-    x_vector: [*c]f64,
-    y_vector: [*c]f64,
+    x_vector: [*]const f64,
+    y_vector: [*]const f64,
     n_points_in: c_uint,
-    points_in: [*c]c.XPoint,
+    points_in: [*]c.XPoint,
 ) callconv(.c) void {
     transformPoints(xw, x_vector, y_vector, n_points_in, points_in);
     var n_points = n_points_in;
     var points = points_in;
     const dpy = xw.xd.*.display;
     while (n_points > 0) {
-        const this_send = if (n_points <= 2047) n_points else 2047;
+        const this_send = @min(n_points, 2047);
         n_points -= this_send;
         _ = c.XDrawLines(dpy, xw.window, xw.normal_gc, points, @intCast(this_send), c.CoordModeOrigin);
         points += this_send - 1;
@@ -563,7 +558,7 @@ pub export fn x_graphics_set_line_style(xw: *c.struct_xwindow, style: c_uint) ca
 pub export fn x_graphics_set_dashes(
     xw: *c.struct_xwindow,
     dash_offset: c_int,
-    dash_list: [*c]u8,
+    dash_list: [*]const u8,
     dash_list_length: c_int,
 ) callconv(.c) c_int {
     if (dash_offset >= dash_list_length) return 0;
@@ -605,9 +600,9 @@ pub export fn x_graphics_copy_area(
 
 pub export fn transform_polygon_points(
     xw: *c.struct_xwindow,
-    vector: [*c]f64,
+    vector: [*]const f64,
     length: c_int,
-    result: [*c]c.XPoint,
+    result: [*]c.XPoint,
 ) callconv(.c) void {
     const border: c_uint = @intCast(xw.attributes.internal_border_width);
     const count: usize = @intCast(@divTrunc(length, 2));
@@ -621,9 +616,9 @@ pub export fn transform_polygon_points(
 
 pub export fn x_graphics_fill_polygon(
     xw: *c.struct_xwindow,
-    vector: [*c]f64,
+    vector: [*]const f64,
     length: c_uint,
-    points: [*c]c.XPoint,
+    points: [*]c.XPoint,
 ) callconv(.c) void {
     transform_polygon_points(xw, vector, @intCast(length), points);
     _ = c.XFillPolygon(
@@ -640,11 +635,11 @@ pub export fn x_graphics_fill_polygon(
 fn findPixmapFormat(dpy: ?*c.Display, depth: c_int, format: *c.XPixmapFormatValues) bool {
     var n_pixmap_formats: c_int = 0;
     const pixmap_formats = c.XListPixmapFormats(dpy, &n_pixmap_formats) orelse return false;
+    defer _ = c.XFree(@ptrCast(pixmap_formats));
     const count: usize = @intCast(n_pixmap_formats);
-    for (0..count) |i| {
-        if (pixmap_formats[i].depth == depth) {
-            format.* = pixmap_formats[i];
-            _ = c.XFree(@ptrCast(pixmap_formats));
+    for (pixmap_formats[0..count]) |fmt| {
+        if (fmt.depth == depth) {
+            format.* = fmt;
             return true;
         }
     }
@@ -667,8 +662,7 @@ pub export fn x_create_image(xw: *c.struct_xwindow, width: c_uint, height: c_uin
     }
     const char_bit: c_uint = 8;
     const bytes_per_line: c_uint = (bits_per_line + (char_bit - 1)) / char_bit;
-    const data_raw = std.c.malloc(@as(usize, height) * @as(usize, bytes_per_line)) orelse return null;
-    const data: [*c]u8 = @ptrCast(data_raw);
+    const data: [*]u8 = @ptrCast(std.c.malloc(@as(usize, height) * @as(usize, bytes_per_line)) orelse return null);
 
     const img = c.XCreateImage(
         dpy,
@@ -693,7 +687,7 @@ pub export fn x_image_height(ximage: *c.struct_ximage) callconv(.c) c_ulong {
     return @intCast(ximage.image.*.height);
 }
 
-pub export fn x_bytes_into_image(vector: [*c]u8, length: c_int, ximage: *c.struct_ximage) callconv(.c) c_int {
+pub export fn x_bytes_into_image(vector: [*]const u8, length: c_int, ximage: *c.struct_ximage) callconv(.c) c_int {
     const image = ximage.image;
     const width: c_ulong = @intCast(image.*.width);
     const height: c_ulong = @intCast(image.*.height);

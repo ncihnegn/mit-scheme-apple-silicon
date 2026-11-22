@@ -9,8 +9,14 @@ comptime {
     _ = blowfish;
 }
 
-const BF_ENCRYPT: c_int = 1;
-const BF_DECRYPT: c_int = 0;
+const Direction = enum(c_int) {
+    decrypt = 0,
+    encrypt = 1,
+    _,
+};
+
+const BF_ENCRYPT = @backingInt(Direction.encrypt);
+const BF_DECRYPT = @backingInt(Direction.decrypt);
 
 pub export fn BF_set_key(B: *blowfish.Blowfish, nbytes: c_int, key: [*]const u8) callconv(.c) void {
     blowfish.blowfish_init(B, key, @intCast(nbytes));
@@ -22,10 +28,10 @@ pub export fn BF_ecb_encrypt(
     B: *blowfish.Blowfish,
     dir: c_int,
 ) callconv(.c) void {
-    switch (dir) {
-        BF_ENCRYPT => blowfish.blowfish_encrypt(B, in[0..blowfish.BLOWFISH_BLOCKLEN], out[0..blowfish.BLOWFISH_BLOCKLEN]),
-        BF_DECRYPT => blowfish.blowfish_decrypt(B, in[0..blowfish.BLOWFISH_BLOCKLEN], out[0..blowfish.BLOWFISH_BLOCKLEN]),
-        else => std.c.abort(),
+    switch (@as(Direction, @fromBackingInt(@intCast(dir)))) {
+        .encrypt => blowfish.blowfish_encrypt(B, in[0..blowfish.BLOWFISH_BLOCKLEN], out[0..blowfish.BLOWFISH_BLOCKLEN]),
+        .decrypt => blowfish.blowfish_decrypt(B, in[0..blowfish.BLOWFISH_BLOCKLEN], out[0..blowfish.BLOWFISH_BLOCKLEN]),
+        _ => std.c.abort(),
     }
 }
 
@@ -38,10 +44,10 @@ pub export fn BF_cbc_encrypt(
     dir: c_int,
 ) callconv(.c) void {
     const n: usize = @intCast(nbytes);
-    switch (dir) {
-        BF_ENCRYPT => blowfish.blowfish_encrypt_cbc(B, iv[0..blowfish.BLOWFISH_BLOCKLEN], in, out, n),
-        BF_DECRYPT => blowfish.blowfish_decrypt_cbc(B, iv[0..blowfish.BLOWFISH_BLOCKLEN], in, out, n),
-        else => std.c.abort(),
+    switch (@as(Direction, @fromBackingInt(@intCast(dir)))) {
+        .encrypt => blowfish.blowfish_encrypt_cbc(B, iv[0..blowfish.BLOWFISH_BLOCKLEN], in, out, n),
+        .decrypt => blowfish.blowfish_decrypt_cbc(B, iv[0..blowfish.BLOWFISH_BLOCKLEN], in, out, n),
+        _ => std.c.abort(),
     }
 }
 
@@ -61,10 +67,10 @@ pub export fn do_BF_cfb64_encrypt(
     const len: usize = @intCast(length);
     const off: c_uint = @intCast(num);
     const iv = ivec[0..blowfish.BLOWFISH_BLOCKLEN];
-    return switch (dir) {
-        BF_ENCRYPT => @intCast(blowfish.blowfish_encrypt_cfb64(schedule, iv, off, in + ioff, out + ooff, len)),
-        BF_DECRYPT => @intCast(blowfish.blowfish_decrypt_cfb64(schedule, iv, off, in + ioff, out + ooff, len)),
-        else => std.c.abort(),
+    return switch (@as(Direction, @fromBackingInt(@intCast(dir)))) {
+        .encrypt => @intCast(blowfish.blowfish_encrypt_cfb64(schedule, iv, off, in[ioff..], out[ooff..], len)),
+        .decrypt => @intCast(blowfish.blowfish_decrypt_cfb64(schedule, iv, off, in[ioff..], out[ooff..], len)),
+        _ => std.c.abort(),
     };
 }
 
@@ -86,8 +92,8 @@ pub export fn do_BF_ofb64_encrypt(
         schedule,
         ivec[0..blowfish.BLOWFISH_BLOCKLEN],
         off,
-        in + ioff,
-        out + ooff,
+        in[ioff..],
+        out[ooff..],
         len,
     ));
 }
