@@ -423,6 +423,71 @@ fn faultAddress(info: *std.c.siginfo_t) usize {
     return 0;
 }
 
+const linux_maps = struct {
+    extern "c" fn open(path: [*:0]const u8, flags: c_int) c_int;
+    extern "c" fn close(fd: c_int) c_int;
+    extern "c" fn read(fd: c_int, buf: [*]u8, count: usize) isize;
+};
+
+/// Parses the start/end addresses of a /proc/self/maps line.
+fn mapsLineBounds(line: []const u8) ?struct { start: usize, end: usize } {
+    const dash = std.mem.indexOfScalar(u8, line, '-') orelse return null;
+    const space = std.mem.indexOfScalar(u8, line[dash + 1 ..], ' ') orelse return null;
+    const start = std.fmt.parseInt(usize, line[0..dash], 16) catch return null;
+    const end = std.fmt.parseInt(usize, line[dash + 1 .. dash + 1 + space], 16) catch return null;
+    return .{ .start = start, .end = end };
+}
+
+/// Prints the /proc/self/maps line containing `addr` (Linux only), so a
+/// fault address can be attributed to the heap, the code arena, or a file
+/// mapping.
+fn printMapsRegionContaining(addr: usize) void {
+    if (comptime builtin.os.tag != .linux) return;
+    if (addr == 0) return;
+    const fd = linux_maps.open("/proc/self/maps", 0); // O_RDONLY
+    if (fd < 0) return;
+    defer _ = linux_maps.close(fd);
+
+    const err = abi.cStderr();
+    var chunk: [4096]u8 = undefined;
+    var line: [256]u8 = undefined;
+    var line_len: usize = 0;
+    while (true) {
+        const n = linux_maps.read(fd, &chunk, chunk.len);
+        if (n <= 0) break;
+        for (chunk[0..@intCast(n)]) |ch| {
+            if (ch == '\n') {
+                if (mapsLineBounds(line[0..line_len])) |b| {
+                    if (addr >= b.start and addr < b.end) {
+                        writeFmt(err, ";;; maps[pc]: {s}\n", .{line[0..line_len]});
+                        _ = abi.fflush(err);
+                        return;
+                    }
+                }
+                line_len = 0;
+            } else if (line_len < line.len) {
+                line[line_len] = ch;
+                line_len += 1;
+            }
+        }
+        if (line_len == line.len) return; // pathological line; give up
+    }
+}
+
+/// Prints machine words at the trap stack pointer; return addresses usually
+/// identify the caller frames of a control-transfer fault.
+fn dumpStackWords(sp: usize) void {
+    if (sp == 0) return;
+    const err = abi.cStderr();
+    const base = sp & ~@as(usize, 0x7);
+    var i: usize = 0;
+    while (i < 12) : (i += 1) {
+        const word: *align(1) const usize = @ptrFromInt(base + i * @sizeOf(usize));
+        writeFmt(err, ";;; stack[sp+0x{x:0>2}] = 0x{x}\n", .{ i * @sizeOf(usize), word.* });
+    }
+    _ = abi.fflush(err);
+}
+
 /// Prints the faulting instruction and fault address before terminating on a
 /// hardware fault, so the crash points at a symbolizable PC even when the
 /// hardware-trap handler is not installed (e.g. batch runs without a tty).
@@ -433,13 +498,21 @@ fn reportFatalFault(signo: c_int, info: ?*std.c.siginfo_t, pscp: ?*anyopaque) vo
     };
     if (!faultp or info == null or info.?.code <= 0) return; // only kernel-generated faults
     const err = abi.cStderr();
-    writeFmt(err, "\n;;; {s} fault: pc=0x{x} addr=0x{x} si_code={d}\n", .{
+    const pc = uxtrap.sigcontextPc(pscp);
+    const sp = uxtrap.sigcontextSp(pscp);
+    writeFmt(err, "\n;;; {s} fault: pc=0x{x} addr=0x{x} sp=0x{x} si_code={d}\n", .{
         std.mem.span(findSignalName(signo)),
-        uxtrap.sigcontextPc(pscp),
+        pc,
         faultAddress(info.?),
+        sp,
         info.?.code,
     });
     _ = abi.fflush(err);
+    printMapsRegionContaining(pc);
+    if (faultAddress(info.?) != pc) {
+        printMapsRegionContaining(faultAddress(info.?));
+    }
+    dumpStackWords(sp);
 }
 
 fn bodyFpe(signo: c_int, info: ?*std.c.siginfo_t, pscp: ?*anyopaque) void {

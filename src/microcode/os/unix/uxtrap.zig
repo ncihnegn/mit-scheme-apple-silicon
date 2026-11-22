@@ -216,12 +216,13 @@ pub fn sigcontextPc(scp: ?*const anyopaque) usize {
     return if (builtin.cpu.arch == .aarch64) @intCast(uc.?.uc_mcontext.pc) else @bitCast(uc.?.uc_mcontext.gregs[16]);
 }
 
-fn sigcontextSp(scp: ?*const Ucontext) usize {
-    const uc = scp orelse return 0;
+pub fn sigcontextSp(scp: ?*const anyopaque) usize {
+    const uc: ?*const Ucontext = if (scp) |p| @ptrCast(@alignCast(p)) else null;
+    const u = uc orelse return 0;
     if (builtin.os.tag.isDarwin()) {
-        return if (builtin.cpu.arch == .aarch64) @intCast(uc.uc_mcontext.ss.sp) else @intCast(uc.uc_mcontext.ss.rsp);
+        return if (builtin.cpu.arch == .aarch64) @intCast(u.uc_mcontext.ss.sp) else @intCast(u.uc_mcontext.ss.rsp);
     }
-    return if (builtin.cpu.arch == .aarch64) @intCast(uc.uc_mcontext.sp) else @bitCast(uc.uc_mcontext.gregs[15]);
+    return if (builtin.cpu.arch == .aarch64) @intCast(u.uc_mcontext.sp) else @bitCast(u.uc_mcontext.gregs[15]);
 }
 
 fn sigcontextSchsp(scp: ?*const Ucontext) usize {
