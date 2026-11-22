@@ -335,7 +335,24 @@ fn floExp(x: f64) f64 {
         const QuadExp = struct {
             extern "c" fn expl(c_longdouble) c_longdouble;
         };
-        return @floatCast(QuadExp.expl(x));
+        const wide = QuadExp.expl(x);
+        const narrow: f64 = @floatCast(wide);
+        // The software quad->double conversion in compiler-rt does not
+        // raise FP flags, so mimic the IEEE conversion semantics here:
+        // exp is essentially always inexact (except exp(0)=1), and the
+        // narrowed result signals overflow/underflow when it leaves the
+        // f64 range. (expl raises its own flags when the quad result
+        // itself over/underflows, in which case wide and narrow agree.)
+        if (!std.math.isNan(narrow) and @as(c_longdouble, narrow) != wide) {
+            if (std.math.isInf(narrow)) {
+                _ = fenv.feraiseexcept(fenv.fe_overflow | fenv.fe_inexact);
+            } else if (narrow == 0) {
+                _ = fenv.feraiseexcept(fenv.fe_underflow | fenv.fe_inexact);
+            } else {
+                _ = fenv.feraiseexcept(fenv.fe_inexact);
+            }
+        }
+        return narrow;
     }
     return exp(x);
 }
