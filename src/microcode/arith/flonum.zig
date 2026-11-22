@@ -253,7 +253,13 @@ pub export fn Prim_flonum_abs() callconv(.c) obj.SchemeObject {
 // DEFINE_PRIMITIVE ("FLONUM-FMA", Prim_flonum_fma, 3, 3, 0)
 pub export fn Prim_flonum_fma() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    return double_to_flonum(fma(arg_flonum(1), arg_flonum(2), arg_flonum(3)));
+    const x = arg_flonum(1);
+    const y = arg_flonum(2);
+    const z = arg_flonum(3);
+    // glibc's software fma fails to raise FE_OVERFLOW (observed on
+    // aarch64 Linux); the hardware fused op raises the flags correctly,
+    // so prefer it whenever it is available.
+    return double_to_flonum(if (fast_fma_p) @mulAdd(f64, x, y, z) else fma(x, y, z));
 }
 
 // DEFINE_PRIMITIVE ("FLONUM-FAST-FMA?", Prim_flonum_fast_fma_p, 0, 0, 0)
@@ -318,9 +324,25 @@ pub export fn Prim_flonum_log2() callconv(.c) obj.SchemeObject {
     return simpleTranscendental(log2);
 }
 
+// Platforms whose long double is IEEE quad (e.g. aarch64 Linux) have a
+// correctly rounded expl, unlike their exp: glibc's aarch64 exp is off
+// by 1 ulp for some inputs (e.g. exp(1)). Compute in long double and
+// narrow; the double-rounding window at quad precision is negligible.
+const quad_long_double_p = @typeInfo(c_longdouble).float.bits == 128;
+
+fn floExp(x: f64) f64 {
+    if (comptime quad_long_double_p) {
+        const QuadExp = struct {
+            extern "c" fn expl(c_longdouble) c_longdouble;
+        };
+        return @floatCast(QuadExp.expl(x));
+    }
+    return exp(x);
+}
+
 // DEFINE_PRIMITIVE ("FLONUM-EXP", Prim_flonum_exp, 1, 1, 0)
 pub export fn Prim_flonum_exp() callconv(.c) obj.SchemeObject {
-    return simpleTranscendental(exp);
+    return simpleTranscendental(floExp);
 }
 
 // DEFINE_PRIMITIVE ("FLONUM-EXP2", Prim_flonum_exp2, 1, 1, 0)
