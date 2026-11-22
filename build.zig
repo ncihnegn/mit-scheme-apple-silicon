@@ -602,6 +602,28 @@ pub fn build(b: *std.Build) void {
         smoke_step.dependOn(&run_smoke.step);
     }
 
+    // `zig build bench`
+    const bench_step = b.step("bench", "Run microcode Zig benchmarks");
+    const microcode_bench_mod = b.createModule(.{
+        .root_source_file = b.path("src/microcode/bench_targets.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    const bench_exe = b.addExecutable(.{
+        .name = "microcode-bench",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tests/microcode/microcode-bench.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .sanitize_c = .off,
+        }),
+    });
+    bench_exe.root_module.addImport("microcode_bench", microcode_bench_mod);
+    const run_bench = b.addRunArtifact(bench_exe);
+    bench_step.dependOn(&run_bench.step);
+
     // `zig build test-unit`
     const unit_test_step = b.step("test-unit", "Run Zig microcode unit tests");
     const unit_tests = b.addTest(.{
