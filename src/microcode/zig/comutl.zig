@@ -146,7 +146,7 @@ pub export fn Prim_compiled_entry_kind() callconv(.c) obj.SchemeObject {
     }
 
     return hunk.hunk3_cons(
-        obj.ulongToFixnum(@intFromEnum(group)),
+        obj.ulongToFixnum(@backingInt(group)),
         obj.ulongToFixnum(field1),
         obj.longToFixnum(field2),
     );
@@ -441,7 +441,7 @@ test "comutl stack offset, entry kind, liarc prefix binding, code arena install 
         };
         stubs.setArgs(&.{entry});
         const k_proc = Prim_compiled_entry_kind();
-        try std.testing.expectEqual(obj.ulongToFixnum(@intFromEnum(abi.CcEntryTypeGroup.procedure)), obj.memoryRef(k_proc, 0));
+        try std.testing.expectEqual(obj.ulongToFixnum(@backingInt(abi.CcEntryTypeGroup.procedure)), obj.memoryRef(k_proc, 0));
         try std.testing.expectEqual(obj.ulongToFixnum(3), obj.memoryRef(k_proc, 1));
         try std.testing.expectEqual(obj.longToFixnum(-5), obj.memoryRef(k_proc, 2));
 
@@ -452,7 +452,7 @@ test "comutl stack offset, entry kind, liarc prefix binding, code arena install 
         const ret = obj.makeObject(obj.tc_compiled_return, 0x10004);
         stubs.setArgs(&.{ret});
         const k_cont = Prim_compiled_entry_kind();
-        try std.testing.expectEqual(obj.ulongToFixnum(@intFromEnum(abi.CcEntryTypeGroup.continuation)), obj.memoryRef(k_cont, 0));
+        try std.testing.expectEqual(obj.ulongToFixnum(@backingInt(abi.CcEntryTypeGroup.continuation)), obj.memoryRef(k_cont, 0));
         try std.testing.expectEqual(obj.ulongToFixnum(0), obj.memoryRef(k_cont, 1));
         try std.testing.expectEqual(obj.longToFixnum(7), obj.memoryRef(k_cont, 2));
 
@@ -462,7 +462,7 @@ test "comutl stack offset, entry kind, liarc prefix binding, code arena install 
         };
         stubs.setArgs(&.{abi.return_to_interpreter});
         const k_rti = Prim_compiled_entry_kind();
-        try std.testing.expectEqual(obj.ulongToFixnum(@intFromEnum(abi.CcEntryTypeGroup.continuation)), obj.memoryRef(k_rti, 0));
+        try std.testing.expectEqual(obj.ulongToFixnum(@backingInt(abi.CcEntryTypeGroup.continuation)), obj.memoryRef(k_rti, 0));
         try std.testing.expectEqual(obj.ulongToFixnum(2), obj.memoryRef(k_rti, 1));
         try std.testing.expectEqual(obj.longToFixnum(0), obj.memoryRef(k_rti, 2));
     }

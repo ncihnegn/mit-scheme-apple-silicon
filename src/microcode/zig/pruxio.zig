@@ -88,7 +88,7 @@ test "pruxio channel-descriptor and ux-make-subprocess" {
     defer wind.dstack_reset();
     defer stubs.resetMockRuntime();
 
-    stubs.setMockChannel(2, @intFromEnum(abi.ChannelType.unix_pipe), false);
+    stubs.setMockChannel(2, @backingInt(abi.ChannelType.unix_pipe), false);
     stubs.setArgs(&.{obj.ulongToFixnum(2)});
     try std.testing.expectEqual(obj.longToFixnum(12), Prim_channel_descriptor());
 

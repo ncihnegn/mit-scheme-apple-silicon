@@ -210,7 +210,7 @@ fn processTimeFromTms(buffer: *const CTms) abi.ClockT {
 fn initializeProcessClock() void {
     var buffer: CTms = undefined;
     while (times(&buffer) == @as(abi.ClockT, @bitCast(@as(isize, -1)))) {
-        if (std.c._errno().* != @intFromEnum(std.c.E.INTR)) {
+        if (std.c._errno().* != @backingInt(std.c.E.INTR)) {
             initial_process_clock = 0;
             return;
         }
@@ -228,7 +228,7 @@ pub fn osProcessClock() callconv(.c) f64 {
             t = processTimeFromTms(&buffer);
             break;
         }
-        if (std.c._errno().* == @intFromEnum(std.c.E.INTR)) {
+        if (std.c._errno().* == @backingInt(std.c.E.INTR)) {
             osscheme.deliver_pending_interrupts();
         } else {
             break;
@@ -241,7 +241,7 @@ pub fn osProcessClock() callconv(.c) f64 {
 fn initializeRealTimeClock() void {
     var tz: std.c.timezone = undefined;
     while (std.c.gettimeofday(&initial_rtc, &tz) == -1) {
-        if (std.c._errno().* != @intFromEnum(std.c.E.INTR)) {
+        if (std.c._errno().* != @backingInt(std.c.E.INTR)) {
             initial_rtc = .{ .sec = 0, .usec = 0 };
             break;
         }
@@ -253,7 +253,7 @@ pub fn osRealTimeClock() callconv(.c) f64 {
     var rtc: std.c.timeval = undefined;
     var tz: std.c.timezone = undefined;
     while (std.c.gettimeofday(&rtc, &tz) == -1) {
-        if (std.c._errno().* == @intFromEnum(std.c.E.INTR)) {
+        if (std.c._errno().* == @backingInt(std.c.E.INTR)) {
             osscheme.deliver_pending_interrupts();
         } else {
             rtc = initial_rtc;
@@ -341,7 +341,7 @@ pub fn osWorkingDirPathname() callconv(.c) [*:0]const u8 {
     if (current_dir_path_size == 0) {
         const init_sz: usize = 1024;
         const raw = std.c.malloc(init_sz) orelse
-            utils.error_system_call(@intFromEnum(std.c.E.NOMEM), abi.syscall_malloc);
+            utils.error_system_call(@backingInt(std.c.E.NOMEM), abi.syscall_malloc);
         current_dir_path = @ptrCast(raw);
         current_dir_path_size = init_sz;
     }
@@ -350,12 +350,12 @@ pub fn osWorkingDirPathname() callconv(.c) [*:0]const u8 {
             return @ptrCast(current_dir_path.?);
         }
         const err = std.c._errno().*;
-        if (err != @intFromEnum(std.c.E.RANGE)) {
+        if (err != @backingInt(std.c.E.RANGE)) {
             utils.error_system_call(err, abi.syscall_getcwd);
         }
         current_dir_path_size *= 2;
         const raw = std.c.realloc(@ptrCast(current_dir_path.?), current_dir_path_size) orelse
-            utils.error_system_call(@intFromEnum(std.c.E.NOMEM), abi.syscall_realloc);
+            utils.error_system_call(@backingInt(std.c.E.NOMEM), abi.syscall_realloc);
         current_dir_path = @ptrCast(raw);
     }
 }
@@ -369,14 +369,14 @@ pub fn osSetWorkingDirPathname(name: [*:0]const u8) callconv(.c) void {
     if (current_dir_path == null) {
         const init_sz = @max(@as(usize, 1024), name_slice.len + 1);
         const raw = std.c.malloc(init_sz) orelse
-            utils.error_system_call(@intFromEnum(std.c.E.NOMEM), abi.syscall_malloc);
+            utils.error_system_call(@backingInt(std.c.E.NOMEM), abi.syscall_malloc);
         current_dir_path = @ptrCast(raw);
         current_dir_path_size = init_sz;
     }
     while (name_slice.len >= current_dir_path_size) {
         current_dir_path_size *= 2;
         const raw = std.c.realloc(@ptrCast(current_dir_path.?), current_dir_path_size) orelse
-            utils.error_system_call(@intFromEnum(std.c.E.NOMEM), abi.syscall_realloc);
+            utils.error_system_call(@backingInt(std.c.E.NOMEM), abi.syscall_realloc);
         current_dir_path = @ptrCast(raw);
     }
     const dst = current_dir_path.?;

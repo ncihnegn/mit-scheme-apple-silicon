@@ -283,7 +283,7 @@ pub export fn Prim_list_to_vector() callconv(.c) obj.SchemeObject {
 pub export fn Prim_sys_list_to_vector() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     const type_code = abi.arg_ulong_index_integer(1, obj.n_type_codes);
-    if (abi.gc_type_code(@intCast(type_code)) != @intFromEnum(abi.GcType.vector)) {
+    if (abi.gc_type_code(@intCast(type_code)) != @backingInt(abi.GcType.vector)) {
         abi.error_bad_range_arg(1);
     }
     return listToVector(type_code, 2);

@@ -18,19 +18,19 @@ inline fn argDatum(arg: c_int) usize {
 fn safeObjectNewTypeP(object: obj.SchemeObject, type_code: usize) bool {
     const gc_type_old = abi.gcType(object);
     const gc_type_new = abi.gc_type_code(@intCast(type_code));
-    if (gc_type_old == @intFromEnum(abi.GcType.undefined) or gc_type_new == @intFromEnum(abi.GcType.undefined)) {
+    if (gc_type_old == @backingInt(abi.GcType.undefined) or gc_type_new == @backingInt(abi.GcType.undefined)) {
         return false;
     }
     if (obj.objectType(object) == obj.tc_reference_trap) {
         return if (obj.objectDatum(object) < obj.trap_max_immediate)
-            gc_type_new == @intFromEnum(abi.GcType.non_pointer)
+            gc_type_new == @backingInt(abi.GcType.non_pointer)
         else
             type_code == obj.tc_pair;
     }
     if (type_code == obj.tc_reference_trap) {
-        return gc_type_old == @intFromEnum(abi.GcType.non_pointer) or obj.pairP(object);
+        return gc_type_old == @backingInt(abi.GcType.non_pointer) or obj.pairP(object);
     }
-    if (gc_type_old == @intFromEnum(abi.GcType.special) or gc_type_new == @intFromEnum(abi.GcType.special)) {
+    if (gc_type_old == @backingInt(abi.GcType.special) or gc_type_new == @backingInt(abi.GcType.special)) {
         return false;
     }
     return gc_type_new == gc_type_old;
@@ -130,7 +130,7 @@ pub export fn Prim_prim_integer_to_obj() callconv(.c) obj.SchemeObject {
 
 fn argAddress(n: c_int) [*]obj.SchemeObject {
     const object = abi.argRef(@intCast(n));
-    if (abi.gc_ptr_type(object) != @intFromEnum(abi.GcPtrType.normal)) {
+    if (abi.gc_ptr_type(object) != @backingInt(abi.GcPtrType.normal)) {
         abi.error_wrong_type_arg(n);
     }
     return obj.objectAddress(object);

@@ -456,36 +456,36 @@ pub fn unixSecToFiletime(sec: i64) FILETIME {
 pub fn win32ErrorToErrno(err: DWORD) c_int {
     return switch (err) {
         0 => 0,
-        2, 3, 15, 161 => @intFromEnum(std.c.E.NOENT),
-        4 => @intFromEnum(std.c.E.MFILE),
-        5, 65, 1314 => @intFromEnum(std.c.E.ACCES),
-        6 => @intFromEnum(std.c.E.BADF),
-        8, 14 => @intFromEnum(std.c.E.NOMEM),
-        17 => @intFromEnum(std.c.E.XDEV),
-        19 => @intFromEnum(std.c.E.ROFS),
-        32, 33 => @intFromEnum(std.c.E.BUSY),
-        80, 183 => @intFromEnum(std.c.E.EXIST),
-        87 => @intFromEnum(std.c.E.INVAL),
-        109, 232 => @intFromEnum(std.c.E.PIPE),
-        39, 112 => @intFromEnum(std.c.E.NOSPC),
-        120 => @intFromEnum(std.c.E.NOSYS),
-        145 => @intFromEnum(std.c.E.NOTEMPTY),
-        206 => @intFromEnum(std.c.E.NAMETOOLONG),
-        267 => @intFromEnum(std.c.E.NOTDIR),
-        10004 => @intFromEnum(std.c.E.INTR),
-        10009 => @intFromEnum(std.c.E.BADF),
-        10013 => @intFromEnum(std.c.E.ACCES),
-        10014 => @intFromEnum(std.c.E.FAULT),
-        10022 => @intFromEnum(std.c.E.INVAL),
-        10024 => @intFromEnum(std.c.E.MFILE),
-        10035 => @intFromEnum(std.c.E.AGAIN),
-        10047 => @intFromEnum(std.c.E.AFNOSUPPORT),
-        10048 => @intFromEnum(std.c.E.ADDRINUSE),
-        10049 => @intFromEnum(std.c.E.ADDRNOTAVAIL),
-        10054 => @intFromEnum(std.c.E.CONNRESET),
-        10061 => @intFromEnum(std.c.E.CONNREFUSED),
-        10065 => @intFromEnum(std.c.E.HOSTUNREACH),
-        else => @intFromEnum(std.c.E.IO),
+        2, 3, 15, 161 => @backingInt(std.c.E.NOENT),
+        4 => @backingInt(std.c.E.MFILE),
+        5, 65, 1314 => @backingInt(std.c.E.ACCES),
+        6 => @backingInt(std.c.E.BADF),
+        8, 14 => @backingInt(std.c.E.NOMEM),
+        17 => @backingInt(std.c.E.XDEV),
+        19 => @backingInt(std.c.E.ROFS),
+        32, 33 => @backingInt(std.c.E.BUSY),
+        80, 183 => @backingInt(std.c.E.EXIST),
+        87 => @backingInt(std.c.E.INVAL),
+        109, 232 => @backingInt(std.c.E.PIPE),
+        39, 112 => @backingInt(std.c.E.NOSPC),
+        120 => @backingInt(std.c.E.NOSYS),
+        145 => @backingInt(std.c.E.NOTEMPTY),
+        206 => @backingInt(std.c.E.NAMETOOLONG),
+        267 => @backingInt(std.c.E.NOTDIR),
+        10004 => @backingInt(std.c.E.INTR),
+        10009 => @backingInt(std.c.E.BADF),
+        10013 => @backingInt(std.c.E.ACCES),
+        10014 => @backingInt(std.c.E.FAULT),
+        10022 => @backingInt(std.c.E.INVAL),
+        10024 => @backingInt(std.c.E.MFILE),
+        10035 => @backingInt(std.c.E.AGAIN),
+        10047 => @backingInt(std.c.E.AFNOSUPPORT),
+        10048 => @backingInt(std.c.E.ADDRINUSE),
+        10049 => @backingInt(std.c.E.ADDRNOTAVAIL),
+        10054 => @backingInt(std.c.E.CONNRESET),
+        10061 => @backingInt(std.c.E.CONNREFUSED),
+        10065 => @backingInt(std.c.E.HOSTUNREACH),
+        else => @backingInt(std.c.E.IO),
     };
 }
 
@@ -564,12 +564,12 @@ test "win_api filetime conversions, error mapping, mode bits, slash normalizatio
     try std.testing.expectEqual(@as(u32, 123_456_700), nt_modern.nanoseconds);
 
     // Win32 / WSA error mappings
-    try std.testing.expectEqual(@intFromEnum(std.c.E.NOENT), win32ErrorToErrno(2));
-    try std.testing.expectEqual(@intFromEnum(std.c.E.ACCES), win32ErrorToErrno(5));
-    try std.testing.expectEqual(@intFromEnum(std.c.E.EXIST), win32ErrorToErrno(183));
-    try std.testing.expectEqual(@intFromEnum(std.c.E.CONNREFUSED), win32ErrorToErrno(10061));
-    try std.testing.expectEqual(@intFromEnum(std.c.E.AGAIN), win32ErrorToErrno(10035));
-    try std.testing.expectEqual(@intFromEnum(std.c.E.IO), win32ErrorToErrno(999999));
+    try std.testing.expectEqual(@backingInt(std.c.E.NOENT), win32ErrorToErrno(2));
+    try std.testing.expectEqual(@backingInt(std.c.E.ACCES), win32ErrorToErrno(5));
+    try std.testing.expectEqual(@backingInt(std.c.E.EXIST), win32ErrorToErrno(183));
+    try std.testing.expectEqual(@backingInt(std.c.E.CONNREFUSED), win32ErrorToErrno(10061));
+    try std.testing.expectEqual(@backingInt(std.c.E.AGAIN), win32ErrorToErrno(10035));
+    try std.testing.expectEqual(@backingInt(std.c.E.IO), win32ErrorToErrno(999999));
 
     // File attributes to POSIX mode
     try std.testing.expectEqual(@as(u32, 0o120777), win32AttrToMode(FILE_ATTRIBUTE_REPARSE_POINT, true));

@@ -58,7 +58,7 @@ pub export fn Prim_hunk3_set_cxr() callconv(.c) obj.SchemeObject {
 pub export fn Prim_sys_hunk3_cons() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     const hunk_type = abi.arg_ulong_index_integer(1, obj.n_type_codes);
-    if (abi.gc_type_code(@intCast(hunk_type)) != @intFromEnum(abi.GcType.triple)) {
+    if (abi.gc_type_code(@intCast(hunk_type)) != @backingInt(abi.GcType.triple)) {
         abi.error_bad_range_arg(1);
     }
     return systemHunk3Cons(hunk_type, abi.argRef(2), abi.argRef(3), abi.argRef(4));

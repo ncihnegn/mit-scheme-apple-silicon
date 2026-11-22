@@ -18,23 +18,23 @@ pub const OutfChannel = extern struct {
 };
 
 pub const console_output: OutfChannel = .{
-    .type = @intFromEnum(ChannelType.console),
+    .type = @backingInt(ChannelType.console),
     .cookie = null,
 };
 
 pub const error_output: OutfChannel = .{
-    .type = @intFromEnum(ChannelType.@"error"),
+    .type = @backingInt(ChannelType.@"error"),
     .cookie = null,
 };
 
 pub const fatal_output: OutfChannel = .{
-    .type = @intFromEnum(ChannelType.fatal),
+    .type = @backingInt(ChannelType.fatal),
     .cookie = null,
 };
 
 pub inline fn fileOutput(fp: *std.c.FILE) OutfChannel {
     return .{
-        .type = @intFromEnum(ChannelType.file),
+        .type = @backingInt(ChannelType.file),
         .cookie = @ptrCast(fp),
     };
 }
@@ -141,9 +141,9 @@ const DiscardWriter = struct {
 
 fn resolveStream(chan: OutfChannel) *std.c.FILE {
     return switch (chan.type) {
-        @intFromEnum(ChannelType.console) => cStdout(),
-        @intFromEnum(ChannelType.@"error"), @intFromEnum(ChannelType.fatal) => cStderr(),
-        @intFromEnum(ChannelType.file) => @ptrCast(@alignCast(chan.cookie.?)),
+        @backingInt(ChannelType.console) => cStdout(),
+        @backingInt(ChannelType.@"error"), @backingInt(ChannelType.fatal) => cStderr(),
+        @backingInt(ChannelType.file) => @ptrCast(@alignCast(chan.cookie.?)),
         else => cStderr(),
     };
 }
@@ -151,8 +151,8 @@ fn resolveStream(chan: OutfChannel) *std.c.FILE {
 pub fn print(chan: OutfChannel, comptime fmt: []const u8, args: anytype) void {
     var buf: [512]u8 = undefined;
     if (comptime builtin.is_test) {
-        if (chan.type != @intFromEnum(ChannelType.file)) {
-            if (chan.type == @intFromEnum(ChannelType.fatal)) {
+        if (chan.type != @backingInt(ChannelType.file)) {
+            if (chan.type == @backingInt(ChannelType.fatal)) {
                 test_fatal_count += 1;
             } else {
                 test_call_count += 1;
@@ -170,7 +170,7 @@ pub fn print(chan: OutfChannel, comptime fmt: []const u8, args: anytype) void {
 
 pub fn flush(chan: OutfChannel) void {
     if (comptime builtin.is_test) {
-        if (chan.type != @intFromEnum(ChannelType.file)) return;
+        if (chan.type != @backingInt(ChannelType.file)) return;
     }
     _ = fflush(resolveStream(chan));
 }

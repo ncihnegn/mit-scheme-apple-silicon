@@ -366,7 +366,7 @@ pub fn stubEncodeOldStyleFormatWord(_: *abi.CcEntryType, _: *u16) callconv(.c) b
 }
 
 fn minLinkageSectionType(_: SchemeObject) callconv(.c) c_uint {
-    return @intFromEnum(abi.LinkageSectionType.operator);
+    return @backingInt(abi.LinkageSectionType.operator);
 }
 
 fn minLinkageSectionCount(_: SchemeObject) callconv(.c) usize {

@@ -259,11 +259,11 @@ pub export fn Prim_macosx_main_bundle_dir() callconv(.c) obj.SchemeObject {
         const path = abi.macosx_main_bundle_dir() orelse return obj.sharp_f;
         const n_words: usize = 1 + obj.bytevectorLengthToGcLength(@intCast(std.mem.len(path)));
         if (abi.gcNeededP(n_words)) {
-            std.c.free(@constCast(@ptrCast(path)));
+            std.c.free(@ptrCast(@constCast(path)));
             abi.primitiveGc(n_words);
         }
         const result = string.char_pointer_to_string_no_gc(path);
-        std.c.free(@constCast(@ptrCast(path)));
+        std.c.free(@ptrCast(@constCast(path)));
         return result;
     } else {
         abi.error_unimplemented_primitive();

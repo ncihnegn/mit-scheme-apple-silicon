@@ -76,9 +76,9 @@ extern "c" fn nice(incr: c_int) c_int;
 
 inline fn sigNum(comptime name: []const u8) c_int {
     if (@hasField(std.c.SIG, name)) {
-        return @intCast(@intFromEnum(@field(std.c.SIG, name)));
+        return @intCast(@backingInt(@field(std.c.SIG, name)));
     } else if (@hasDecl(std.c.SIG, name)) {
-        return @intCast(@intFromEnum(@field(std.c.SIG, name)));
+        return @intCast(@backingInt(@field(std.c.SIG, name)));
     }
     return 0;
 }
@@ -109,7 +109,7 @@ fn writeFmt(stream: *std.c.FILE, comptime fmt: []const u8, args: anytype) void {
 fn currentHandler(signo: c_int) TsignalHandler {
     if (signo <= 0) return sig_dfl;
     var act: std.c.Sigaction = std.mem.zeroes(std.c.Sigaction);
-    if (std.c.sigaction(@enumFromInt(@as(u32, @intCast(signo))), null, &act) < 0) return sig_dfl;
+    if (std.c.sigaction(@fromBackingInt(@intCast(@as(u32, @intCast(signo)))), null, &act) < 0) return sig_dfl;
     return @ptrCast(act.handler.handler);
 }
 
@@ -128,7 +128,7 @@ pub fn installHandler(signo: c_int, handler: TsignalHandler) callconv(.c) void {
         act.flags = std.c.SA.SIGINFO | (if (builtin.os.tag.isDarwin()) std.c.SA.@"64REGSET" else 0);
     }
     _ = std.c.sigemptyset(&act.mask);
-    const sig: std.c.SIG = @enumFromInt(@as(u32, @intCast(signo)));
+    const sig: std.c.SIG = @fromBackingInt(@intCast(@as(u32, @intCast(signo))));
     _ = std.c.sigaddset(&act.mask, sig);
     _ = std.c.sigaction(sig, &act, null);
 }
@@ -357,9 +357,9 @@ pub fn stopSignalDefault(signo: c_int) callconv(.c) void {
         var signo_mask: std.c.sigset_t = undefined;
         var old_mask: std.c.sigset_t = undefined;
         _ = std.c.sigemptyset(&signo_mask);
-        _ = std.c.sigaddset(&signo_mask, @enumFromInt(@as(u32, @intCast(signo))));
+        _ = std.c.sigaddset(&signo_mask, @fromBackingInt(@intCast(@as(u32, @intCast(signo)))));
         _ = std.c.sigprocmask(std.c.SIG.UNBLOCK, &signo_mask, &old_mask);
-        _ = std.c.kill(std.c.getpid(), @enumFromInt(@as(u32, @intCast(signo))));
+        _ = std.c.kill(std.c.getpid(), @fromBackingInt(@intCast(@as(u32, @intCast(signo)))));
         _ = std.c.sigprocmask(std.c.SIG.SETMASK, &old_mask, null);
 
         installHandler(signo, handler);
@@ -391,7 +391,7 @@ fn bodyStop(signo: c_int, _: ?*std.c.siginfo_t, _: ?*anyopaque) void {
 
 /// Suspend Scheme using `SIGTSTP` (`OS_restartable_exit`).
 pub fn osRestartableExit() callconv(.c) void {
-    stopSignalDefault(@intFromEnum(std.c.SIG.TSTP));
+    stopSignalDefault(@backingInt(std.c.SIG.TSTP));
 }
 
 fn bodyConsoleResize(_: c_int, _: ?*std.c.siginfo_t, _: ?*anyopaque) void {
@@ -650,17 +650,17 @@ pub fn decodeInterruptHandler(encoding: InterruptHandler) TsignalHandler {
 
 /// Return current interrupt handler encoding for `SIGQUIT` (`OS_signal_quit_handler`).
 pub fn osSignalQuitHandler() callconv(.c) InterruptHandler {
-    return encodeInterruptHandler(currentHandler(@intFromEnum(std.c.SIG.QUIT)));
+    return encodeInterruptHandler(currentHandler(@backingInt(std.c.SIG.QUIT)));
 }
 
 /// Return current interrupt handler encoding for `SIGINT` (`OS_signal_int_handler`).
 pub fn osSignalIntHandler() callconv(.c) InterruptHandler {
-    return encodeInterruptHandler(currentHandler(@intFromEnum(std.c.SIG.INT)));
+    return encodeInterruptHandler(currentHandler(@backingInt(std.c.SIG.INT)));
 }
 
 /// Return current interrupt handler encoding for `SIGTSTP` (`OS_signal_tstp_handler`).
 pub fn osSignalTstpHandler() callconv(.c) InterruptHandler {
-    return encodeInterruptHandler(currentHandler(@intFromEnum(std.c.SIG.TSTP)));
+    return encodeInterruptHandler(currentHandler(@backingInt(std.c.SIG.TSTP)));
 }
 
 /// Install encoded interrupt handlers for `SIGQUIT`, `SIGINT`, and `SIGTSTP` (`OS_signal_set_interrupt_handlers`).
@@ -670,19 +670,19 @@ pub fn osSignalSetInterruptHandlers(
     tstp_handler: InterruptHandler,
 ) callconv(.c) void {
     if (decodeInterruptHandler(quit_handler)) |h| {
-        installHandler(@intFromEnum(std.c.SIG.QUIT), h);
+        installHandler(@backingInt(std.c.SIG.QUIT), h);
     } else if (quit_handler == .default) {
-        installHandler(@intFromEnum(std.c.SIG.QUIT), sig_dfl);
+        installHandler(@backingInt(std.c.SIG.QUIT), sig_dfl);
     }
     if (decodeInterruptHandler(int_handler)) |h| {
-        installHandler(@intFromEnum(std.c.SIG.INT), h);
+        installHandler(@backingInt(std.c.SIG.INT), h);
     } else if (int_handler == .default) {
-        installHandler(@intFromEnum(std.c.SIG.INT), sig_dfl);
+        installHandler(@backingInt(std.c.SIG.INT), sig_dfl);
     }
     if (decodeInterruptHandler(tstp_handler)) |h| {
-        installHandler(@intFromEnum(std.c.SIG.TSTP), h);
+        installHandler(@backingInt(std.c.SIG.TSTP), h);
     } else if (tstp_handler == .default) {
-        installHandler(@intFromEnum(std.c.SIG.TSTP), sig_dfl);
+        installHandler(@backingInt(std.c.SIG.TSTP), sig_dfl);
     }
 }
 
@@ -715,15 +715,15 @@ fn printInterruptChars() void {
     const out = abi.cStdout();
     const quit_char = abi.OS_ctty_quit_char();
     writeFmt(out, "\n\nThe quit character is {s}.\n", .{std.mem.span(abi.char_description(quit_char, 1))});
-    describeSighnd(@intFromEnum(std.c.SIG.QUIT), quit_char);
+    describeSighnd(@backingInt(std.c.SIG.QUIT), quit_char);
 
     const int_char = abi.OS_ctty_int_char();
     writeFmt(out, "\nThe interrupt character is {s}.\n", .{std.mem.span(abi.char_description(int_char, 1))});
-    describeSighnd(@intFromEnum(std.c.SIG.INT), int_char);
+    describeSighnd(@backingInt(std.c.SIG.INT), int_char);
 
     const tstp_char = abi.OS_ctty_tstp_char();
     writeFmt(out, "\nThe terminal stop character is {s}.\n", .{std.mem.span(abi.char_description(tstp_char, 1))});
-    describeSighnd(@intFromEnum(std.c.SIG.TSTP), tstp_char);
+    describeSighnd(@backingInt(std.c.SIG.TSTP), tstp_char);
 
     writeByte(out, '\n');
     _ = abi.fflush(out);
@@ -922,9 +922,9 @@ test "uxsig signal descriptors handlers masks parseLongInput and etaFclose" {
     }
 
     initializeSignalDescriptors();
-    try std.testing.expectEqualStrings("SIGINT", std.mem.span(findSignalName(@intFromEnum(std.c.SIG.INT))));
-    try std.testing.expectEqualStrings("SIGIOT", std.mem.span(findSignalName(@intFromEnum(std.c.SIG.ABRT))));
-    try std.testing.expectEqualStrings("SIGSEGV", std.mem.span(findSignalName(@intFromEnum(std.c.SIG.SEGV))));
+    try std.testing.expectEqualStrings("SIGINT", std.mem.span(findSignalName(@backingInt(std.c.SIG.INT))));
+    try std.testing.expectEqualStrings("SIGIOT", std.mem.span(findSignalName(@backingInt(std.c.SIG.ABRT))));
+    try std.testing.expectEqualStrings("SIGSEGV", std.mem.span(findSignalName(@backingInt(std.c.SIG.SEGV))));
     try std.testing.expectEqualStrings("unknown signal 999", std.mem.span(findSignalName(999)));
 
     async_sig_counter = 0;
@@ -937,7 +937,7 @@ test "uxsig signal descriptors handlers masks parseLongInput and etaFclose" {
     }
     try std.testing.expectEqual(@as(TsignalHandler, null), decodeInterruptHandler(.unknown));
 
-    const usr2_sig = @intFromEnum(std.c.SIG.USR2);
+    const usr2_sig = @backingInt(std.c.SIG.USR2);
     var saved_usr2: std.c.Sigaction = std.mem.zeroes(std.c.Sigaction);
     try std.testing.expectEqual(@as(c_int, 0), std.c.sigaction(.USR2, null, &saved_usr2));
     defer _ = std.c.sigaction(.USR2, &saved_usr2, null);
@@ -947,7 +947,7 @@ test "uxsig signal descriptors handlers masks parseLongInput and etaFclose" {
     activateHandler(usr2_sig, &sighnd_control_g);
     try std.testing.expectEqual(InterruptHandler.control_g, encodeInterruptHandler(currentHandler(usr2_sig)));
 
-    const pipe_sig = @intFromEnum(std.c.SIG.PIPE);
+    const pipe_sig = @backingInt(std.c.SIG.PIPE);
     var saved_pipe: std.c.Sigaction = std.mem.zeroes(std.c.Sigaction);
     try std.testing.expectEqual(@as(c_int, 0), std.c.sigaction(.PIPE, null, &saved_pipe));
     defer _ = std.c.sigaction(.PIPE, &saved_pipe, null);

@@ -79,7 +79,7 @@ fn dupCStringOsMalloc(src: [*:0]const u8) [*:0]const u8 {
 fn doConnect(s: c_int, address: *const std.c.sockaddr, addr_len: std.c.socklen_t) void {
     if (std.c.connect(s, address, addr_len) < 0) {
         const err = std.c._errno().*;
-        if (err != @intFromEnum(std.c.E.INTR)) {
+        if (err != @backingInt(std.c.E.INTR)) {
             utils.error_system_call(err, abi.syscall_connect);
         }
         while (true) {
@@ -95,7 +95,7 @@ fn doConnect(s: c_int, address: *const std.c.sockaddr, addr_len: std.c.socklen_t
             }
             if (nfds < 0) {
                 const poll_err = std.c._errno().*;
-                if (poll_err != @intFromEnum(std.c.E.INTR)) {
+                if (poll_err != @backingInt(std.c.E.INTR)) {
                     utils.error_system_call(poll_err, abi.syscall_select);
                 }
             }
@@ -109,8 +109,8 @@ fn doConnect(s: c_int, address: *const std.c.sockaddr, addr_len: std.c.socklen_t
 }
 
 fn isWouldBlock(err: c_int) bool {
-    if (err == @intFromEnum(std.c.E.AGAIN)) return true;
-    if (@hasDecl(std.c.E, "WOULDBLOCK") and err == @intFromEnum(std.c.E.WOULDBLOCK)) return true;
+    if (err == @backingInt(std.c.E.AGAIN)) return true;
+    if (@hasDecl(std.c.E, "WOULDBLOCK") and err == @backingInt(std.c.E.WOULDBLOCK)) return true;
     return false;
 }
 

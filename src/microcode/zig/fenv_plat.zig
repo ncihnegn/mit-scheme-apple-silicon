@@ -145,8 +145,7 @@ inline fn getMxcsr() u32 {
     asm volatile ("stmxcsr (%[ptr])"
         :
         : [ptr] "r" (&csr),
-        : .{ .memory = true }
-    );
+        : .{ .memory = true });
     return csr;
 }
 
@@ -154,8 +153,7 @@ inline fn setMxcsr(csr: u32) void {
     asm volatile ("ldmxcsr (%[ptr])"
         :
         : [ptr] "r" (&csr),
-        : .{ .memory = true }
-    );
+        : .{ .memory = true });
 }
 
 fn darwinFegetexcept() callconv(.c) c_int {

@@ -142,14 +142,14 @@ pub fn osMakeSubprocess(
 
     var i: usize = 0;
     while (argv[i]) |arg_z| : (i += 1) {
-        if (i > 0) cmdline.append(alloc, ' ') catch utils.error_system_call(@intFromEnum(std.c.E.NOMEM), abi.syscall_malloc);
+        if (i > 0) cmdline.append(alloc, ' ') catch utils.error_system_call(@backingInt(std.c.E.NOMEM), abi.syscall_malloc);
         const s = if (i == 0) std.mem.span(filename) else std.mem.span(arg_z);
-        win.appendQuotedWindowsArg(&cmdline, alloc, s) catch utils.error_system_call(@intFromEnum(std.c.E.NOMEM), abi.syscall_malloc);
+        win.appendQuotedWindowsArg(&cmdline, alloc, s) catch utils.error_system_call(@backingInt(std.c.E.NOMEM), abi.syscall_malloc);
     }
     if (i == 0) {
-        win.appendQuotedWindowsArg(&cmdline, alloc, std.mem.span(filename)) catch utils.error_system_call(@intFromEnum(std.c.E.NOMEM), abi.syscall_malloc);
+        win.appendQuotedWindowsArg(&cmdline, alloc, std.mem.span(filename)) catch utils.error_system_call(@backingInt(std.c.E.NOMEM), abi.syscall_malloc);
     }
-    cmdline.append(alloc, 0) catch utils.error_system_call(@intFromEnum(std.c.E.NOMEM), abi.syscall_malloc);
+    cmdline.append(alloc, 0) catch utils.error_system_call(@backingInt(std.c.E.NOMEM), abi.syscall_malloc);
 
     var env_block: std.ArrayList(u8) = .empty;
     defer env_block.deinit(alloc);
@@ -157,10 +157,10 @@ pub fn osMakeSubprocess(
     if (envp) |ep| {
         var j: usize = 0;
         while (ep[j]) |kv| : (j += 1) {
-            env_block.appendSlice(alloc, std.mem.span(kv)) catch utils.error_system_call(@intFromEnum(std.c.E.NOMEM), abi.syscall_malloc);
-            env_block.append(alloc, 0) catch utils.error_system_call(@intFromEnum(std.c.E.NOMEM), abi.syscall_malloc);
+            env_block.appendSlice(alloc, std.mem.span(kv)) catch utils.error_system_call(@backingInt(std.c.E.NOMEM), abi.syscall_malloc);
+            env_block.append(alloc, 0) catch utils.error_system_call(@backingInt(std.c.E.NOMEM), abi.syscall_malloc);
         }
-        env_block.append(alloc, 0) catch utils.error_system_call(@intFromEnum(std.c.E.NOMEM), abi.syscall_malloc);
+        env_block.append(alloc, 0) catch utils.error_system_call(@backingInt(std.c.E.NOMEM), abi.syscall_malloc);
         env_ptr = @ptrCast(env_block.items.ptr);
     }
 

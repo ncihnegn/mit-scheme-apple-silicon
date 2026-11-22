@@ -145,33 +145,33 @@ pub fn uxReadFileStatusIndirect(filename: [*:0]const u8, s: *abi.Stat) callconv(
 
 pub fn osFileExistenceTest(name: [*:0]const u8) callconv(.c) c_uint {
     var s: abi.Stat = undefined;
-    if (uxReadFileStatus(name, &s) == 0) return @intFromEnum(abi.FileExistence.doesnt_exist);
+    if (uxReadFileStatus(name, &s) == 0) return @backingInt(abi.FileExistence.doesnt_exist);
     if ((s.mode & 0o170000) == 0o120000) {
-        return @intFromEnum(if (uxReadFileStatusIndirect(name, &s) != 0)
+        return @backingInt(if (uxReadFileStatusIndirect(name, &s) != 0)
             abi.FileExistence.does_exist
         else
             abi.FileExistence.is_link);
     }
-    return @intFromEnum(abi.FileExistence.does_exist);
+    return @backingInt(abi.FileExistence.does_exist);
 }
 
 pub fn osFileExistenceTestDirect(name: [*:0]const u8) callconv(.c) c_uint {
     var s: abi.Stat = undefined;
-    if (uxReadFileStatus(name, &s) == 0) return @intFromEnum(abi.FileExistence.doesnt_exist);
+    if (uxReadFileStatus(name, &s) == 0) return @backingInt(abi.FileExistence.doesnt_exist);
     if ((s.mode & 0o170000) == 0o120000) {
-        return @intFromEnum(abi.FileExistence.is_link);
+        return @backingInt(abi.FileExistence.is_link);
     }
-    return @intFromEnum(abi.FileExistence.does_exist);
+    return @backingInt(abi.FileExistence.does_exist);
 }
 
 fn computeFileType(name: [*:0]const u8, indirect: bool) c_int {
     var s: abi.Stat = undefined;
-    if (readStatusImpl(name, &s, indirect) == 0) return @intFromEnum(abi.FileType.nonexistent);
+    if (readStatusImpl(name, &s, indirect) == 0) return @backingInt(abi.FileType.nonexistent);
     return switch (s.mode & 0o170000) {
-        0o100000 => @intFromEnum(abi.FileType.regular),
-        0o040000 => @intFromEnum(abi.FileType.directory),
-        0o120000 => @intFromEnum(abi.FileType.unix_symbolic_link),
-        else => @intFromEnum(abi.FileType.unknown),
+        0o100000 => @backingInt(abi.FileType.regular),
+        0o040000 => @backingInt(abi.FileType.directory),
+        0o120000 => @backingInt(abi.FileType.unix_symbolic_link),
+        else => @backingInt(abi.FileType.unknown),
     };
 }
 
@@ -360,12 +360,12 @@ pub fn osDirectoryOpen(name: [*:0]const u8) callconv(.c) c_uint {
             break;
         }
     }
-    const idx = slot_idx orelse utils.error_system_call(@intFromEnum(std.c.E.MFILE), abi.syscall_opendir);
+    const idx = slot_idx orelse utils.error_system_call(@backingInt(std.c.E.MFILE), abi.syscall_opendir);
 
     const name_slice = std.mem.span(name);
     var pat_buf: [520]u8 = undefined;
     if (name_slice.len + 3 >= pat_buf.len) {
-        utils.error_system_call(@intFromEnum(std.c.E.NAMETOOLONG), abi.syscall_opendir);
+        utils.error_system_call(@backingInt(std.c.E.NAMETOOLONG), abi.syscall_opendir);
     }
     var n: usize = name_slice.len;
     @memcpy(pat_buf[0..n], name_slice);

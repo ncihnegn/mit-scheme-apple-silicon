@@ -79,7 +79,7 @@ fn rxWriteFaults(target: *volatile u32) bool {
 fn triggerUsr1(_: ?*anyopaque) callconv(.c) void {
     smoke.jit_write_begin();
     smoke.check(smoke.jit_write_nesting_depth() == 1, "depth == 1 before raise");
-    _ = DarwinJit.raise(@intFromEnum(std.c.SIG.USR1));
+    _ = DarwinJit.raise(@backingInt(std.c.SIG.USR1));
     std.c.abort();
 }
 

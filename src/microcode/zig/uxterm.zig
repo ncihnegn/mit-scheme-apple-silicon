@@ -53,7 +53,7 @@ const baud_table = blk: {
         const name = std.fmt.comptimePrint("B{d}", .{rate});
         if (@hasField(std.c.speed_t, name)) {
             entries[i] = .{
-                .index = @intCast(@intFromEnum(@field(std.c.speed_t, name))),
+                .index = @intCast(@backingInt(@field(std.c.speed_t, name))),
                 .rate = rate,
             };
             i += 1;
@@ -179,12 +179,12 @@ pub fn terminalStateNonbuffered(s: *abi.TttyState, fd: c_int, polling: c_int) ca
     s.tio.cflag.CSIZE = .CS8;
     s.tio.cflag.PARENB = false;
 
-    s.tio.cc[@intFromEnum(std.c.V.MIN)] = if (polling != 0) 0 else 1;
-    s.tio.cc[@intFromEnum(std.c.V.TIME)] = 0;
+    s.tio.cc[@backingInt(std.c.V.MIN)] = if (polling != 0) 0 else 1;
+    s.tio.cc[@backingInt(std.c.V.TIME)] = 0;
 
     const disable = abi.UX_PC_VDISABLE(fd);
-    s.tio.cc[@intFromEnum(std.c.V.STOP)] = disable;
-    s.tio.cc[@intFromEnum(std.c.V.START)] = disable;
+    s.tio.cc[@backingInt(std.c.V.STOP)] = disable;
+    s.tio.cc[@backingInt(std.c.V.START)] = disable;
 }
 
 /// Configure `s` for raw input (non-buffered and `ISIG` disabled).
@@ -203,10 +203,10 @@ pub fn terminalStateBuffered(s: *abi.TttyState, channel: abi.Tchannel) callconv(
     s.tio.iflag = orig.tio.iflag;
     s.tio.cflag.CSIZE = .CS8;
     s.tio.cflag.PARENB = false;
-    s.tio.cc[@intFromEnum(std.c.V.MIN)] = orig.tio.cc[@intFromEnum(std.c.V.MIN)];
-    s.tio.cc[@intFromEnum(std.c.V.TIME)] = orig.tio.cc[@intFromEnum(std.c.V.TIME)];
-    s.tio.cc[@intFromEnum(std.c.V.STOP)] = orig.tio.cc[@intFromEnum(std.c.V.STOP)];
-    s.tio.cc[@intFromEnum(std.c.V.START)] = orig.tio.cc[@intFromEnum(std.c.V.START)];
+    s.tio.cc[@backingInt(std.c.V.MIN)] = orig.tio.cc[@backingInt(std.c.V.MIN)];
+    s.tio.cc[@backingInt(std.c.V.TIME)] = orig.tio.cc[@backingInt(std.c.V.TIME)];
+    s.tio.cc[@backingInt(std.c.V.STOP)] = orig.tio.cc[@backingInt(std.c.V.STOP)];
+    s.tio.cc[@backingInt(std.c.V.START)] = orig.tio.cc[@backingInt(std.c.V.START)];
 }
 
 /// Query terminal input baud index for `channel`.
@@ -385,7 +385,7 @@ pub fn osOpenPtyMaster(master_fd: *abi.Tchannel, master_fname: *[*:0]const u8) c
             fd = PosixPty.posix_openpt(.{ .ACCMODE = .RDWR, .NOCTTY = true });
         }
         if (fd < 0) {
-            if (std.c._errno().* == @intFromEnum(std.c.E.INTR)) {
+            if (std.c._errno().* == @backingInt(std.c.E.INTR)) {
                 osscheme.deliver_pending_interrupts();
                 continue;
             }
@@ -428,32 +428,32 @@ pub fn osPtyMasterSendSignal(channel: abi.Tchannel, sig: c_int) callconv(.c) voi
 
 /// Send `SIGKILL` to the slave process group of PTY master `channel`.
 pub fn osPtyMasterKill(channel: abi.Tchannel) callconv(.c) void {
-    osPtyMasterSendSignal(channel, @intFromEnum(std.c.SIG.KILL));
+    osPtyMasterSendSignal(channel, @backingInt(std.c.SIG.KILL));
 }
 
 /// Send `SIGTSTP` to the slave process group of PTY master `channel`.
 pub fn osPtyMasterStop(channel: abi.Tchannel) callconv(.c) void {
-    osPtyMasterSendSignal(channel, @intFromEnum(std.c.SIG.TSTP));
+    osPtyMasterSendSignal(channel, @backingInt(std.c.SIG.TSTP));
 }
 
 /// Send `SIGCONT` to the slave process group of PTY master `channel`.
 pub fn osPtyMasterContinue(channel: abi.Tchannel) callconv(.c) void {
-    osPtyMasterSendSignal(channel, @intFromEnum(std.c.SIG.CONT));
+    osPtyMasterSendSignal(channel, @backingInt(std.c.SIG.CONT));
 }
 
 /// Send `SIGINT` to the slave process group of PTY master `channel`.
 pub fn osPtyMasterInterrupt(channel: abi.Tchannel) callconv(.c) void {
-    osPtyMasterSendSignal(channel, @intFromEnum(std.c.SIG.INT));
+    osPtyMasterSendSignal(channel, @backingInt(std.c.SIG.INT));
 }
 
 /// Send `SIGQUIT` to the slave process group of PTY master `channel`.
 pub fn osPtyMasterQuit(channel: abi.Tchannel) callconv(.c) void {
-    osPtyMasterSendSignal(channel, @intFromEnum(std.c.SIG.QUIT));
+    osPtyMasterSendSignal(channel, @backingInt(std.c.SIG.QUIT));
 }
 
 /// Send `SIGHUP` to the slave process group of PTY master `channel`.
 pub fn osPtyMasterHangup(channel: abi.Tchannel) callconv(.c) void {
-    osPtyMasterSendSignal(channel, @intFromEnum(std.c.SIG.HUP));
+    osPtyMasterSendSignal(channel, @backingInt(std.c.SIG.HUP));
 }
 
 comptime {

@@ -201,8 +201,7 @@ fn runClosureTrampoline(
               [_] "{x2}" (@intFromPtr(out)),
               [target] "{x16}" (@intFromPtr(target_pc)),
               [hook] "{x9}" (@intFromPtr(hook_stub)),
-            : .{ .x17 = true, .x30 = true, .memory = true }
-        );
+            : .{ .x17 = true, .x30 = true, .memory = true });
     }
 }
 

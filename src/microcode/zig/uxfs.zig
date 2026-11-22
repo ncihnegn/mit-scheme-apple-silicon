@@ -16,8 +16,8 @@ fn statCall(filename: [*:0]const u8, s: *abi.Stat, comptime indirect: bool) c_in
         const rc = if (indirect) abi.cStat(filename, s) else abi.cLstat(filename, s);
         if (rc >= 0) return 1;
         const err = std.c._errno().*;
-        if (err == @intFromEnum(std.c.E.NOENT) or err == @intFromEnum(std.c.E.NOTDIR)) return 0;
-        if (err != @intFromEnum(std.c.E.INTR)) {
+        if (err == @backingInt(std.c.E.NOENT) or err == @backingInt(std.c.E.NOTDIR)) return 0;
+        if (err != @backingInt(std.c.E.INTR)) {
             utils.error_system_call(err, if (indirect) abi.syscall_stat else abi.syscall_lstat);
         }
         osscheme.deliver_pending_interrupts();
@@ -44,30 +44,30 @@ pub fn uxReadFileStatusIndirect(filename: [*:0]const u8, s: *abi.Stat) callconv(
 /// Classify file existence, following symlinks (`does_exist`, `doesnt_exist`, or dangling `is_link`).
 pub fn osFileExistenceTest(name: [*:0]const u8) callconv(.c) c_uint {
     var s: abi.Stat = undefined;
-    if (uxReadFileStatus(name, &s) == 0) return @intFromEnum(abi.FileExistence.doesnt_exist);
+    if (uxReadFileStatus(name, &s) == 0) return @backingInt(abi.FileExistence.doesnt_exist);
     if ((@as(u32, s.mode) & std.c.S.IFMT) == std.c.S.IFLNK) {
-        return @intFromEnum(if (uxReadFileStatusIndirect(name, &s) != 0)
+        return @backingInt(if (uxReadFileStatusIndirect(name, &s) != 0)
             abi.FileExistence.does_exist
         else
             abi.FileExistence.is_link);
     }
-    return @intFromEnum(abi.FileExistence.does_exist);
+    return @backingInt(abi.FileExistence.does_exist);
 }
 
 /// Classify file existence directly via `lstat` without dereferencing symlinks.
 pub fn osFileExistenceTestDirect(name: [*:0]const u8) callconv(.c) c_uint {
     var s: abi.Stat = undefined;
-    if (uxReadFileStatus(name, &s) == 0) return @intFromEnum(abi.FileExistence.doesnt_exist);
+    if (uxReadFileStatus(name, &s) == 0) return @backingInt(abi.FileExistence.doesnt_exist);
     if ((@as(u32, s.mode) & std.c.S.IFMT) == std.c.S.IFLNK) {
-        return @intFromEnum(abi.FileExistence.is_link);
+        return @backingInt(abi.FileExistence.is_link);
     }
-    return @intFromEnum(abi.FileExistence.does_exist);
+    return @backingInt(abi.FileExistence.does_exist);
 }
 
 fn computeFileType(name: [*:0]const u8, comptime indirect: bool) c_int {
     var s: abi.Stat = undefined;
     const found = if (indirect) uxReadFileStatusIndirect(name, &s) else uxReadFileStatus(name, &s);
-    if (found == 0) return @intFromEnum(abi.FileType.nonexistent);
+    if (found == 0) return @backingInt(abi.FileType.nonexistent);
     const ftype: u32 = @as(u32, s.mode) & std.c.S.IFMT;
     const kind: abi.FileType = switch (ftype) {
         std.c.S.IFREG => .regular,
@@ -79,7 +79,7 @@ fn computeFileType(name: [*:0]const u8, comptime indirect: bool) c_int {
         std.c.S.IFSOCK => .unix_stream_socket,
         else => .unknown,
     };
-    return @intFromEnum(kind);
+    return @backingInt(kind);
 }
 
 /// Return `FileType` integer classification of `name` without following symlinks.
@@ -105,8 +105,8 @@ pub fn uxFileSystemType(name: [*:0]const u8) callconv(.c) ?[*:0]const u8 {
         var s = std.mem.zeroes(LinuxStatfs);
         while (LinuxFs.statfs(name, &s) < 0) {
             const err = std.c._errno().*;
-            if (err == @intFromEnum(std.c.E.NOENT) or err == @intFromEnum(std.c.E.NOTDIR)) return null;
-            if (err != @intFromEnum(std.c.E.INTR)) utils.error_system_call(err, abi.syscall_statfs);
+            if (err == @backingInt(std.c.E.NOENT) or err == @backingInt(std.c.E.NOTDIR)) return null;
+            if (err != @backingInt(std.c.E.INTR)) utils.error_system_call(err, abi.syscall_statfs);
             osscheme.deliver_pending_interrupts();
         }
         return switch (@as(u64, @bitCast(@as(i64, s.f_type)))) {
@@ -153,7 +153,7 @@ pub fn osFileSoftLinkP(name: [*:0]const u8) callconv(.c) ?[*:0]const u8 {
     }
     var buffer_length: usize = 100;
     var buffer: [*]u8 = @ptrCast(std.c.malloc(buffer_length) orelse
-        utils.error_system_call(@intFromEnum(std.c.E.NOMEM), abi.syscall_malloc));
+        utils.error_system_call(@backingInt(std.c.E.NOMEM), abi.syscall_malloc));
     var scr: isize = 0;
     while (true) {
         scr = std.c.readlink(name, buffer, buffer_length);
@@ -168,7 +168,7 @@ pub fn osFileSoftLinkP(name: [*:0]const u8) callconv(.c) ?[*:0]const u8 {
         }
         buffer_length *= 2;
         buffer = @ptrCast(std.c.realloc(@ptrCast(buffer), buffer_length) orelse
-            utils.error_system_call(@intFromEnum(std.c.E.NOMEM), abi.syscall_realloc));
+            utils.error_system_call(@backingInt(std.c.E.NOMEM), abi.syscall_realloc));
     }
 }
 
@@ -237,7 +237,7 @@ pub fn osFileCopy(from_name: [*:0]const u8, to_name: [*:0]const u8) callconv(.c)
         if (nwrite < 0) {
             utils.error_system_call(std.c._errno().*, abi.syscall_write);
         } else if (nwrite < nread) {
-            utils.error_system_call(@intFromEnum(std.c.E.NOSPC), abi.syscall_write);
+            utils.error_system_call(@backingInt(std.c.E.NOSPC), abi.syscall_write);
         }
         src_len -= nread;
     }
@@ -272,7 +272,7 @@ fn protectFd(fd: c_int) void {
 }
 
 fn isStaleErrno(err: c_int) bool {
-    return @hasField(std.c.E, "STALE") and err == @intFromEnum(std.c.E.STALE);
+    return @hasField(std.c.E, "STALE") and err == @backingInt(std.c.E.STALE);
 }
 
 /// Atomically create or update timestamps on `filename`, returning 1 if created, 0 if touched, or -1 if non-regular.
@@ -293,14 +293,14 @@ pub fn osFileTouch(filename: [*:0]const u8) callconv(.c) c_int {
             return 1;
         }
         const err = std.c._errno().*;
-        if (err == @intFromEnum(std.c.E.EXIST)) {
+        if (err == @backingInt(std.c.E.EXIST)) {
             fd = std.c.open(filename, .{ .ACCMODE = .RDWR }, @as(c_uint, abi.mode_reg));
             if (fd >= 0) {
                 protectFd(fd);
                 break;
             }
             const err2 = std.c._errno().*;
-            if (err2 == @intFromEnum(std.c.E.NOENT) or isStaleErrno(err2)) continue;
+            if (err2 == @backingInt(std.c.E.NOENT) or isStaleErrno(err2)) continue;
             if (count >= file_touch_open_tries) {
                 utils.error_system_call(err2, abi.syscall_open);
             }
@@ -377,7 +377,7 @@ fn allocateDirectoryPointer(pointer: *std.c.DIR) c_uint {
     if (n_directory_pointers == 0) {
         const init_len: usize = 4;
         const raw = std.c.malloc(@sizeOf(?*std.c.DIR) * init_len) orelse
-            utils.error_system_call(@intFromEnum(std.c.E.NOMEM), abi.syscall_malloc);
+            utils.error_system_call(@backingInt(std.c.E.NOMEM), abi.syscall_malloc);
         const ptrs: [*]?*std.c.DIR = @ptrCast(@alignCast(raw));
         ptrs[0] = pointer;
         for (ptrs[1..init_len]) |*slot| slot.* = null;
@@ -397,7 +397,7 @@ fn allocateDirectoryPointer(pointer: *std.c.DIR) c_uint {
     const result = n_directory_pointers;
     const next_len = n_directory_pointers * 2;
     const raw = std.c.realloc(@ptrCast(cur), @sizeOf(?*std.c.DIR) * next_len) orelse
-        utils.error_system_call(@intFromEnum(std.c.E.NOMEM), abi.syscall_realloc);
+        utils.error_system_call(@backingInt(std.c.E.NOMEM), abi.syscall_realloc);
     const ptrs: [*]?*std.c.DIR = @ptrCast(@alignCast(raw));
     ptrs[result] = pointer;
     for (ptrs[result + 1 .. next_len]) |*slot| slot.* = null;
@@ -518,8 +518,8 @@ test "uxfs directory lifecycle, touch, links, existence, types, and cleanup" {
 
     osDirectoryMake(dir_path);
     try std.testing.expectEqual(@as(c_int, 1), osFileDirectoryP(dir_path));
-    try std.testing.expectEqual(@intFromEnum(abi.FileType.directory), osFileTypeDirect(dir_path));
-    try std.testing.expectEqual(@intFromEnum(abi.FileExistence.doesnt_exist), osFileExistenceTest(file_a));
+    try std.testing.expectEqual(@backingInt(abi.FileType.directory), osFileTypeDirect(dir_path));
+    try std.testing.expectEqual(@backingInt(abi.FileExistence.doesnt_exist), osFileExistenceTest(file_a));
 
     // Touch creates empty file, then touches non-empty content
     try std.testing.expectEqual(@as(c_int, 1), osFileTouch(file_a));
@@ -543,11 +543,11 @@ test "uxfs directory lifecycle, touch, links, existence, types, and cleanup" {
     osFileLinkSoft(file_a, link_s);
     osFileLinkSoft("/tmp/zig-n2-uxfs-dir/missing-target", link_d);
 
-    try std.testing.expectEqual(@intFromEnum(abi.FileExistence.does_exist), osFileExistenceTest(link_s));
-    try std.testing.expectEqual(@intFromEnum(abi.FileExistence.is_link), osFileExistenceTestDirect(link_s));
-    try std.testing.expectEqual(@intFromEnum(abi.FileExistence.is_link), osFileExistenceTest(link_d));
-    try std.testing.expectEqual(@intFromEnum(abi.FileType.unix_symbolic_link), osFileTypeDirect(link_s));
-    try std.testing.expectEqual(@intFromEnum(abi.FileType.regular), osFileTypeIndirect(link_s));
+    try std.testing.expectEqual(@backingInt(abi.FileExistence.does_exist), osFileExistenceTest(link_s));
+    try std.testing.expectEqual(@backingInt(abi.FileExistence.is_link), osFileExistenceTestDirect(link_s));
+    try std.testing.expectEqual(@backingInt(abi.FileExistence.is_link), osFileExistenceTest(link_d));
+    try std.testing.expectEqual(@backingInt(abi.FileType.unix_symbolic_link), osFileTypeDirect(link_s));
+    try std.testing.expectEqual(@backingInt(abi.FileType.regular), osFileTypeIndirect(link_s));
 
     const target = osFileSoftLinkP(link_s).?;
     defer std.c.free(@ptrCast(@constCast(target)));
@@ -568,5 +568,5 @@ test "uxfs directory lifecycle, touch, links, existence, types, and cleanup" {
     osFileRemoveLink(link_s);
     osFileRemove(file_a);
     osDirectoryDelete(dir_path);
-    try std.testing.expectEqual(@intFromEnum(abi.FileExistence.doesnt_exist), osFileExistenceTest(dir_path));
+    try std.testing.expectEqual(@backingInt(abi.FileExistence.doesnt_exist), osFileExistenceTest(dir_path));
 }

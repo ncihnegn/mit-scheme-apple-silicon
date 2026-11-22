@@ -334,11 +334,11 @@ pub fn osHavePtysP() callconv(.c) c_int {
 }
 
 pub fn osOpenPtyMaster(_: *abi.Tchannel, _: *[*:0]const u8) callconv(.c) ?[*:0]const u8 {
-    utils.error_system_call(@intFromEnum(std.c.E.NOSYS), abi.syscall_open);
+    utils.error_system_call(@backingInt(std.c.E.NOSYS), abi.syscall_open);
 }
 
 pub fn osPtyMasterSendSignal(_: abi.Tchannel, _: c_int) callconv(.c) void {
-    utils.error_system_call(@intFromEnum(std.c.E.NOSYS), abi.syscall_kill);
+    utils.error_system_call(@backingInt(std.c.E.NOSYS), abi.syscall_kill);
 }
 
 pub fn osPtyMasterKill(ch: abi.Tchannel) callconv(.c) void {

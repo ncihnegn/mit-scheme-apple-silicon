@@ -108,7 +108,7 @@ const return_code_names_table = [abi.max_return_code + 1]?[*:0]const u8{
     "compiler-error-restart", // 0x5e
 };
 
-const return_frame_type_names_table = [@intFromEnum(RFT.limit)]?[*:0]const u8{
+const return_frame_type_names_table = [@backingInt(RFT.limit)]?[*:0]const u8{
     null,
     "with-arg",
     "with-arg-subproblem",
@@ -262,15 +262,15 @@ pub export fn return_frame_type(frame: [*]obj.SchemeObject) callconv(.c) c_int {
     if (build_options.cc_support) {
         if (obj.ccReturnP(ret)) {
             if (ret == abi.return_to_interpreter) {
-                return @intFromEnum(RFT.return_to_interpreter);
+                return @backingInt(RFT.return_to_interpreter);
             }
             if (ret == abi.reflect_to_interface) {
                 return abi.reflect_to_interface_frame_type(frame);
             }
-            return @intFromEnum(RFT.compiled_address);
+            return @backingInt(RFT.compiled_address);
         }
         if (obj.ccEntryP(ret)) {
-            return @intFromEnum(RFT.compiled_address);
+            return @backingInt(RFT.compiled_address);
         }
     }
     return return_code_frame_type(ret);
@@ -279,7 +279,7 @@ pub export fn return_frame_type(frame: [*]obj.SchemeObject) callconv(.c) c_int {
 pub export fn return_code_frame_type(ret: obj.SchemeObject) callconv(.c) c_int {
     const rc = obj.objectDatum(ret);
     std.debug.assert(rc <= abi.max_return_code);
-    return @intFromEnum(return_frame_types_table[@intCast(rc)]);
+    return @backingInt(return_frame_types_table[@intCast(rc)]);
 }
 
 const FieldDefn = struct {
@@ -399,7 +399,7 @@ fn fillFieldInfo(v: obj.SchemeObject, start_idx: usize, fields: []const FieldDef
 
 fn makeFtitEntry(rft: RFT, subp: bool, history_subp: bool, fields: []const FieldDefn) obj.SchemeObject {
     const entry = abi.allocate_vector((2 * fields.len) + 3, true);
-    const type_idx: usize = @intCast(@intFromEnum(rft));
+    const type_idx: usize = @intCast(@backingInt(rft));
     obj.vectorSet(entry, 0, intern.char_pointer_to_symbol(return_frame_type_names_table[type_idx].?));
     obj.vectorSet(entry, 1, obj.booleanToObject(subp));
     obj.vectorSet(entry, 2, obj.booleanToObject(history_subp));
@@ -408,12 +408,12 @@ fn makeFtitEntry(rft: RFT, subp: bool, history_subp: bool, fields: []const Field
 }
 
 fn setFtitEntry(table: obj.SchemeObject, rft: RFT, subp: bool, history_subp: bool, fields: []const FieldDefn) void {
-    obj.vectorSet(table, @intCast(@intFromEnum(rft)), makeFtitEntry(rft, subp, history_subp, fields));
+    obj.vectorSet(table, @intCast(@backingInt(rft)), makeFtitEntry(rft, subp, history_subp, fields));
 }
 
 pub export fn make_frame_type_info_table() callconv(.c) obj.SchemeObject {
-    const table = abi.allocate_vector(@intCast(@intFromEnum(RFT.limit)), true);
-    obj.vectorSet(table, @intCast(@intFromEnum(RFT.undefined)), obj.sharp_f);
+    const table = abi.allocate_vector(@intCast(@backingInt(RFT.limit)), true);
+    obj.vectorSet(table, @intCast(@backingInt(RFT.undefined)), obj.sharp_f);
     setFtitEntry(table, .with_arg, false, false, &with_arg_fields);
     setFtitEntry(table, .with_arg_subproblem, true, true, &with_arg_fields);
     setFtitEntry(table, .exp_env, true, true, &exp_env_fields);
@@ -463,39 +463,39 @@ pub export fn cpoint_next_frame(cpoint: obj.SchemeObject, index: usize) callconv
     const frame = obj.vectorLoc(cpoint, @intCast(index));
     const rft = return_frame_type(frame);
     switch (rft) {
-        @intFromEnum(RFT.with_arg), @intFromEnum(RFT.with_arg_subproblem) => return index + abi.cont_size,
-        @intFromEnum(RFT.exp_env) => return index + abi.env_cont_size,
-        @intFromEnum(RFT.history) => return index + abi.history_cont_size,
-        @intFromEnum(RFT.stack_marker) => return index + abi.cont_size + 1,
-        @intFromEnum(RFT.hardware_trap) => return index + abi.cont_size + 7,
-        @intFromEnum(RFT.apply),
-        @intFromEnum(RFT.combination_apply),
-        @intFromEnum(RFT.cc_internal_apply),
+        @backingInt(RFT.with_arg), @backingInt(RFT.with_arg_subproblem) => return index + abi.cont_size,
+        @backingInt(RFT.exp_env) => return index + abi.env_cont_size,
+        @backingInt(RFT.history) => return index + abi.history_cont_size,
+        @backingInt(RFT.stack_marker) => return index + abi.cont_size + 1,
+        @backingInt(RFT.hardware_trap) => return index + abi.cont_size + 7,
+        @backingInt(RFT.apply),
+        @backingInt(RFT.combination_apply),
+        @backingInt(RFT.cc_internal_apply),
         => {
             const header = frame[abi.cont_size];
             std.debug.assert(obj.vectorHeaderP(header));
             return index + abi.cont_size + 1 + obj.objectDatum(header);
         },
-        @intFromEnum(RFT.combination_save) => {
+        @backingInt(RFT.combination_save) => {
             const exp = frame[1];
             std.debug.assert(obj.combinationP(exp));
             return index + abi.env_cont_size + obj.vectorLength(exp);
         },
-        @intFromEnum(RFT.compiled_code),
-        @intFromEnum(RFT.compiled_code_subproblem),
+        @backingInt(RFT.compiled_code),
+        @backingInt(RFT.compiled_code_subproblem),
         => if (build_options.cc_support) {
             return abi.cpoint_compiled_code_next(cpoint, index);
         },
-        @intFromEnum(RFT.compiled_address) => if (build_options.cc_support) {
+        @backingInt(RFT.compiled_address) => if (build_options.cc_support) {
             return abi.cpoint_compiled_address_next(cpoint, index);
         },
-        @intFromEnum(RFT.return_to_interpreter) => if (build_options.cc_support) {
+        @backingInt(RFT.return_to_interpreter) => if (build_options.cc_support) {
             return index + 1;
         },
-        @intFromEnum(RFT.cc_restore_interrupt_mask),
-        @intFromEnum(RFT.cc_stack_marker),
-        @intFromEnum(RFT.cc_bkpt),
-        @intFromEnum(RFT.cc_invocation),
+        @backingInt(RFT.cc_restore_interrupt_mask),
+        @backingInt(RFT.cc_stack_marker),
+        @backingInt(RFT.cc_bkpt),
+        @backingInt(RFT.cc_invocation),
         => if (build_options.cc_support) {
             return abi.cpoint_reflect_to_interface_next(cpoint, index);
         },
@@ -520,8 +520,8 @@ test "returns tables, frame types, and cpoint_next_frame" {
     const rc_eval_err = obj.makeObject(obj.tc_return_code, 0x41);
     try std.testing.expectEqualStrings("eval-error", std.mem.span(return_code_name(rc_eval_err).?));
     try std.testing.expectEqual(@as(?[*:0]const u8, null), return_code_name(obj.makeObject(obj.tc_return_code, 0x02)));
-    try std.testing.expectEqual(@intFromEnum(RFT.exp_env), return_code_frame_type(rc_eval_err));
-    try std.testing.expectEqual(@intFromEnum(RFT.compiled_code_subproblem), return_code_frame_type(obj.makeObject(obj.tc_return_code, abi.rc_comp_error_restart)));
+    try std.testing.expectEqual(@backingInt(RFT.exp_env), return_code_frame_type(rc_eval_err));
+    try std.testing.expectEqual(@backingInt(RFT.compiled_code_subproblem), return_code_frame_type(obj.makeObject(obj.tc_return_code, abi.rc_comp_error_restart)));
 
     // make_return_code_names_table
     const rc_names = make_return_code_names_table();
@@ -532,9 +532,9 @@ test "returns tables, frame types, and cpoint_next_frame" {
 
     // make_frame_type_info_table (preserving upstream "cc-bpkt" spelling)
     const fti = make_frame_type_info_table();
-    try std.testing.expectEqual(@as(usize, @intFromEnum(RFT.limit)), obj.vectorLength(fti));
+    try std.testing.expectEqual(@as(usize, @backingInt(RFT.limit)), obj.vectorLength(fti));
     try std.testing.expectEqual(obj.sharp_f, obj.vectorRef(fti, 0));
-    const cc_bkpt_entry = obj.vectorRef(fti, @intFromEnum(RFT.cc_bkpt));
+    const cc_bkpt_entry = obj.vectorRef(fti, @backingInt(RFT.cc_bkpt));
     try std.testing.expectEqual(intern.char_pointer_to_symbol("cc-bpkt"), obj.vectorRef(cc_bkpt_entry, 0));
     try std.testing.expectEqual(obj.sharp_t, obj.vectorRef(cc_bkpt_entry, 1));
     try std.testing.expectEqual(obj.sharp_f, obj.vectorRef(cc_bkpt_entry, 2));
@@ -581,16 +581,16 @@ test "returns tables, frame types, and cpoint_next_frame" {
     try std.testing.expect(return_address_p(obj.makeObject(obj.tc_return_code, 0x00)));
     if (build_options.cc_support) {
         obj.vectorSet(cpoint, 34, abi.return_to_interpreter);
-        try std.testing.expectEqual(@intFromEnum(RFT.return_to_interpreter), return_frame_type(obj.vectorLoc(cpoint, 34)));
+        try std.testing.expectEqual(@backingInt(RFT.return_to_interpreter), return_frame_type(obj.vectorLoc(cpoint, 34)));
         try std.testing.expectEqual(@as(usize, 35), cpoint_next_frame(cpoint, 34));
 
         obj.vectorSet(cpoint, 35, abi.reflect_to_interface);
         obj.vectorSet(cpoint, 36, obj.ulongToFixnum(2));
-        try std.testing.expectEqual(@intFromEnum(RFT.cc_stack_marker), return_frame_type(obj.vectorLoc(cpoint, 35)));
+        try std.testing.expectEqual(@backingInt(RFT.cc_stack_marker), return_frame_type(obj.vectorLoc(cpoint, 35)));
         try std.testing.expectEqual(@as(usize, 40), cpoint_next_frame(cpoint, 35));
 
         obj.vectorSet(cpoint, 37, obj.makeObject(obj.tc_compiled_entry, 0x10));
-        try std.testing.expectEqual(@intFromEnum(RFT.compiled_address), return_frame_type(obj.vectorLoc(cpoint, 37)));
+        try std.testing.expectEqual(@backingInt(RFT.compiled_address), return_frame_type(obj.vectorLoc(cpoint, 37)));
         try std.testing.expectEqual(@as(usize, 41), cpoint_next_frame(cpoint, 37));
     }
 }

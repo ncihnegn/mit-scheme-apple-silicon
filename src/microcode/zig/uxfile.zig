@@ -69,7 +69,7 @@ fn openLoadOrDumpFile(filename: [*:0]const u8, oflag: std.c.O) abi.Tchannel {
     while (true) {
         const fd = std.c.open(filename, oflag, @as(c_uint, abi.mode_reg));
         if (fd >= 0) return makeLoadChannel(fd);
-        if (std.c._errno().* != @intFromEnum(std.c.E.INTR)) return abi.no_channel;
+        if (std.c._errno().* != @backingInt(std.c.E.INTR)) return abi.no_channel;
     }
 }
 

@@ -221,9 +221,9 @@ test "rgxprim char-set adjoin, compile-fastmap, substring search with register f
     const fastmap = str.allocate_string(256);
     const pat = str.allocate_string(6);
     const pat_bytes = [_]u8{
-        @intFromEnum(regex.RegexpCode.start_memory), 1,
-        @intFromEnum(regex.RegexpCode.exact_1), 'x',
-        @intFromEnum(regex.RegexpCode.stop_memory), 1,
+        @backingInt(regex.RegexpCode.start_memory), 1,
+        @backingInt(regex.RegexpCode.exact_1),      'x',
+        @backingInt(regex.RegexpCode.stop_memory),  1,
     };
     @memcpy(obj.legacyStringData(pat)[0..6], &pat_bytes);
 

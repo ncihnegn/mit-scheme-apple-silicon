@@ -12,7 +12,7 @@ const file_copy_buffer_length: usize = 8192;
 inline fn fileExistencePrim(comptime test_fn: *const fn ([*:0]const u8) callconv(.c) c_uint) obj.SchemeObject {
     abi.primitiveHeader();
     const res = test_fn(abi.stringArg(1));
-    return switch (@as(abi.FileExistence, @enumFromInt(res))) {
+    return switch (@as(abi.FileExistence, @fromBackingInt(@intCast(res)))) {
         .doesnt_exist => obj.sharp_f,
         .does_exist => obj.sharp_t,
         .is_link => obj.ulongToFixnum(0),
@@ -22,7 +22,7 @@ inline fn fileExistencePrim(comptime test_fn: *const fn ([*:0]const u8) callconv
 inline fn fileTypePrim(comptime type_fn: *const fn ([*:0]const u8) callconv(.c) c_int) obj.SchemeObject {
     abi.primitiveHeader();
     const t = type_fn(abi.stringArg(1));
-    return if (t == @intFromEnum(abi.FileType.nonexistent))
+    return if (t == @backingInt(abi.FileType.nonexistent))
         obj.sharp_f
     else
         abi.ulong_to_integer(@intCast(t));
@@ -263,14 +263,14 @@ test "prosfs file queries, copy, touch, and directory primitives" {
 
     const p = string.char_pointer_to_string("/tmp/alpha");
     const link_target = string.char_pointer_to_string("/tmp/beta");
-    stubs.mock_file_existence = @intFromEnum(abi.FileExistence.is_link);
+    stubs.mock_file_existence = @backingInt(abi.FileExistence.is_link);
     stubs.setArgs(&.{p});
     try std.testing.expectEqual(obj.ulongToFixnum(0), Prim_file_exists_p());
     try std.testing.expectEqual(obj.ulongToFixnum(0), Prim_file_exists_direct_p());
 
-    stubs.mock_file_type = @intFromEnum(abi.FileType.regular);
-    try std.testing.expectEqual(obj.ulongToFixnum(@intCast(@intFromEnum(abi.FileType.regular))), Prim_file_type_direct());
-    stubs.mock_file_type = @intFromEnum(abi.FileType.nonexistent);
+    stubs.mock_file_type = @backingInt(abi.FileType.regular);
+    try std.testing.expectEqual(obj.ulongToFixnum(@intCast(@backingInt(abi.FileType.regular))), Prim_file_type_direct());
+    stubs.mock_file_type = @backingInt(abi.FileType.nonexistent);
     try std.testing.expectEqual(obj.sharp_f, Prim_file_type_indirect());
 
     stubs.setArgs(&.{ p, obj.ulongToFixnum(4) });
@@ -285,8 +285,8 @@ test "prosfs file queries, copy, touch, and directory primitives" {
     try std.testing.expectEqual(obj.sharp_t, Prim_file_touch());
 
     // OS_channel_copy roundtrip
-    stubs.setMockChannel(1, @intFromEnum(abi.ChannelType.file), false);
-    stubs.setMockChannel(2, @intFromEnum(abi.ChannelType.file), false);
+    stubs.setMockChannel(1, @backingInt(abi.ChannelType.file), false);
+    stubs.setMockChannel(2, @backingInt(abi.ChannelType.file), false);
     _ = abi.OS_channel_write(1, "abcde", 5);
     try std.testing.expectEqual(@as(c_int, 0), OS_channel_copy(5, 1, 2));
 

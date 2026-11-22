@@ -24,8 +24,8 @@ fn argClientSocket(arg: c_int) abi.Tchannel {
     }
     const socket: abi.Tchannel = @intCast(raw);
     const ch_type = abi.OS_channel_type(socket);
-    if (ch_type != @intFromEnum(abi.ChannelType.tcp_stream_socket) and
-        ch_type != @intFromEnum(abi.ChannelType.unix_stream_socket))
+    if (ch_type != @backingInt(abi.ChannelType.tcp_stream_socket) and
+        ch_type != @backingInt(abi.ChannelType.unix_stream_socket))
     {
         abi.error_bad_range_arg(arg);
     }
@@ -38,7 +38,7 @@ fn argServerSocket(arg: c_int, expected_type: abi.ChannelType) abi.Tchannel {
         abi.error_bad_range_arg(arg);
     }
     const server_socket: abi.Tchannel = @intCast(raw);
-    if (abi.OS_channel_type(server_socket) != @intFromEnum(expected_type)) {
+    if (abi.OS_channel_type(server_socket) != @backingInt(expected_type)) {
         abi.error_bad_range_arg(arg);
     }
     return server_socket;
@@ -55,7 +55,7 @@ fn argUnixServerSocket(arg: c_int) abi.Tchannel {
 fn stringAndFree(host_name_opt: ?[*:0]const u8) obj.SchemeObject {
     const host_name = host_name_opt orelse return obj.sharp_f;
     const result = string.char_pointer_to_string(host_name);
-    abi.OS_free(@constCast(@ptrCast(host_name)));
+    abi.OS_free(@ptrCast(@constCast(host_name)));
     return result;
 }
 
@@ -265,9 +265,9 @@ test "pruxsock host, service, client, and server primitives" {
     const hn = Prim_get_host_name();
     try std.testing.expectEqualStrings("mock-host", std.mem.span(@as([*:0]const u8, @ptrCast(obj.legacyStringData(hn)))));
 
-    stubs.setArgs(&.{string.char_pointer_to_string("http"), string.char_pointer_to_string("tcp")});
+    stubs.setArgs(&.{ string.char_pointer_to_string("http"), string.char_pointer_to_string("tcp") });
     try std.testing.expectEqual(obj.ulongToFixnum(80 << 8), Prim_get_service_by_name());
-    stubs.setArgs(&.{string.char_pointer_to_string("missing"), string.char_pointer_to_string("tcp")});
+    stubs.setArgs(&.{ string.char_pointer_to_string("missing"), string.char_pointer_to_string("tcp") });
     try std.testing.expectEqual(obj.sharp_f, Prim_get_service_by_name());
     stubs.setArgs(&.{obj.ulongToFixnum(80)});
     try std.testing.expectEqual(obj.ulongToFixnum(80 << 8), Prim_get_service_by_number());

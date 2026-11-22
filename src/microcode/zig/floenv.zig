@@ -364,7 +364,7 @@ test "floenv primitives round mode, exception flags, and environment save/restor
     const saved_flags = Prim_save_float_exception_flags();
     stubs.setArgs(&.{all});
     _ = Prim_clear_float_exceptions();
-    stubs.setArgs(&.{saved_flags, inv});
+    stubs.setArgs(&.{ saved_flags, inv });
     _ = Prim_restore_float_exception_flags();
     stubs.setArgs(&.{inv});
     try std.testing.expectEqual(inv, Prim_test_float_exceptions());

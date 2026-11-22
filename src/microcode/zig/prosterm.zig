@@ -9,8 +9,8 @@ const abi = @import("prim_abi.zig");
 pub export fn arg_terminal(argument_number: c_int) callconv(.c) abi.Tchannel {
     const channel = abi.arg_channel(argument_number);
     const ch_type = abi.OS_channel_type(channel);
-    if (ch_type != @intFromEnum(abi.ChannelType.terminal) and
-        ch_type != @intFromEnum(abi.ChannelType.unix_pty_master))
+    if (ch_type != @backingInt(abi.ChannelType.terminal) and
+        ch_type != @backingInt(abi.ChannelType.unix_pty_master))
     {
         abi.error_bad_range_arg(argument_number);
     }
@@ -164,7 +164,7 @@ test "prosterm terminal modes, baud rates, and state primitives" {
     stubs.resetMockRuntime();
     defer stubs.resetMockRuntime();
 
-    stubs.setMockChannel(1, @intFromEnum(abi.ChannelType.terminal), false);
+    stubs.setMockChannel(1, @backingInt(abi.ChannelType.terminal), false);
     stubs.setArgs(&.{ obj.ulongToFixnum(1), obj.ulongToFixnum(3) });
     _ = Prim_terminal_set_ispeed();
     _ = Prim_terminal_set_ospeed();

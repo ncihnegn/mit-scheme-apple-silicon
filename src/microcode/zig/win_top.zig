@@ -41,11 +41,11 @@ pub fn osMallocInit(size: usize) callconv(.c) ?*anyopaque {
 }
 
 pub fn osMalloc(size: usize) callconv(.c) ?*anyopaque {
-    return std.c.malloc(size) orelse utils.error_system_call(@intFromEnum(std.c.E.NOMEM), abi.syscall_malloc);
+    return std.c.malloc(size) orelse utils.error_system_call(@backingInt(std.c.E.NOMEM), abi.syscall_malloc);
 }
 
 pub fn osRealloc(ptr: ?*anyopaque, size: usize) callconv(.c) ?*anyopaque {
-    return std.c.realloc(ptr, size) orelse utils.error_system_call(@intFromEnum(std.c.E.NOMEM), abi.syscall_realloc);
+    return std.c.realloc(ptr, size) orelse utils.error_system_call(@backingInt(std.c.E.NOMEM), abi.syscall_realloc);
 }
 
 pub fn osFree(ptr: ?*anyopaque) callconv(.c) void {
@@ -54,7 +54,7 @@ pub fn osFree(ptr: ?*anyopaque) callconv(.c) void {
 
 pub fn uxPrimCheckErrno(name: c_int) callconv(.c) void {
     const err = std.c._errno().*;
-    if (err != @intFromEnum(std.c.E.INTR)) {
+    if (err != @backingInt(std.c.E.INTR)) {
         utils.error_system_call(err, name);
     }
     osscheme.deliver_pending_interrupts();
@@ -62,11 +62,11 @@ pub fn uxPrimCheckErrno(name: c_int) callconv(.c) void {
 
 pub fn uxPrimCheckFdErrno(name: c_int) callconv(.c) void {
     const err = std.c._errno().*;
-    if (err == @intFromEnum(std.c.E.INTR)) {
+    if (err == @backingInt(std.c.E.INTR)) {
         osscheme.deliver_pending_interrupts();
         return;
     }
-    if (err == @intFromEnum(std.c.E.MFILE) or err == @intFromEnum(std.c.E.NFILE)) {
+    if (err == @backingInt(std.c.E.MFILE) or err == @backingInt(std.c.E.NFILE)) {
         if (!ux_out_of_files_p) {
             ux_out_of_files_p = true;
             abi.requestGc(0);
@@ -234,8 +234,8 @@ fn findBlockAddress(pc: usize, area_start: [*]obj.SchemeObject) ?[*]obj.SchemeOb
                 const count: usize = @intCast(abi.linkage_section_count(object));
                 area += 1;
                 switch (abi.linkage_section_type(object)) {
-                    @intFromEnum(abi.LinkageSectionType.global_operator),
-                    @intFromEnum(abi.LinkageSectionType.operator),
+                    @backingInt(abi.LinkageSectionType.global_operator),
+                    @backingInt(abi.LinkageSectionType.operator),
                     => area += count * uuo_link_size,
                     else => area += count,
                 }
@@ -342,11 +342,11 @@ pub fn osErrorCodeToSyserr(code: c_int) callconv(.c) c_int {
     inline for (errno_map) |entry| {
         if (@hasField(std.c.E, entry.field)) {
             if (comptime std.mem.eql(u8, entry.field, "NOTEMPTY")) {
-                if (@intFromEnum(@field(std.c.E, "NOTEMPTY")) != @intFromEnum(std.c.E.EXIST)) {
-                    if (code == @intFromEnum(@field(std.c.E, entry.field))) return entry.syserr;
+                if (@backingInt(@field(std.c.E, "NOTEMPTY")) != @backingInt(std.c.E.EXIST)) {
+                    if (code == @backingInt(@field(std.c.E, entry.field))) return entry.syserr;
                 }
             } else {
-                if (code == @intFromEnum(@field(std.c.E, entry.field))) return entry.syserr;
+                if (code == @backingInt(@field(std.c.E, entry.field))) return entry.syserr;
             }
         }
     }
@@ -356,7 +356,7 @@ pub fn osErrorCodeToSyserr(code: c_int) callconv(.c) c_int {
 fn syserrToErrorCode(syserr: c_uint) c_int {
     inline for (errno_map) |entry| {
         if (@hasField(std.c.E, entry.field)) {
-            if (syserr == entry.syserr) return @intFromEnum(@field(std.c.E, entry.field));
+            if (syserr == entry.syserr) return @backingInt(@field(std.c.E, entry.field));
         }
     }
     return 0;

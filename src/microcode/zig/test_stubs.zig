@@ -373,15 +373,15 @@ fn mockCcReturnAddressP(o: obj.SchemeObject) callconv(.c) bool {
 
 fn mockReflectToInterfaceFrameType(frame: [*]obj.SchemeObject) callconv(.c) c_int {
     if (!obj.fixnumP(frame[1]) or !obj.fixnumToUlongP(frame[1])) {
-        return @intFromEnum(abi.ReturnFrameType.undefined);
+        return @backingInt(abi.ReturnFrameType.undefined);
     }
     return switch (obj.fixnumToUlong(frame[1])) {
-        0 => @intFromEnum(abi.ReturnFrameType.cc_internal_apply),
-        1 => @intFromEnum(abi.ReturnFrameType.cc_restore_interrupt_mask),
-        2 => @intFromEnum(abi.ReturnFrameType.cc_stack_marker),
-        3 => @intFromEnum(abi.ReturnFrameType.cc_bkpt),
-        8 => @intFromEnum(abi.ReturnFrameType.cc_invocation),
-        else => @intFromEnum(abi.ReturnFrameType.undefined),
+        0 => @backingInt(abi.ReturnFrameType.cc_internal_apply),
+        1 => @backingInt(abi.ReturnFrameType.cc_restore_interrupt_mask),
+        2 => @backingInt(abi.ReturnFrameType.cc_stack_marker),
+        3 => @backingInt(abi.ReturnFrameType.cc_bkpt),
+        8 => @backingInt(abi.ReturnFrameType.cc_invocation),
+        else => @backingInt(abi.ReturnFrameType.undefined),
     };
 }
 
@@ -966,8 +966,8 @@ pub export fn OS_channel_write(_: abi.Tchannel, buf: ?*const anyopaque, nbytes: 
 pub export fn OS_make_pipe(rp: *abi.Tchannel, wp: *abi.Tchannel) callconv(.c) void {
     rp.* = mock_next_pipe_ch;
     wp.* = mock_next_pipe_ch + 1;
-    setMockChannel(rp.*, @intFromEnum(abi.ChannelType.unix_pipe), false);
-    setMockChannel(wp.*, @intFromEnum(abi.ChannelType.unix_pipe), false);
+    setMockChannel(rp.*, @backingInt(abi.ChannelType.unix_pipe), false);
+    setMockChannel(wp.*, @backingInt(abi.ChannelType.unix_pipe), false);
     mock_next_pipe_ch += 2;
 }
 
@@ -1044,7 +1044,7 @@ pub fn setMockFileMetrics(ch: abi.Tchannel, len: abi.OffT, pos: abi.OffT) void {
 
 fn mockOpenFile() abi.Tchannel {
     const ch: abi.Tchannel = 3;
-    setMockChannel(ch, @intFromEnum(abi.ChannelType.file), false);
+    setMockChannel(ch, @backingInt(abi.ChannelType.file), false);
     return ch;
 }
 
@@ -1273,7 +1273,7 @@ pub export fn OS_have_ptys_p() callconv(.c) c_int {
 
 pub export fn OS_open_pty_master(ch_out: *abi.Tchannel, master_name: *[*:0]const u8) callconv(.c) [*:0]const u8 {
     ch_out.* = 5;
-    setMockChannel(5, @intFromEnum(abi.ChannelType.unix_pty_master), false);
+    setMockChannel(5, @backingInt(abi.ChannelType.unix_pty_master), false);
     master_name.* = "/dev/ptym0";
     return "/dev/ptys0";
 }
@@ -1332,7 +1332,7 @@ pub export fn OS_process_id(_: abi.Tprocess) callconv(.c) abi.PidT {
     return 4321;
 }
 pub export fn OS_process_jc_status(_: abi.Tprocess) callconv(.c) c_uint {
-    return @intFromEnum(abi.ProcessJcStatus.jc);
+    return @backingInt(abi.ProcessJcStatus.jc);
 }
 pub export fn OS_process_status_sync(_: abi.Tprocess) callconv(.c) c_int {
     return 1;
@@ -1341,7 +1341,7 @@ pub export fn OS_process_status_sync_all() callconv(.c) c_int {
     return 1;
 }
 pub export fn OS_process_status(_: abi.Tprocess) callconv(.c) c_uint {
-    return @intFromEnum(abi.ProcessStatus.running);
+    return @backingInt(abi.ProcessStatus.running);
 }
 pub export fn OS_process_reason(_: abi.Tprocess) callconv(.c) c_ushort {
     return 0;
@@ -1370,7 +1370,7 @@ pub export fn UX_channel_descriptor(ch: abi.Tchannel) callconv(.c) c_int {
 }
 pub export fn OS_open_tcp_stream_socket(_: ?*anyopaque, _: c_uint) callconv(.c) abi.Tchannel {
     const ch: abi.Tchannel = 7;
-    setMockChannel(ch, @intFromEnum(abi.ChannelType.tcp_stream_socket), false);
+    setMockChannel(ch, @backingInt(abi.ChannelType.tcp_stream_socket), false);
     return ch;
 }
 pub export fn OS_shutdown_socket(_: abi.Tchannel, action: usize) callconv(.c) void {
@@ -1415,24 +1415,24 @@ pub export fn OS_host_address_loopback(addr: ?*anyopaque) callconv(.c) void {
 }
 pub export fn OS_open_unix_stream_socket(_: [*:0]const u8, _: c_int) callconv(.c) abi.Tchannel {
     const ch: abi.Tchannel = 8;
-    setMockChannel(ch, @intFromEnum(abi.ChannelType.unix_stream_socket), false);
+    setMockChannel(ch, @backingInt(abi.ChannelType.unix_stream_socket), false);
     return ch;
 }
 pub export fn OS_create_unix_server_socket(_: [*:0]const u8, _: c_int) callconv(.c) abi.Tchannel {
     if (mock_sock_accept_none) return abi.no_channel;
     const ch: abi.Tchannel = 9;
-    setMockChannel(ch, @intFromEnum(abi.ChannelType.unix_server_socket), false);
+    setMockChannel(ch, @backingInt(abi.ChannelType.unix_server_socket), false);
     return ch;
 }
 pub export fn OS_unix_server_connection_accept(_: abi.Tchannel) callconv(.c) abi.Tchannel {
     if (mock_sock_accept_none) return abi.no_channel;
     const ch: abi.Tchannel = 10;
-    setMockChannel(ch, @intFromEnum(abi.ChannelType.unix_stream_socket), false);
+    setMockChannel(ch, @backingInt(abi.ChannelType.unix_stream_socket), false);
     return ch;
 }
 pub export fn OS_create_tcp_server_socket() callconv(.c) abi.Tchannel {
     const ch: abi.Tchannel = 11;
-    setMockChannel(ch, @intFromEnum(abi.ChannelType.tcp_server_socket), false);
+    setMockChannel(ch, @backingInt(abi.ChannelType.tcp_server_socket), false);
     return ch;
 }
 pub export fn OS_bind_tcp_server_socket(_: abi.Tchannel, _: ?*anyopaque, _: c_uint) callconv(.c) void {}
@@ -1449,7 +1449,7 @@ pub export fn OS_tcp_server_connection_accept(_: abi.Tchannel, peer_host: ?*anyo
         dst[3] = 2;
     }
     const ch: abi.Tchannel = 12;
-    setMockChannel(ch, @intFromEnum(abi.ChannelType.tcp_stream_socket), false);
+    setMockChannel(ch, @backingInt(abi.ChannelType.tcp_stream_socket), false);
     return ch;
 }
 

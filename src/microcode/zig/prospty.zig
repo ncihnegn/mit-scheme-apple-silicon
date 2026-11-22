@@ -11,7 +11,7 @@ const string = @import("string.zig");
 fn argPtyMaster(arg: c_int) abi.Tchannel {
     _ = arg;
     const channel = abi.arg_channel(1);
-    if (abi.OS_channel_type(channel) != @intFromEnum(abi.ChannelType.unix_pty_master)) {
+    if (abi.OS_channel_type(channel) != @backingInt(abi.ChannelType.unix_pty_master)) {
         abi.error_bad_range_arg(1);
     }
     return channel;

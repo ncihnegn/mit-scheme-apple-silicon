@@ -746,14 +746,14 @@ fn nextAddr(addr: [*]obj.SchemeObject) [*]obj.SchemeObject {
             if (build_options.cc_support) {
                 const section_type: c_uint = @intCast(obj.objectDatum(object) >> 16);
                 switch (section_type) {
-                    @intFromEnum(abi.LinkageSectionType.global_operator),
-                    @intFromEnum(abi.LinkageSectionType.operator),
+                    @backingInt(abi.LinkageSectionType.global_operator),
+                    @backingInt(abi.LinkageSectionType.operator),
                     => {
                         const n_words: usize = @intCast(obj.objectDatum(object) & 0xFFFF);
                         return addr + (1 + n_words);
                     },
-                    @intFromEnum(abi.LinkageSectionType.reference),
-                    @intFromEnum(abi.LinkageSectionType.assignment),
+                    @backingInt(abi.LinkageSectionType.reference),
+                    @backingInt(abi.LinkageSectionType.assignment),
                     => return addr + 1,
                     else => {
                         outf.err("Invalid linkage section type: {d}\n", .{@as(c_int, @intCast(section_type))});
@@ -857,7 +857,7 @@ fn dumpHeapAt(addr: ?[*]obj.SchemeObject) callconv(.c) void {
 }
 
 fn verifyObject(object: obj.SchemeObject) bool {
-    return abi.gc_type_code(@intCast(obj.objectType(object))) != @intFromEnum(abi.GcType.undefined);
+    return abi.gc_type_code(@intCast(obj.objectType(object))) != @backingInt(abi.GcType.undefined);
 }
 
 fn verifyTuple(object: obj.SchemeObject, size: usize, name: [*:0]const u8, address: usize) bool {
@@ -951,34 +951,34 @@ fn verifyHeapArea(area_in: [*]obj.SchemeObject, end: [*]obj.SchemeObject) bool {
         const code = abi.gc_type_code(@intCast(tc));
         const area_addr: usize = @intCast(@intFromPtr(area));
         switch (code) {
-            @intFromEnum(abi.GcType.undefined) => {
+            @backingInt(abi.GcType.undefined) => {
                 outf.err("0x{x}: Invalid object type: 0x{x}\n", .{ area_addr, @as(c_uint, @intCast(tc)) });
                 return false;
             },
-            @intFromEnum(abi.GcType.non_pointer) => {
+            @backingInt(abi.GcType.non_pointer) => {
                 area += 1;
             },
-            @intFromEnum(abi.GcType.cell) => {
+            @backingInt(abi.GcType.cell) => {
                 if (!verifyTuple(object, 1, "cell", area_addr)) complaints += 1;
                 area += 1;
             },
-            @intFromEnum(abi.GcType.pair) => {
+            @backingInt(abi.GcType.pair) => {
                 if (!verifyTuple(object, 2, "pair", area_addr)) complaints += 1;
                 area += 1;
             },
-            @intFromEnum(abi.GcType.triple) => {
+            @backingInt(abi.GcType.triple) => {
                 if (!verifyTuple(object, 3, "triple", area_addr)) complaints += 1;
                 area += 1;
             },
-            @intFromEnum(abi.GcType.quadruple) => {
+            @backingInt(abi.GcType.quadruple) => {
                 if (!verifyTuple(object, 4, "quadruple", area_addr)) complaints += 1;
                 area += 1;
             },
-            @intFromEnum(abi.GcType.vector) => {
+            @backingInt(abi.GcType.vector) => {
                 if (!verifyVector(object, area_addr)) complaints += 1;
                 area += 1;
             },
-            @intFromEnum(abi.GcType.special) => {
+            @backingInt(abi.GcType.special) => {
                 switch (tc) {
                     obj.tc_broken_heart => {
                         area += 1;
@@ -995,8 +995,8 @@ fn verifyHeapArea(area_in: [*]obj.SchemeObject, end: [*]obj.SchemeObject) bool {
                     obj.tc_linkage_section => {
                         const section_type: c_uint = @intCast(obj.objectDatum(object) >> 16);
                         switch (section_type) {
-                            @intFromEnum(abi.LinkageSectionType.global_operator),
-                            @intFromEnum(abi.LinkageSectionType.operator),
+                            @backingInt(abi.LinkageSectionType.global_operator),
+                            @backingInt(abi.LinkageSectionType.operator),
                             => {
                                 const n_words: usize = @intCast(obj.objectDatum(object) & 0xFFFF);
                                 const next = area + (1 + n_words);
@@ -1008,8 +1008,8 @@ fn verifyHeapArea(area_in: [*]obj.SchemeObject, end: [*]obj.SchemeObject) bool {
                                 }
                                 area = next;
                             },
-                            @intFromEnum(abi.LinkageSectionType.reference),
-                            @intFromEnum(abi.LinkageSectionType.assignment),
+                            @backingInt(abi.LinkageSectionType.reference),
+                            @backingInt(abi.LinkageSectionType.assignment),
                             => {
                                 area += 1;
                             },
@@ -1047,7 +1047,7 @@ fn verifyHeapArea(area_in: [*]obj.SchemeObject, end: [*]obj.SchemeObject) bool {
                     },
                 }
             },
-            @intFromEnum(abi.GcType.compiled_entry) => {
+            @backingInt(abi.GcType.compiled_entry) => {
                 if (build_options.cc_support) {
                     if (!verifyCompiled(object, area_addr)) complaints += 1;
                     area += 1;
@@ -1057,7 +1057,7 @@ fn verifyHeapArea(area_in: [*]obj.SchemeObject, end: [*]obj.SchemeObject) bool {
                     area += 1;
                 }
             },
-            @intFromEnum(abi.GcType.compiled_return) => {
+            @backingInt(abi.GcType.compiled_return) => {
                 if (build_options.cc_support) {
                     outf.err("0x{x}: XXX not implemented", .{area_addr});
                 } else {
@@ -1096,7 +1096,7 @@ fn verifyStack(sp_in: [*]obj.SchemeObject, bottom: [*]obj.SchemeObject) callconv
             sp += @as(usize, @intCast(n_words));
         } else if (tc == obj.tc_manifest_closure or
             tc == obj.tc_broken_heart or
-            abi.gc_type_code(@intCast(tc)) == @intFromEnum(abi.GcType.undefined))
+            abi.gc_type_code(@intCast(tc)) == @backingInt(abi.GcType.undefined))
         {
             outf.err("0x{x}: Invalid stack slot: ", .{@as(usize, @intCast(@intFromPtr(sp)))});
             printObject(outf.error_output, object);

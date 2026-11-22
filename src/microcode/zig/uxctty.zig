@@ -53,14 +53,14 @@ extern "c" fn ctermid(s: ?[*]u8) ?[*:0]u8;
 fn getTerminalState(fd: c_int, s: *abi.TttyState) c_int {
     while (true) {
         const scr = abi.UX_terminal_get_state(fd, s);
-        if (scr >= 0 or std.c._errno().* != @intFromEnum(std.c.E.INTR)) return scr;
+        if (scr >= 0 or std.c._errno().* != @backingInt(std.c.E.INTR)) return scr;
     }
 }
 
 fn setTerminalState(fd: c_int, s: *const abi.TttyState) void {
     while (true) {
         const scr = abi.UX_terminal_set_state(fd, s);
-        if (scr >= 0 or std.c._errno().* != @intFromEnum(std.c.E.INTR)) return;
+        if (scr >= 0 or std.c._errno().* != @backingInt(std.c.E.INTR)) return;
     }
 }
 
@@ -71,14 +71,14 @@ fn getFlags(fd: c_int, flags: *c_int) c_int {
             flags.* = scr;
             return 0;
         }
-        if (std.c._errno().* != @intFromEnum(std.c.E.INTR)) return -1;
+        if (std.c._errno().* != @backingInt(std.c.E.INTR)) return -1;
     }
 }
 
 fn setFlags(fd: c_int, flags: c_int) void {
     while (true) {
         const scr = std.c.fcntl(fd, std.c.F.SETFL, flags);
-        if (scr >= 0 or std.c._errno().* != @intFromEnum(std.c.E.INTR)) return;
+        if (scr >= 0 or std.c._errno().* != @backingInt(std.c.E.INTR)) return;
     }
 }
 
@@ -124,7 +124,7 @@ pub fn uxCttySaveExternalState() callconv(.c) void {
     if (permit_ctty_control != 0 and ctty_fildes >= 0) {
         const pgrp_id = tcgetpgrp(ctty_fildes);
         scheme_in_foreground = if (pgrp_id < 0)
-            @intFromBool(std.c._errno().* == @intFromEnum(std.c.E.NOSYS))
+            @intFromBool(std.c._errno().* == @backingInt(std.c.E.NOSYS))
         else
             @intFromBool(getpgrp() == pgrp_id);
     } else {
@@ -206,11 +206,11 @@ pub fn osCttyFd() callconv(.c) c_int {
 fn cttySetInterruptChars(ic: *const TinterruptChars) void {
     var s: abi.TttyState = undefined;
     if (getTerminalState(ctty_fildes, &s) == 0) {
-        s.tio.cc[@intFromEnum(std.c.V.QUIT)] = ic.quit;
-        s.tio.cc[@intFromEnum(std.c.V.INTR)] = ic.intrpt;
-        s.tio.cc[@intFromEnum(std.c.V.SUSP)] = ic.tstp;
+        s.tio.cc[@backingInt(std.c.V.QUIT)] = ic.quit;
+        s.tio.cc[@backingInt(std.c.V.INTR)] = ic.intrpt;
+        s.tio.cc[@backingInt(std.c.V.SUSP)] = ic.tstp;
         if (@hasField(std.c.V, "DSUSP")) {
-            s.tio.cc[@intFromEnum(std.c.V.DSUSP)] = ic.dtstp;
+            s.tio.cc[@backingInt(std.c.V.DSUSP)] = ic.dtstp;
         }
         setTerminalState(ctty_fildes, &s);
     }

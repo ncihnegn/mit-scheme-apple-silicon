@@ -104,7 +104,7 @@ pub fn userioReadChar() callconv(.c) u8 {
         std.c._errno().* = 0;
         const nread = std.c.read(std.c.STDIN_FILENO, @ptrCast(&c), 1);
         if (nread == 1) break;
-        if (std.c._errno().* != @intFromEnum(std.c.E.INTR)) {
+        if (std.c._errno().* != @backingInt(std.c.E.INTR)) {
             c = 0;
             break;
         }

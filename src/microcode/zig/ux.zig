@@ -11,7 +11,7 @@ var memoized_clk_tck: abi.ClockT = 0;
 /// Check C `errno` after a failed syscall: deliver pending interrupts on `EINTR` or raise a system call error.
 pub fn uxPrimCheckErrno(name: c_int) callconv(.c) void {
     const err = std.c._errno().*;
-    if (err != @intFromEnum(std.c.E.INTR)) {
+    if (err != @backingInt(std.c.E.INTR)) {
         utils.error_system_call(err, name);
     }
     osscheme.deliver_pending_interrupts();
@@ -20,11 +20,11 @@ pub fn uxPrimCheckErrno(name: c_int) callconv(.c) void {
 /// Check C `errno` after a descriptor-allocating syscall, requesting GC once on `EMFILE`/`ENFILE`.
 pub fn uxPrimCheckFdErrno(name: c_int) callconv(.c) void {
     const err = std.c._errno().*;
-    if (err == @intFromEnum(std.c.E.INTR)) {
+    if (err == @backingInt(std.c.E.INTR)) {
         osscheme.deliver_pending_interrupts();
         return;
     }
-    if (err == @intFromEnum(std.c.E.MFILE) or err == @intFromEnum(std.c.E.NFILE)) {
+    if (err == @backingInt(std.c.E.MFILE) or err == @backingInt(std.c.E.NFILE)) {
         if (!ux_out_of_files_p) {
             ux_out_of_files_p = true;
             abi.requestGc(0);
@@ -68,7 +68,7 @@ pub fn uxClosefrom(start_fd: c_int) callconv(.c) c_int {
     while (fd < fd_limit) : (fd += 1) {
         if (std.c.close(fd) < 0) {
             const err = std.c._errno().*;
-            if (err != @intFromEnum(std.c.E.BADF)) {
+            if (err != @backingInt(std.c.E.BADF)) {
                 status = -1;
                 last_err = err;
             }
@@ -85,12 +85,12 @@ pub fn osMallocInit(size: usize) callconv(.c) ?*anyopaque {
 
 /// Allocate `size` bytes via `malloc` or signal `ENOMEM` (`syscall_malloc`).
 pub fn osMalloc(size: usize) callconv(.c) ?*anyopaque {
-    return std.c.malloc(size) orelse utils.error_system_call(@intFromEnum(std.c.E.NOMEM), abi.syscall_malloc);
+    return std.c.malloc(size) orelse utils.error_system_call(@backingInt(std.c.E.NOMEM), abi.syscall_malloc);
 }
 
 /// Reallocate `ptr` to `size` bytes via `realloc` or signal `ENOMEM` (`syscall_realloc`).
 pub fn osRealloc(ptr: ?*anyopaque, size: usize) callconv(.c) ?*anyopaque {
-    return std.c.realloc(ptr, size) orelse utils.error_system_call(@intFromEnum(std.c.E.NOMEM), abi.syscall_realloc);
+    return std.c.realloc(ptr, size) orelse utils.error_system_call(@backingInt(std.c.E.NOMEM), abi.syscall_realloc);
 }
 
 /// Free memory allocated via `OS_malloc`, `OS_malloc_init`, or `OS_realloc`.
@@ -137,7 +137,7 @@ test "ux sysconf, allocation helpers, closefrom, and EINTR handling" {
     const fd_limit: c_int = @intCast(std.c.sysconf(sc_open_max));
     try std.testing.expectEqual(@as(c_int, 0), uxClosefrom(fd_limit));
 
-    std.c._errno().* = @intFromEnum(std.c.E.INTR);
+    std.c._errno().* = @backingInt(std.c.E.INTR);
     uxPrimCheckErrno(abi.syscall_read);
     uxPrimCheckFdErrno(abi.syscall_open);
 }

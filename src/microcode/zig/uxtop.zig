@@ -120,7 +120,7 @@ pub fn osQuit(code: c_int, abnormal_p: c_int) callconv(.c) void {
 /// Restore external terminal state and abort with default `SIGABRT` disposition.
 pub fn uxDumpCore() callconv(.c) void {
     osRestoreExternalState();
-    _ = signal(@intFromEnum(std.c.SIG.ABRT), null);
+    _ = signal(@backingInt(std.c.SIG.ABRT), null);
     std.c.abort();
 }
 
@@ -252,11 +252,11 @@ pub fn osErrorCodeToSyserr(code: c_int) callconv(.c) c_int {
     inline for (errno_map) |entry| {
         if (@hasField(std.c.E, entry.field)) {
             if (comptime std.mem.eql(u8, entry.field, "NOTEMPTY")) {
-                if (@intFromEnum(@field(std.c.E, "NOTEMPTY")) != @intFromEnum(std.c.E.EXIST)) {
-                    if (code == @intFromEnum(@field(std.c.E, entry.field))) return entry.syserr;
+                if (@backingInt(@field(std.c.E, "NOTEMPTY")) != @backingInt(std.c.E.EXIST)) {
+                    if (code == @backingInt(@field(std.c.E, entry.field))) return entry.syserr;
                 }
             } else {
-                if (code == @intFromEnum(@field(std.c.E, entry.field))) return entry.syserr;
+                if (code == @backingInt(@field(std.c.E, entry.field))) return entry.syserr;
             }
         }
     }
@@ -266,7 +266,7 @@ pub fn osErrorCodeToSyserr(code: c_int) callconv(.c) c_int {
 fn syserrToErrorCode(syserr: c_uint) c_int {
     inline for (errno_map) |entry| {
         if (@hasField(std.c.E, entry.field)) {
-            if (syserr == entry.syserr) return @intFromEnum(@field(std.c.E, entry.field));
+            if (syserr == entry.syserr) return @backingInt(@field(std.c.E, entry.field));
         }
     }
     return 0;
@@ -511,9 +511,9 @@ test "uxtop syscall/syserr tables, error translation, page hints, and Darwin bun
     try std.testing.expectEqualStrings("unknown", std.mem.span(se_names[0].?));
     try std.testing.expectEqualStrings("too-many-open-files", std.mem.span(se_names[43].?));
 
-    try std.testing.expectEqual(@as(c_int, 30), osErrorCodeToSyserr(@intFromEnum(std.c.E.NOENT)));
-    try std.testing.expectEqual(@as(c_int, 33), osErrorCodeToSyserr(@intFromEnum(std.c.E.NOMEM)));
-    try std.testing.expectEqual(@as(c_int, 39), osErrorCodeToSyserr(@intFromEnum(std.c.E.AGAIN)));
+    try std.testing.expectEqual(@as(c_int, 30), osErrorCodeToSyserr(@backingInt(std.c.E.NOENT)));
+    try std.testing.expectEqual(@as(c_int, 33), osErrorCodeToSyserr(@backingInt(std.c.E.NOMEM)));
+    try std.testing.expectEqual(@as(c_int, 39), osErrorCodeToSyserr(@backingInt(std.c.E.AGAIN)));
     try std.testing.expectEqual(@as(c_int, 0), osErrorCodeToSyserr(99999));
 
     try std.testing.expect(osErrorCodeToMessage(0) == null);

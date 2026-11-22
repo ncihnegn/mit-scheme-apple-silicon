@@ -123,7 +123,7 @@ pub fn osHostAddressLoopback(addr: ?*anyopaque) callconv(.c) void {
 }
 
 pub fn osOpenUnixStreamSocket(_: [*:0]const u8, _: c_int) callconv(.c) abi.Tchannel {
-    utils.error_system_call(@intFromEnum(std.c.E.AFNOSUPPORT), abi.syscall_socket);
+    utils.error_system_call(@backingInt(std.c.E.AFNOSUPPORT), abi.syscall_socket);
 }
 
 pub fn osCreateTcpServerSocket() callconv(.c) abi.Tchannel {
@@ -152,7 +152,7 @@ pub fn osListenTcpServerSocket(channel: abi.Tchannel) callconv(.c) void {
 }
 
 pub fn osCreateUnixServerSocket(_: [*:0]const u8, _: c_int) callconv(.c) abi.Tchannel {
-    utils.error_system_call(@intFromEnum(std.c.E.AFNOSUPPORT), abi.syscall_socket);
+    utils.error_system_call(@backingInt(std.c.E.AFNOSUPPORT), abi.syscall_socket);
 }
 
 pub fn osTcpServerConnectionAccept(
@@ -181,7 +181,7 @@ pub fn osTcpServerConnectionAccept(
 }
 
 pub fn osUnixServerConnectionAccept(_: abi.Tchannel) callconv(.c) abi.Tchannel {
-    utils.error_system_call(@intFromEnum(std.c.E.AFNOSUPPORT), abi.syscall_accept);
+    utils.error_system_call(@backingInt(std.c.E.AFNOSUPPORT), abi.syscall_accept);
 }
 
 comptime {

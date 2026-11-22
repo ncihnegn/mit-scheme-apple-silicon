@@ -252,7 +252,7 @@ fn deleteTempFiles() void {
             const filename: [*:0]const u8 = @ptrCast(obj.legacyStringData(entry));
             var new_state: interp.InterpreterState = .{};
             interp.bindInterpreterState(&new_state);
-            _ = interp.scm_setjmp_try(&new_state.catch_env, &deleteFileBody, @constCast(@ptrCast(filename)));
+            _ = interp.scm_setjmp_try(&new_state.catch_env, &deleteFileBody, @ptrCast(@constCast(filename)));
             interp.unbindInterpreterState(&new_state);
         }
     }

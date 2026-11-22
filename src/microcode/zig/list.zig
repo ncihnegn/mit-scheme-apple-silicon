@@ -136,7 +136,7 @@ pub export fn system_pair_cons(
 pub export fn Prim_sys_pair_cons() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     const pair_type = abi.arg_ulong_index_integer(1, obj.n_type_codes);
-    if (abi.gc_type_code(@intCast(pair_type)) != @intFromEnum(abi.GcType.pair)) {
+    if (abi.gc_type_code(@intCast(pair_type)) != @backingInt(abi.GcType.pair)) {
         abi.error_bad_range_arg(1);
     }
     return system_pair_cons(@intCast(pair_type), abi.argRef(2), abi.argRef(3));

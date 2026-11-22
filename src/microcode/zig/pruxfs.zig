@@ -313,7 +313,7 @@ test "pruxfs modes, times, attributes, mode string, file-eq?, and filesystem typ
 
     // Directory + setgid (no group x) + sticky (with other x)
     stubs.mock_stat.mode = s_ifdir | s_isgid | s_isvtx | 0o741;
-    stubs.setMockChannel(4, @intFromEnum(abi.ChannelType.directory), false);
+    stubs.setMockChannel(4, @backingInt(abi.ChannelType.directory), false);
     stubs.setArgs(&.{obj.ulongToFixnum(4)});
     const dir_attrs = Prim_channel_file_attributes();
     try std.testing.expectEqual(obj.sharp_t, obj.vectorRef(dir_attrs, 0));
