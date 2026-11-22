@@ -10,7 +10,6 @@ const boot = @import("boot.zig");
 const fasl = @import("fasl.zig");
 const outf = @import("outf.zig");
 
-extern "c" fn getenv(name: [*:0]const u8) ?[*:0]const u8;
 extern "c" fn strtoull(nptr: [*:0]const u8, endptr: *[*]const u8, base: c_int) c_ulonglong;
 
 const compiler_interface_version: c_uint = 4;
@@ -415,7 +414,7 @@ fn parseStandardOptions(argc: c_int, argv: [*]?[*:0]const u8) void {
 
 fn standardStringOption(option: ?[*:0]const u8, variable: [*:0]const u8, defval: [*:0]const u8) [*:0]const u8 {
     if (option) |opt| return opt;
-    return getenv(variable) orelse defval;
+    return std.c.getenv(variable) orelse defval;
 }
 
 fn parseNumericString(
@@ -443,7 +442,7 @@ fn standardNumericOption(
         return parseNumericString(val, "{s}: illegal argument for option --{s}: {s}\n", option);
     }
     if (variable) |vname| {
-        if (getenv(vname)) |t| {
+        if (std.c.getenv(vname)) |t| {
             return parseNumericString(t, "{s}: illegal value for environment variable {s}: {s}\n", vname);
         }
     }
@@ -648,7 +647,7 @@ fn standardFilenameOption(
         return search_path_for_file(option, val, false, fail_p);
     }
 
-    const filename = getenv(variable) orelse defval;
+    const filename = std.c.getenv(variable) orelse defval;
     if (fileAbsolute(filename)) {
         if (!fileReadable(filename) and fail_p) {
             outf.fatal("{s}: can't read default file {s} for option --{s}.\n", .{ prog, filename, option });

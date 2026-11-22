@@ -31,7 +31,6 @@ extern "c" fn _mktime64(*CTm) abi.TimeT;
 extern "c" fn _mkgmtime64(*CTm) abi.TimeT;
 extern "c" fn _tzset() void;
 extern "c" fn __timezone() *c_long;
-extern "c" fn getenv(name: [*:0]const u8) ?[*:0]const u8;
 
 var qpc_freq: i64 = 1;
 var start_qpc: i64 = 0;
@@ -241,12 +240,12 @@ pub fn osCurrentUserName() callconv(.c) [*:0]const u8 {
         user_name_buf[idx] = 0;
         return @ptrCast(&user_name_buf);
     }
-    if (getenv("USERNAME")) |u| return u;
+    if (std.c.getenv("USERNAME")) |u| return u;
     return "user";
 }
 
 pub fn osCurrentUserHomeDirectory() callconv(.c) [*:0]const u8 {
-    if (getenv("USERPROFILE")) |up| {
+    if (std.c.getenv("USERPROFILE")) |up| {
         const s = std.mem.span(up);
         const n = @min(s.len, home_dir_buf.len - 1);
         @memcpy(home_dir_buf[0..n], s[0..n]);
@@ -254,8 +253,8 @@ pub fn osCurrentUserHomeDirectory() callconv(.c) [*:0]const u8 {
         win.normalizeSlashesInPlace(home_dir_buf[0..n]);
         return @ptrCast(&home_dir_buf);
     }
-    if (getenv("HOMEDRIVE")) |hd| {
-        if (getenv("HOMEPATH")) |hp| {
+    if (std.c.getenv("HOMEDRIVE")) |hd| {
+        if (std.c.getenv("HOMEPATH")) |hp| {
             const ds = std.mem.span(hd);
             const ps = std.mem.span(hp);
             if (ds.len + ps.len < home_dir_buf.len) {
@@ -268,7 +267,7 @@ pub fn osCurrentUserHomeDirectory() callconv(.c) [*:0]const u8 {
             }
         }
     }
-    if (getenv("HOME")) |h| {
+    if (std.c.getenv("HOME")) |h| {
         const s = std.mem.span(h);
         const n = @min(s.len, home_dir_buf.len - 1);
         @memcpy(home_dir_buf[0..n], s[0..n]);

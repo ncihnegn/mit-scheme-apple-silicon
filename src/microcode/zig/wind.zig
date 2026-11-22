@@ -12,8 +12,6 @@ comptime {
 }
 
 extern "c" fn OS_malloc(size: usize) ?*anyopaque;
-extern "c" fn free(ptr: ?*anyopaque) void;
-extern "c" fn abort() noreturn;
 extern "c" fn block_signals() void;
 extern "c" fn unblock_signals() void;
 
@@ -39,7 +37,7 @@ var save_binding_location: ?*?*anyopaque = null;
 fn fatalError(procedure_name: [*:0]const u8, message: [*:0]const u8) noreturn {
     outf.fatal("{s}: {s}\n", .{ procedure_name, message });
     outf.flushFatal();
-    abort();
+    std.c.abort();
 }
 
 inline fn exportPtr(sp: anytype) ?*anyopaque {
@@ -47,7 +45,7 @@ inline fn exportPtr(sp: anytype) ?*anyopaque {
 }
 
 pub export fn dstack_initialize() callconv(.c) void {
-    dstack.init(&OS_malloc, &free);
+    dstack.init(&OS_malloc, &std.c.free);
     dstack_position = null;
     current_winding_record = null;
 }

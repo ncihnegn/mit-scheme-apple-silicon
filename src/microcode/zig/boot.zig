@@ -17,9 +17,6 @@ const utabmd = @import("utabmd.zig");
 const string = @import("string.zig");
 const bytevector = @import("bytevector.zig");
 
-extern "c" fn malloc(size: usize) ?*anyopaque;
-extern "c" fn free(ptr: ?*anyopaque) void;
-
 pub export var scheme_program_name: ?[*:0]const u8 = null;
 pub export var OS_Name: ?[*:0]const u8 = null;
 pub export var OS_Variant: ?[*:0]const u8 = null;
@@ -46,12 +43,12 @@ fn initialObstack() obstack.Obstack {
         .temp = 0,
         .alignment_mask = 0,
         .chunkfun = @ptrCast(&obstack_chunk_alloc),
-        .freefun = &free,
+        .freefun = &std.c.free,
     };
 }
 
 pub export fn obstack_chunk_alloc(size: usize) callconv(.c) ?*anyopaque {
-    return malloc(size) orelse {
+    return std.c.malloc(size) orelse {
         const name: [*:0]const u8 = scheme_program_name orelse "mit-scheme";
         const size_int: c_int = @intCast(size);
         outf.fatal("\n{s}: unable to allocate obstack chunk of {d} bytes\n", .{ name, size_int });
@@ -75,8 +72,8 @@ fn schemeMain(argc: c_int, argv: [*]?[*:0]const u8) callconv(.c) c_int {
     scheme_program_name = argv[0];
     initial_C_stack_pointer = @ptrCast(&argc_slot);
 
-    scratch_obstack.init(&obstack_chunk_alloc, &free);
-    ffi_obstack.init(&obstack_chunk_alloc, &free);
+    scratch_obstack.init(&obstack_chunk_alloc, &std.c.free);
+    ffi_obstack.init(&obstack_chunk_alloc, &std.c.free);
     wind.dstack_initialize();
     transact.transaction_initialize();
     reload_saved_string = null;
@@ -213,7 +210,7 @@ pub export fn Prim_get_unused_command_line() callconv(.c) obj.SchemeObject {
 
 pub fn clearReloadSavedString() void {
     if (reload_saved_string) |saved| {
-        free(@ptrCast(saved));
+        std.c.free(@ptrCast(saved));
         reload_saved_string = null;
     }
     reload_saved_string_length = 0;
@@ -247,7 +244,7 @@ pub export fn Prim_reload_retrieve_string() callconv(.c) obj.SchemeObject {
         string.memory_to_string(reload_saved_string_length, @ptrCast(saved))
     else
         bytevector.memory_to_bytevector(reload_saved_string_length, @ptrCast(saved));
-    free(@ptrCast(saved));
+    std.c.free(@ptrCast(saved));
     reload_saved_string = null;
     reload_saved_string_length = 0;
     return result;
@@ -267,7 +264,7 @@ test "boot utility primitives, obstack_chunk_alloc, and reload save/retrieve" {
     // obstack_chunk_alloc allocates usable memory
     const chunk = obstack_chunk_alloc(64);
     try std.testing.expect(chunk != null);
-    free(chunk);
+    std.c.free(chunk);
 
     // BATCH-MODE?
     abi.option_batch_mode = false;

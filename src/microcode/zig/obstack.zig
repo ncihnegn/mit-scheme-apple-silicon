@@ -129,8 +129,6 @@ const FooRound = extern union {
 };
 const default_rounding: usize = @sizeOf(FooRound);
 
-extern "c" fn abort() noreturn;
-
 // The non-GNU-C macros copy the obstack into this global variable to avoid multiple evaluation.
 pub export var _obstack: ?*Obstack = null;
 
@@ -236,7 +234,7 @@ pub export fn obstack_free(h: *Obstack, obj: ?*anyopaque) callconv(.c) void {
         h.chunk = chunk;
     } else if (obj != null) {
         // obj is not in any of the chunks!
-        abort();
+        std.c.abort();
     } else {
         h.chunk = null;
         h.object_base = null;

@@ -21,7 +21,6 @@ const has_mmap: bool = builtin.os.tag.isDarwin() or builtin.os.tag == .linux;
 const is_windows: bool = builtin.os.tag == .windows;
 
 extern "c" fn munmap(addr: *anyopaque, len: usize) c_int;
-extern "c" fn abort() noreturn;
 
 const darwin_ext = struct {
     extern "c" fn pthread_jit_write_protect_np(enabled: c_int) void;
@@ -35,7 +34,7 @@ var cached_page_size: usize = 0;
 fn fatalError(message: [*:0]const u8) noreturn {
     outf.fatal("{s}", .{message});
     outf.flushFatal();
-    abort();
+    std.c.abort();
 }
 
 pub export fn jit_available_p() callconv(.c) bool {
@@ -49,7 +48,7 @@ pub export fn jit_page_size() callconv(.c) usize {
             win.kernel32.GetSystemInfo(&si);
             cached_page_size = if (si.dwPageSize > 0) @intCast(si.dwPageSize) else 0x1000;
         } else {
-            const ps = std.c.sysconf(@intFromEnum(std.c._SC.PAGESIZE));
+            const ps = std.c.sysconf(@backingInt(std.c._SC.PAGESIZE));
             const fallback: usize = if (is_apple_jit) 0x4000 else 0x1000;
             cached_page_size = if (ps > 0) @intCast(ps) else fallback;
         }

@@ -7,13 +7,12 @@ const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 const abi = @import("prim_abi.zig");
 const outf = @import("outf.zig");
+const debug = @import("debug.zig");
 
 pub const SpRecord = extern struct {
     sp: ?[*]obj.SchemeObject,
     next: ?*SpRecord,
 };
-
-extern "c" fn Print_One_Continuation_Frame(obj.SchemeObject) bool;
 
 pub var sp_list: ?*SpRecord = null;
 var one_before: SpRecord = .{
@@ -38,8 +37,10 @@ pub fn addAPopReturnBreakpoint(sp: [*]obj.SchemeObject) callconv(.c) bool {
         return false;
     };
     const rec: *SpRecord = @ptrCast(@alignCast(raw));
-    rec.sp = sp;
-    rec.next = old;
+    rec.* = .{
+        .sp = sp,
+        .next = old,
+    };
     sp_list = rec;
     one_before.next = sp_list;
     return true;
@@ -48,7 +49,7 @@ pub fn addAPopReturnBreakpoint(sp: [*]obj.SchemeObject) callconv(.c) bool {
 pub fn handlePopReturnBreak() callconv(.c) void {
     const old_stack = abi.stack_pointer;
     outf.err("Pop Return Break: SP = 0x{x}\n", .{@intFromPtr(abi.stack_pointer)});
-    _ = Print_One_Continuation_Frame(abi.Registers[abi.regblock_return]);
+    _ = debug.Print_One_Continuation_Frame(abi.Registers[abi.regblock_return]);
     abi.stack_pointer = old_stack;
 }
 

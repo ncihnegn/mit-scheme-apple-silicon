@@ -43,9 +43,6 @@ comptime {
     std.debug.assert(@offsetOf(Md5, "i") == 88);
 }
 
-extern "c" fn memset(s: ?*anyopaque, c: c_int, n: usize) ?*anyopaque;
-pub export var md5_explicit_memset_impl: ?*const fn (?*anyopaque, c_int, usize) callconv(.c) ?*anyopaque = &memset;
-
 const RoundKind = enum { f, g, h, i };
 
 const Step = struct {

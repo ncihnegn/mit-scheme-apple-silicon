@@ -11,8 +11,6 @@ comptime {
     _ = wind;
 }
 
-extern "c" fn abort() noreturn;
-
 pub const TransactionActionType = enum(c_int) {
     tat_abort = 0,
     tat_commit = 1,
@@ -43,7 +41,7 @@ var current_transaction: ?*Transaction = null;
 fn fatalError(procedure_name: [*:0]const u8, message: [*:0]const u8) noreturn {
     outf.fatal("{s}: {s}\n", .{ procedure_name, message });
     outf.flushFatal();
-    abort();
+    std.c.abort();
 }
 
 fn guaranteeCurrentTransaction(proc_name: [*:0]const u8) *Transaction {

@@ -3,6 +3,7 @@
 // Licensed under the GNU General Public License (GPL v2 or later); see src/COPYING.
 
 const std = @import("std");
+const primutl = @import("primutl.zig");
 
 pub const TreeNode = extern struct {
     height: c_int,
@@ -23,10 +24,6 @@ comptime {
     }
 }
 
-extern "c" fn malloc(size: usize) ?*anyopaque;
-extern "c" fn free(ptr: ?*anyopaque) void;
-extern "c" fn strcmp_ci(s1: [*:0]const u8, s2: [*:0]const u8) c_int;
-
 pub export var tree_error_message: ?[*:0]const u8 = null;
 pub export var tree_error_noise: ?[*:0]const u8 = null;
 
@@ -46,16 +43,18 @@ fn updateHeight(node: *TreeNode) void {
 }
 
 fn leafMake(name: [*:0]const u8, value: usize) ?*TreeNode {
-    const raw = malloc(@sizeOf(TreeNode)) orelse {
+    const raw = std.c.malloc(@sizeOf(TreeNode)) orelse {
         treeError("leaf_make: malloc failed.\n", null);
         return null;
     };
     const leaf: *TreeNode = @ptrCast(@alignCast(raw));
-    leaf.name = name;
-    leaf.value = value;
-    leaf.height = 1;
-    leaf.left = null;
-    leaf.rite = null;
+    leaf.* = .{
+        .name = name,
+        .value = value,
+        .height = 1,
+        .left = null,
+        .rite = null,
+    };
     return leaf;
 }
 
@@ -105,7 +104,7 @@ fn rebalanceRite(tree: *TreeNode) *TreeNode {
 
 pub export fn tree_insert(tree: ?*TreeNode, name: [*:0]const u8, value: usize) callconv(.c) ?*TreeNode {
     const node = tree orelse return leafMake(name, value);
-    const cmp = strcmp_ci(name, node.name.?);
+    const cmp = primutl.strcmp_ci(name, node.name.?);
     if (cmp == 0) {
         treeError("tree_insert: Duplicate entry %s.\n", name);
         return node;
@@ -121,7 +120,7 @@ pub export fn tree_insert(tree: ?*TreeNode, name: [*:0]const u8, value: usize) c
 pub export fn tree_lookup(tree: ?*TreeNode, name: [*:0]const u8) callconv(.c) ?*TreeNode {
     var cur = tree;
     while (cur) |node| {
-        const cmp = strcmp_ci(name, node.name.?);
+        const cmp = primutl.strcmp_ci(name, node.name.?);
         if (cmp == 0) return node;
         cur = if (cmp < 0) node.left else node.rite;
     }
@@ -158,7 +157,7 @@ pub export fn tree_free(tree: ?*TreeNode) callconv(.c) void {
     const node = tree orelse return;
     tree_free(node.left);
     tree_free(node.rite);
-    free(@ptrCast(node));
+    std.c.free(@ptrCast(node));
 }
 
 fn checkAvlInvariant(node: ?*const TreeNode) !c_int {

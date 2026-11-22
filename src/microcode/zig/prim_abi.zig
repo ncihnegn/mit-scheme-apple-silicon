@@ -7,6 +7,29 @@ const builtin = @import("builtin");
 const build_options = @import("build_options");
 const obj = @import("scheme_obj.zig");
 const outf = @import("outf.zig");
+const artutl = @import("artutl.zig");
+const bignum = @import("bignum.zig");
+const bytevector = @import("bytevector.zig");
+const char_mod = @import("char.zig");
+const debug = @import("debug.zig");
+const fixnum = @import("fixnum.zig");
+const flonum = @import("flonum.zig");
+const hooks = @import("hooks.zig");
+const intext = @import("intext.zig");
+const list = @import("list.zig");
+const lookup = @import("lookup.zig");
+const memmag = @import("memmag.zig");
+const option = @import("option.zig");
+const osscheme = @import("osscheme.zig");
+const ostty = @import("ostty.zig");
+const primutl = @import("primutl.zig");
+const prosfs = @import("prosfs.zig");
+const prosio = @import("prosio.zig");
+const prosterm = @import("prosterm.zig");
+const returns = @import("returns.zig");
+const string = @import("string.zig");
+const utils = @import("utils.zig");
+const vector = @import("vector.zig");
 
 pub const regblock_memtop: usize = 0;
 pub const regblock_int_mask: usize = 1;
@@ -806,32 +829,32 @@ pub extern var Primitive_Arity_Table: ?[*]c_int;
 pub extern var Primitive_Name_Table: ?[*]?[*:0]const u8;
 pub extern var Primitive_Documentation_Table: ?[*]?[*:0]const u8;
 
-pub extern "c" fn error_wrong_type_arg(c_int) noreturn;
-pub extern "c" fn error_bad_range_arg(c_int) noreturn;
+pub const error_wrong_type_arg = utils.error_wrong_type_arg;
+pub const error_bad_range_arg = utils.error_bad_range_arg;
 
 pub const fflush = outf.fflush;
 pub const cStdout = outf.cStdout;
 pub const cStderr = outf.cStderr;
 pub extern "c" fn error_external_return() noreturn;
-pub extern "c" fn signal_error_from_primitive(isize) noreturn;
+pub const signal_error_from_primitive = utils.signal_error_from_primitive;
 pub extern "c" fn signal_interrupt_from_primitive() noreturn;
 pub extern "c" fn Microcode_Termination(c_int) noreturn;
 pub extern "c" fn termination_init_error() noreturn;
-pub extern "c" fn error_in_system_call(c_int, c_int) noreturn;
+pub const error_in_system_call = utils.error_in_system_call;
 pub extern "c" fn OS_malloc(usize) ?*anyopaque;
 pub extern "c" fn OS_realloc(?*anyopaque, usize) ?*anyopaque;
 pub extern "c" fn OS_free(?*anyopaque) void;
 pub extern "c" fn get_object_address(obj.SchemeObject) ?[*]obj.SchemeObject;
 pub extern "c" fn OS_tty_map_interrupt_char(u8) u8;
-pub extern "c" fn debug_stack_trace(OutfChannel) void;
-pub extern "c" fn debug_print_expr(obj.SchemeObject, [*:0]const u8) void;
+pub const debug_stack_trace = debug.debug_stack_trace;
+pub const debug_print_expr = debug.debug_print_expr;
 pub extern "c" fn code_address_p(?*const anyopaque) bool;
 pub extern "c" fn record_primitive_entry(obj.SchemeObject) void;
 pub extern "c" fn gc_type_code(c_uint) c_int;
 pub extern "c" fn gc_ptr_type(obj.SchemeObject) c_int;
-pub extern "c" fn hashable_object_p(obj.SchemeObject) bool;
-pub extern "c" fn hash_object(obj.SchemeObject) u32;
-pub extern "c" fn combine_hashes(u32, u32) u32;
+pub const hashable_object_p = utils.hashable_object_p;
+pub const hash_object = utils.hash_object;
+pub const combine_hashes = utils.combine_hashes;
 pub extern "c" fn OS_channel_close_noerror(c_uint) void;
 pub extern var OS_channel_table_size: Tchannel;
 pub extern var channel_table: [*]Channel;
@@ -863,8 +886,8 @@ pub extern "c" fn OS_test_select_registry(SelectRegistry, c_int) c_int;
 pub extern "c" fn OS_test_select_descriptor(c_int, c_int, c_uint) c_int;
 pub extern "c" fn OS_pause(bool, bool) c_int;
 pub extern "c" fn OS_process_any_status_change() c_int;
-pub extern "c" fn arg_to_channel(obj.SchemeObject, c_int) Tchannel;
-pub extern "c" fn arg_channel(c_int) Tchannel;
+pub const arg_to_channel = prosio.arg_to_channel;
+pub const arg_channel = prosio.arg_channel;
 pub extern "c" fn OS_open_input_file([*:0]const u8) Tchannel;
 pub extern "c" fn OS_open_output_file([*:0]const u8) Tchannel;
 pub extern "c" fn OS_open_exclusive_output_file([*:0]const u8) Tchannel;
@@ -891,7 +914,7 @@ pub extern "c" fn OS_directory_valid_p(c_uint) c_int;
 pub extern "c" fn OS_directory_close(c_uint) void;
 pub extern "c" fn OS_directory_read(c_uint) ?[*:0]const u8;
 pub extern "c" fn OS_directory_read_matching(c_uint, [*:0]const u8) ?[*:0]const u8;
-pub extern "c" fn OS_channel_copy(OffT, Tchannel, Tchannel) c_int;
+pub const OS_channel_copy = prosfs.OS_channel_copy;
 pub extern "c" fn OS_file_copy([*:0]const u8, [*:0]const u8) void;
 pub extern "c" fn OS_nanotime_since_utc_epoch(*SchemeNanotime) void;
 pub extern "c" fn OS_monotonic_nanotime(*SchemeNanotime) void;
@@ -916,14 +939,14 @@ pub extern "c" fn OS_tty_output_channel() Tchannel;
 pub extern "c" fn OS_tty_error_channel() Tchannel;
 pub extern "c" fn OS_tty_command_beep() [*:0]const u8;
 pub extern "c" fn OS_tty_command_clear() [*:0]const u8;
-pub extern "c" fn OS_tty_next_interrupt_char() CcT;
+pub const OS_tty_next_interrupt_char = ostty.OS_tty_next_interrupt_char;
 pub extern "c" fn UX_PC_VDISABLE(c_int) CcT;
 pub extern "c" fn UX_terminal_control_ok(c_int) c_int;
 pub extern "c" fn OS_signal_quit_handler() c_uint;
 pub extern "c" fn OS_signal_int_handler() c_uint;
 pub extern "c" fn OS_signal_tstp_handler() c_uint;
 pub extern "c" fn OS_signal_set_interrupt_handlers(c_uint, c_uint, c_uint) void;
-pub extern "c" fn initialize_interruptable_extent() void;
+pub const initialize_interruptable_extent = intext.initialize_interruptable_extent;
 pub extern "c" fn UX_initialize_ctty(c_int) void;
 pub extern "c" fn UX_initialize_channels() void;
 pub extern "c" fn UX_initialize_terminals() void;
@@ -953,7 +976,7 @@ pub extern "c" fn OS_ctty_get_int_chars() [*]CcT;
 pub extern "c" fn OS_ctty_get_int_char_handlers() [*]CcT;
 pub extern "c" fn OS_ctty_set_int_chars([*]CcT) void;
 pub extern "c" fn OS_ctty_set_int_char_handlers([*]CcT) void;
-pub extern "c" fn arg_terminal(c_int) Tchannel;
+pub const arg_terminal = prosterm.arg_terminal;
 pub extern "c" fn OS_terminal_get_ispeed(Tchannel) c_uint;
 pub extern "c" fn OS_terminal_get_ospeed(Tchannel) c_uint;
 pub extern "c" fn OS_terminal_set_ispeed(Tchannel, c_uint) void;
@@ -1053,7 +1076,7 @@ pub extern "c" fn UX_read_fd_status(c_int, *Stat) void;
 pub extern "c" fn UX_read_file_status([*:0]const u8, *Stat) c_int;
 pub extern "c" fn UX_read_file_status_indirect([*:0]const u8, *Stat) c_int;
 pub extern "c" fn UX_file_system_type([*:0]const u8) ?[*:0]const u8;
-pub extern "c" fn find_primitive(obj.SchemeObject, bool, bool, c_int) obj.SchemeObject;
+pub const find_primitive = primutl.find_primitive;
 pub extern "c" fn termination_normal(c_int) noreturn;
 pub extern "c" fn termination_eof() noreturn;
 pub extern "c" fn UX_terminal_get_state(c_int, *TttyState) c_int;
@@ -1066,15 +1089,15 @@ pub extern "c" fn OS_tty_x_size() c_uint;
 pub extern "c" fn OS_tty_y_size() c_uint;
 pub extern "c" fn OS_syscall_names(*usize, *[*]?[*:0]const u8) void;
 pub extern "c" fn OS_syserr_names(*usize, *[*]?[*:0]const u8) void;
-pub extern "c" fn initialize_history() obj.SchemeObject;
-pub extern "c" fn initialize_interrupt_handler_vector() obj.SchemeObject;
-pub extern "c" fn initialize_interrupt_mask_vector() obj.SchemeObject;
+pub const initialize_history = hooks.initialize_history;
+pub const initialize_interrupt_handler_vector = utils.initialize_interrupt_handler_vector;
+pub const initialize_interrupt_mask_vector = utils.initialize_interrupt_mask_vector;
 pub extern "c" fn make_reflect_code_table() obj.SchemeObject;
 pub extern "c" fn cc_block_linkage_info(obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn return_address_p(obj.SchemeObject) bool;
-pub extern "c" fn cpoint_next_frame(obj.SchemeObject, usize) usize;
-pub extern "c" fn return_frame_type([*]obj.SchemeObject) c_int;
-pub extern "c" fn return_code_frame_type(obj.SchemeObject) c_int;
+pub const return_address_p = returns.return_address_p;
+pub const cpoint_next_frame = returns.cpoint_next_frame;
+pub const return_frame_type = returns.return_frame_type;
+pub const return_code_frame_type = returns.return_code_frame_type;
 
 pub extern var return_to_interpreter: obj.SchemeObject;
 pub extern var reflect_to_interface: obj.SchemeObject;
@@ -1091,25 +1114,25 @@ pub extern "c" fn add_to_tospace(obj.SchemeObject) void;
 pub extern "c" fn std_gc_table() ?*anyopaque;
 pub extern "c" fn gc_scan_tospace([*]obj.SchemeObject, ?[*]obj.SchemeObject) void;
 pub extern "c" fn increment_tospace_ptr(usize) void;
-pub extern "c" fn std_gc_pt1() void;
-pub extern "c" fn std_gc_pt2() void;
+pub const std_gc_pt1 = memmag.std_gc_pt1;
+pub const std_gc_pt2 = memmag.std_gc_pt2;
 pub extern "c" fn resize_tospace(usize) void;
 
 pub extern "c" fn lookup_variable(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) isize;
 pub extern "c" fn safe_lookup_variable(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) isize;
 pub extern "c" fn assign_variable(obj.SchemeObject, obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) isize;
-pub extern "c" fn define_variable(obj.SchemeObject, obj.SchemeObject, obj.SchemeObject) isize;
+pub const define_variable = lookup.define_variable;
 pub extern "c" fn variable_unassigned_p(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) isize;
-pub extern "c" fn variable_unbound_p(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) isize;
-pub extern "c" fn variable_unreferenceable_p(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) isize;
-pub extern "c" fn link_variables(obj.SchemeObject, obj.SchemeObject, obj.SchemeObject, obj.SchemeObject) isize;
-pub extern "c" fn unbind_variable(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject) isize;
+pub const variable_unbound_p = lookup.variable_unbound_p;
+pub const variable_unreferenceable_p = lookup.variable_unreferenceable_p;
+pub const link_variables = lookup.link_variables;
+pub const unbind_variable = lookup.unbind_variable;
 
-pub extern "c" fn make_dummy_history() [*]obj.SchemeObject;
-pub extern "c" fn save_history(usize) void;
-pub extern "c" fn stop_history() void;
-pub extern "c" fn preserve_interrupt_mask() void;
-pub extern "c" fn back_out_of_primitive() void;
+pub const make_dummy_history = utils.make_dummy_history;
+pub const save_history = utils.save_history;
+pub const stop_history = utils.stop_history;
+pub const preserve_interrupt_mask = utils.preserve_interrupt_mask;
+pub const back_out_of_primitive = utils.back_out_of_primitive;
 pub extern "c" fn apply_compiled_from_primitive(usize, obj.SchemeObject) void;
 pub extern "c" fn compiled_with_stack_marker(obj.SchemeObject) void;
 pub extern "c" fn compiled_with_interrupt_mask(usize, obj.SchemeObject, usize) void;
@@ -1164,7 +1187,7 @@ pub extern "c" fn gc_scan_oldspace([*]obj.SchemeObject, [*]obj.SchemeObject) voi
 pub extern "c" fn gc_drain_tospace_and_code_arena([*]obj.SchemeObject) void;
 pub extern "c" fn aarch64_flush_i_cache() void;
 pub extern "c" fn aarch64_flush_i_cache_region([*]obj.SchemeObject, usize) void;
-pub extern "c" fn debug_verify_heap() bool;
+pub const debug_verify_heap = debug.debug_verify_heap;
 pub extern "c" fn std_gc_death([*:0]const u8) noreturn;
 pub extern "c" fn initialize_gc_object_references() void;
 pub extern "c" fn finalize_gc_object_references() void;
@@ -1203,7 +1226,7 @@ pub extern "c" fn jit_force_execute_mode() void;
 pub extern "c" fn jit_flush_icache(?*anyopaque, usize) void;
 pub extern "c" fn code_arena_flush_icache() void;
 pub extern "c" fn init_exit_scheme() void;
-pub extern "c" fn read_command_line_options(c_int, [*]?[*:0]const u8) void;
+pub const read_command_line_options = option.read_command_line_options;
 pub extern "c" fn compiler_initialize(bool) void;
 pub extern "c" fn compiler_reset(obj.SchemeObject) void;
 pub extern "c" fn abort_to_interpreter_argument() c_int;
@@ -1238,15 +1261,15 @@ pub extern "c" fn cc_block_debugging_info(obj.SchemeObject) obj.SchemeObject;
 pub extern "c" fn read_cc_entry_offset(*CcEntryOffset, ?*anyopaque) bool;
 pub extern "c" fn compiled_closure_objects([*]obj.SchemeObject) [*]obj.SchemeObject;
 pub extern "c" fn find_signal_name(c_int) [*:0]const u8;
-pub extern "c" fn reset_interruptable_extent() void;
+pub const reset_interruptable_extent = intext.reset_interruptable_extent;
 pub extern "c" fn termination_trap() noreturn;
 pub extern "c" fn userio_choose_option([*:0]const u8, [*:0]const u8, [*]const ?[*:0]const u8) u8;
 pub extern "c" fn plausible_cc_block_p([*]obj.SchemeObject) c_int;
 pub extern "c" fn pc_to_builtin_index(usize) c_int;
 pub extern "c" fn pc_to_utility_index(usize) c_int;
 pub extern "c" fn svm_export_instruction_pointer(usize) usize;
-pub extern "c" fn enter_interruption_extent() c_int;
-pub extern "c" fn exit_interruption_extent() void;
+pub const enter_interruption_extent = intext.enter_interruption_extent;
+pub const exit_interruption_extent = intext.exit_interruption_extent;
 pub extern "c" fn OS_ctty_int_char() CcT;
 pub extern "c" fn OS_ctty_tstp_char() CcT;
 pub extern "c" fn OS_ctty_disabled_char() CcT;
@@ -1330,46 +1353,46 @@ pub extern "c" fn cc_block_environment(obj.SchemeObject) obj.SchemeObject;
 pub extern "c" fn write_variable_cache(obj.SchemeObject, obj.SchemeObject, usize) void;
 pub extern "c" fn make_uuo_link(obj.SchemeObject, obj.SchemeObject, obj.SchemeObject, usize) isize;
 
-pub extern "c" fn arg_integer(c_int) isize;
-pub extern "c" fn arg_nonnegative_integer(c_int) isize;
-pub extern "c" fn arg_index_integer(c_int, isize) isize;
-pub extern "c" fn arg_ulong_integer(c_int) usize;
-pub extern "c" fn arg_ulong_index_integer(c_int, usize) usize;
-pub extern "c" fn arg_flonum(c_int) f64;
+pub const arg_integer = utils.arg_integer;
+pub const arg_nonnegative_integer = utils.arg_nonnegative_integer;
+pub const arg_index_integer = utils.arg_index_integer;
+pub const arg_ulong_integer = utils.arg_ulong_integer;
+pub const arg_ulong_index_integer = utils.arg_ulong_index_integer;
+pub const arg_flonum = flonum.arg_flonum;
 
-pub extern "c" fn long_to_integer(isize) obj.SchemeObject;
-pub extern "c" fn ulong_to_integer(usize) obj.SchemeObject;
-pub extern "c" fn double_to_flonum(f64) obj.SchemeObject;
+pub const long_to_integer = artutl.long_to_integer;
+pub const ulong_to_integer = artutl.ulong_to_integer;
+pub const double_to_flonum = flonum.double_to_flonum;
 
-pub extern "c" fn allocate_non_marked_vector(c_uint, usize, bool) obj.SchemeObject;
-pub extern "c" fn allocate_marked_vector(c_uint, usize, bool) obj.SchemeObject;
-pub extern "c" fn allocate_vector(usize, bool) obj.SchemeObject;
+pub const allocate_non_marked_vector = vector.allocate_non_marked_vector;
+pub const allocate_marked_vector = vector.allocate_marked_vector;
+pub const allocate_vector = vector.allocate_vector;
 pub extern "c" fn make_vector(usize, obj.SchemeObject, bool) obj.SchemeObject;
 
-pub extern "c" fn arg_bytevector(c_int, *usize) [*]u8;
-pub extern "c" fn allocate_bytevector(usize) obj.SchemeObject;
-pub extern "c" fn memory_to_bytevector(usize, ?*const anyopaque) obj.SchemeObject;
+pub const arg_bytevector = bytevector.arg_bytevector;
+pub const allocate_bytevector = bytevector.allocate_bytevector;
+pub const memory_to_bytevector = bytevector.memory_to_bytevector;
 pub extern "c" fn OS_get_entropy(*[32]u8) void;
 
 pub extern "c" fn canonicalize_primitive_context() void;
 pub extern "c" fn abort_to_interpreter(isize) noreturn;
 pub extern "c" fn stack_death([*:0]const u8) noreturn;
-pub extern "c" fn cons(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
+pub const cons = list.cons;
 
-pub extern "c" fn arg_integer_in_range(c_int, isize, isize) isize;
-pub extern "c" fn arg_index_integer_to_intmax(c_int, i64) i64;
-pub extern "c" fn error_unimplemented_primitive() noreturn;
-pub extern "c" fn Mul(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn string_p(obj.SchemeObject) bool;
-pub extern "c" fn allocate_string(usize) obj.SchemeObject;
-pub extern "c" fn system_pair_cons(isize, obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn memory_hash(usize, ?*const anyopaque) u32;
-pub extern "c" fn arg_ascii_char(c_int) isize;
-pub extern "c" fn arg_ascii_integer(c_int) isize;
-pub extern "c" fn char_upcase(isize) isize;
-pub extern "c" fn char_downcase(isize) isize;
-pub extern "c" fn string_to_char_pointer(obj.SchemeObject, ?*usize) [*]u8;
-pub extern "c" fn arg_extended_string(c_uint, ?*usize) [*]u8;
+pub const arg_integer_in_range = utils.arg_integer_in_range;
+pub const arg_index_integer_to_intmax = utils.arg_index_integer_to_intmax;
+pub const error_unimplemented_primitive = osscheme.error_unimplemented_primitive;
+pub const Mul = fixnum.Mul;
+pub const string_p = string.string_p;
+pub const allocate_string = string.allocate_string;
+pub const system_pair_cons = list.system_pair_cons;
+pub const memory_hash = utils.memory_hash;
+pub const arg_ascii_char = char_mod.arg_ascii_char;
+pub const arg_ascii_integer = char_mod.arg_ascii_integer;
+pub const char_upcase = char_mod.char_upcase;
+pub const char_downcase = char_mod.char_downcase;
+pub const string_to_char_pointer = string.string_to_char_pointer;
+pub const arg_extended_string = string.arg_extended_string;
 
 pub const BignumComparison = enum(c_int) {
     equal = 0,
@@ -1381,77 +1404,66 @@ pub const dbl_min_exp: isize = -1021;
 pub const dbl_max_exp: isize = 1024;
 pub const dbl_mant_dig: isize = 53;
 
-pub extern "c" fn bignum_equal_p(obj.SchemeObject, obj.SchemeObject) c_int;
-pub extern "c" fn bignum_test(obj.SchemeObject) c_int;
-pub extern "c" fn bignum_compare(obj.SchemeObject, obj.SchemeObject) c_int;
-pub extern "c" fn bignum_add(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn bignum_subtract(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn bignum_negate(obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn bignum_multiply(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn bignum_divide(obj.SchemeObject, obj.SchemeObject, *obj.SchemeObject, *obj.SchemeObject) c_int;
-pub extern "c" fn bignum_quotient(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn bignum_remainder(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn long_to_bignum(isize) obj.SchemeObject;
-pub extern "c" fn ulong_to_bignum(usize) obj.SchemeObject;
-pub extern "c" fn bignum_to_long(obj.SchemeObject) isize;
-pub extern "c" fn bignum_to_ulong(obj.SchemeObject) usize;
-pub extern "c" fn intmax_to_bignum(i64) obj.SchemeObject;
-pub extern "c" fn uintmax_to_bignum(u64) obj.SchemeObject;
-pub extern "c" fn bignum_to_intmax(obj.SchemeObject) i64;
-pub extern "c" fn bignum_to_uintmax(obj.SchemeObject) u64;
-pub extern "c" fn double_to_bignum(f64) obj.SchemeObject;
-pub extern "c" fn bignum_to_double(obj.SchemeObject) f64;
-pub extern "c" fn bignum_fits_in_word_p(obj.SchemeObject, isize, c_int) c_int;
-pub extern "c" fn bignum_length_in_bits(obj.SchemeObject) usize;
-pub extern "c" fn bignum_integer_length(obj.SchemeObject) usize;
-pub extern "c" fn bignum_first_set_bit(obj.SchemeObject) isize;
-pub extern "c" fn bignum_bit_count(obj.SchemeObject) usize;
-pub extern "c" fn bignum_hamming_distance(obj.SchemeObject, obj.SchemeObject) isize;
-pub extern "c" fn bignum_bitwise_not(obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn bignum_bitwise_and(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn bignum_bitwise_andc2(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn bignum_bitwise_andc1(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn bignum_bitwise_xor(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn bignum_bitwise_ior(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn bignum_bitwise_nor(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn bignum_bitwise_eqv(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn bignum_bitwise_orc2(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn bignum_bitwise_orc1(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn bignum_bitwise_nand(obj.SchemeObject, obj.SchemeObject) obj.SchemeObject;
-pub extern "c" fn bignum_nonnegative_one_bits(usize, usize) obj.SchemeObject;
-pub extern "c" fn bignum_negative_zero_bits(usize, usize) obj.SchemeObject;
-pub extern "c" fn bignum_shift_right(obj.SchemeObject, usize) obj.SchemeObject;
-pub extern "c" fn bignum_shift_left(obj.SchemeObject, usize) obj.SchemeObject;
-pub extern "c" fn unsigned_long_to_shifted_bignum(usize, usize, c_int) obj.SchemeObject;
-pub extern "c" fn digit_stream_to_bignum(
-    c_uint,
-    *const fn (?*anyopaque) callconv(.c) c_uint,
-    ?*anyopaque,
-    c_uint,
-    c_int,
-) obj.SchemeObject;
-pub extern "c" fn bignum_to_digit_stream(
-    obj.SchemeObject,
-    c_uint,
-    *const fn (?*anyopaque, isize) callconv(.c) void,
-    ?*anyopaque,
-) void;
-pub extern "c" fn bignum_max_digit_stream_radix() isize;
+pub const bignum_equal_p = bignum.bignum_equal_p;
+pub const bignum_test = bignum.bignum_test;
+pub const bignum_compare = bignum.bignum_compare;
+pub const bignum_add = bignum.bignum_add;
+pub const bignum_subtract = bignum.bignum_subtract;
+pub const bignum_negate = bignum.bignum_negate;
+pub const bignum_multiply = bignum.bignum_multiply;
+pub const bignum_divide = bignum.bignum_divide;
+pub const bignum_quotient = bignum.bignum_quotient;
+pub const bignum_remainder = bignum.bignum_remainder;
+pub const long_to_bignum = bignum.long_to_bignum;
+pub const ulong_to_bignum = bignum.ulong_to_bignum;
+pub const bignum_to_long = bignum.bignum_to_long;
+pub const bignum_to_ulong = bignum.bignum_to_ulong;
+pub const intmax_to_bignum = bignum.intmax_to_bignum;
+pub const uintmax_to_bignum = bignum.uintmax_to_bignum;
+pub const bignum_to_intmax = bignum.bignum_to_intmax;
+pub const bignum_to_uintmax = bignum.bignum_to_uintmax;
+pub const double_to_bignum = bignum.double_to_bignum;
+pub const bignum_to_double = bignum.bignum_to_double;
+pub const bignum_fits_in_word_p = bignum.bignum_fits_in_word_p;
+pub const bignum_length_in_bits = bignum.bignum_length_in_bits;
+pub const bignum_integer_length = bignum.bignum_integer_length;
+pub const bignum_first_set_bit = bignum.bignum_first_set_bit;
+pub const bignum_bit_count = bignum.bignum_bit_count;
+pub const bignum_hamming_distance = bignum.bignum_hamming_distance;
+pub const bignum_bitwise_not = bignum.bignum_bitwise_not;
+pub const bignum_bitwise_and = bignum.bignum_bitwise_and;
+pub const bignum_bitwise_andc2 = bignum.bignum_bitwise_andc2;
+pub const bignum_bitwise_andc1 = bignum.bignum_bitwise_andc1;
+pub const bignum_bitwise_xor = bignum.bignum_bitwise_xor;
+pub const bignum_bitwise_ior = bignum.bignum_bitwise_ior;
+pub const bignum_bitwise_nor = bignum.bignum_bitwise_nor;
+pub const bignum_bitwise_eqv = bignum.bignum_bitwise_eqv;
+pub const bignum_bitwise_orc2 = bignum.bignum_bitwise_orc2;
+pub const bignum_bitwise_orc1 = bignum.bignum_bitwise_orc1;
+pub const bignum_bitwise_nand = bignum.bignum_bitwise_nand;
+pub const bignum_nonnegative_one_bits = bignum.bignum_nonnegative_one_bits;
+pub const bignum_negative_zero_bits = bignum.bignum_negative_zero_bits;
+pub const bignum_shift_right = bignum.bignum_shift_right;
+pub const bignum_shift_left = bignum.bignum_shift_left;
+pub const unsigned_long_to_shifted_bignum = bignum.unsigned_long_to_shifted_bignum;
+pub const digit_stream_to_bignum = bignum.digit_stream_to_bignum;
+pub const bignum_to_digit_stream = bignum.bignum_to_digit_stream;
+pub const bignum_max_digit_stream_radix = bignum.bignum_max_digit_stream_radix;
 
 pub inline fn bignumZeroP(b: obj.SchemeObject) bool {
-    return bignum_test(b) == @intFromEnum(BignumComparison.equal);
+    return bignum_test(b) == @backingInt(BignumComparison.equal);
 }
 
 pub inline fn bignumNegativeP(b: obj.SchemeObject) bool {
-    return bignum_test(b) == @intFromEnum(BignumComparison.less);
+    return bignum_test(b) == @backingInt(BignumComparison.less);
 }
 
 pub inline fn bignumPositiveP(b: obj.SchemeObject) bool {
-    return bignum_test(b) == @intFromEnum(BignumComparison.greater);
+    return bignum_test(b) == @backingInt(BignumComparison.greater);
 }
 
 pub inline fn bignumLessP(x: obj.SchemeObject, y: obj.SchemeObject) bool {
-    return bignum_compare(x, y) == @intFromEnum(BignumComparison.less);
+    return bignum_compare(x, y) == @backingInt(BignumComparison.less);
 }
 
 pub inline fn bignumToLongP(b: obj.SchemeObject) bool {
@@ -1547,15 +1559,15 @@ pub inline fn gcType(o: obj.SchemeObject) c_int {
 }
 
 pub inline fn gcTypePair(o: obj.SchemeObject) bool {
-    return gcType(o) == @intFromEnum(GcType.pair);
+    return gcType(o) == @backingInt(GcType.pair);
 }
 
 pub inline fn gcTypeTriple(o: obj.SchemeObject) bool {
-    return gcType(o) == @intFromEnum(GcType.triple);
+    return gcType(o) == @backingInt(GcType.triple);
 }
 
 pub inline fn gcTypeVector(o: obj.SchemeObject) bool {
-    return gcType(o) == @intFromEnum(GcType.vector);
+    return gcType(o) == @backingInt(GcType.vector);
 }
 
 pub inline fn interruptEnabledP(mask: usize) bool {

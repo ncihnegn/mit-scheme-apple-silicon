@@ -20,7 +20,6 @@ extern "c" fn fopen([*:0]const u8, [*:0]const u8) FaslFileHandle;
 extern "c" fn fclose(FaslFileHandle) c_int;
 extern "c" fn fread(?*anyopaque, usize, usize, FaslFileHandle) usize;
 extern "c" fn fwrite(?*const anyopaque, usize, usize, FaslFileHandle) usize;
-extern "c" fn abort() noreturn;
 
 pub const fasl_file_marker: obj.SchemeObject = if (@sizeOf(usize) == 4)
     0xFAFAFAFA
@@ -344,7 +343,7 @@ pub export fn fasl_object_address(o: obj.SchemeObject, h: *FaslHeader) callconv(
         else
             obj.datumToAddress(datum);
     }
-    abort();
+    std.c.abort();
 }
 
 pub export fn fasl_cc_address(o: obj.SchemeObject, h: *FaslHeader) callconv(.c) ?[*]Insn {
@@ -357,7 +356,7 @@ pub export fn fasl_cc_address(o: obj.SchemeObject, h: *FaslHeader) callconv(.c) 
         std.debug.assert(obj.objectType(o) == obj.tc_compiled_entry);
         return @ptrFromInt(obj.datumToRawAddress(datum));
     }
-    abort();
+    std.c.abort();
 }
 
 pub export fn fasl_cc_return(o: obj.SchemeObject, h: *FaslHeader) callconv(.c) ?[*]Insn {
@@ -370,7 +369,7 @@ pub export fn fasl_cc_return(o: obj.SchemeObject, h: *FaslHeader) callconv(.c) ?
         std.debug.assert(obj.ccReturnP(o));
         return @ptrFromInt(obj.datumToRawAddress(datum));
     }
-    abort();
+    std.c.abort();
 }
 
 pub export fn fasl_raw_address_to_object(
@@ -389,7 +388,7 @@ pub export fn fasl_raw_address_to_object(
             obj.addressToDatum(address.?);
         return obj.makeObject(@intCast(type_code), datum);
     }
-    abort();
+    std.c.abort();
 }
 
 pub export fn fasl_raw_address_to_cc_entry(address: ?[*]Insn, h: *FaslHeader) callconv(.c) obj.SchemeObject {
@@ -401,7 +400,7 @@ pub export fn fasl_raw_address_to_cc_entry(address: ?[*]Insn, h: *FaslHeader) ca
         const datum: usize = obj.rawAddressToDatum(@intFromPtr(address));
         return obj.makeObject(obj.tc_compiled_entry, datum);
     }
-    abort();
+    std.c.abort();
 }
 
 pub export fn faslhdr_utilities_end(h: *FaslHeader) callconv(.c) ?[*]obj.SchemeObject {

@@ -12,12 +12,6 @@ const storage = @import("storage.zig");
 const utils = @import("utils.zig");
 const code_arena = @import("code_arena.zig");
 
-extern "c" fn malloc(size: usize) ?*anyopaque;
-extern "c" fn realloc(ptr: ?*anyopaque, size: usize) ?*anyopaque;
-extern "c" fn free(ptr: ?*anyopaque) void;
-extern "c" fn memmove(dst: ?*anyopaque, src: ?*const anyopaque, n: usize) ?*anyopaque;
-extern "c" fn exit(status: c_int) noreturn;
-
 var saved_heap_size: usize = 0;
 var saved_constant_size: usize = 0;
 var saved_stack_size: usize = 0;
@@ -59,7 +53,7 @@ fn allocationTooLarge() noreturn {
     outf.fatal("Try again with a smaller argument to '--heap'.\n", .{});
     outf.flushFatal();
     reset_memory();
-    exit(1);
+    std.c.exit(1);
 }
 
 pub export fn setup_memory(
@@ -71,7 +65,7 @@ pub export fn setup_memory(
     if (heap_size == 0 or stack_size == 0) {
         outf.fatal("Configuration won't hold initial data.\n", .{});
         outf.flushFatal();
-        exit(1);
+        std.c.exit(1);
     }
 
     const total_words_u128 = @as(u128, stack_size) + heap_size + constant_size;
@@ -83,7 +77,7 @@ pub export fn setup_memory(
     const raw = abi.OS_malloc_init(total_words * @sizeOf(obj.SchemeObject)) orelse {
         outf.fatal("Not enough memory for this configuration.\n", .{});
         outf.flushFatal();
-        exit(1);
+        std.c.exit(1);
     };
     const block_start: [*]obj.SchemeObject = @ptrCast(@alignCast(raw));
     const block_end = block_start + total_words;
@@ -109,7 +103,7 @@ pub export fn setup_memory(
 pub export fn reset_memory() callconv(.c) void {
     code_arena.code_arena_teardown();
     if (storage.memory_block_start) |p| {
-        free(@ptrCast(p));
+        std.c.free(@ptrCast(p));
         storage.memory_block_start = null;
         storage.memory_block_end = null;
     }
@@ -164,16 +158,16 @@ fn allocateTospace(
 ) callconv(.c) void {
     if (n_words > 0) {
         const bytes: usize = @as(usize, @intCast(n_words)) * @sizeOf(obj.SchemeObject);
-        const raw = if (start_r.*) |prev| realloc(@ptrCast(prev), bytes) else malloc(bytes);
+        const raw = if (start_r.*) |prev| std.c.realloc(@ptrCast(prev), bytes) else std.c.malloc(bytes);
         const p: [*]obj.SchemeObject = @ptrCast(@alignCast(raw orelse {
             outf.fatal("Unable to allocate temporary heap for GC.\n", .{});
             outf.flushFatal();
-            exit(1);
+            std.c.exit(1);
         }));
         start_r.* = p;
         end_r.* = p + @as(usize, @intCast(n_words));
     } else if (start_r.*) |prev| {
-        free(@ptrCast(prev));
+        std.c.free(@ptrCast(prev));
         start_r.* = null;
         end_r.* = null;
     }
@@ -332,7 +326,9 @@ fn saveTospaceCopy(
     end: [*]obj.SchemeObject,
     _: ?*anyopaque,
 ) callconv(.c) bool {
-    _ = memmove(abi.tospace_to_newspace(@ptrCast(start)), @ptrCast(start), @intFromPtr(end) - @intFromPtr(start));
+    const dst: [*]obj.SchemeObject = @ptrCast(@alignCast(abi.tospace_to_newspace(@ptrCast(start)).?));
+    const n_words = (@intFromPtr(end) - @intFromPtr(start)) / @sizeOf(obj.SchemeObject);
+    @memmove(dst[0..n_words], start[0..n_words]);
     return true;
 }
 

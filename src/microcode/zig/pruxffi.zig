@@ -20,7 +20,12 @@ pub const CalloutTrampOut = *const fn () callconv(.c) SCM;
 pub const CalloutTrampIn = *const fn () callconv(.c) SCM;
 pub const CallbackKernel = *const fn () callconv(.c) void;
 
-extern "c" fn strncpy([*]u8, [*]const u8, usize) [*]u8;
+fn copyCStringZ(dst: [*]u8, src: [*]const u8, n: usize) void {
+    const src_slice = src[0..n];
+    const len = std.mem.indexOfScalar(u8, src_slice, 0) orelse n;
+    @memcpy(dst[0..len], src_slice[0..len]);
+    @memset(dst[len..n], 0);
+}
 
 const CChar = if (builtin.os.tag == .linux and builtin.cpu.arch == .aarch64) u8 else i8;
 
@@ -53,7 +58,7 @@ fn alienAddressLoc() [*]u8 {
 }
 
 fn readUnaligned(comptime T: type, ptr: [*]const u8) T {
-    const p: *const align(1) T = @ptrCast(ptr);
+    const p: *align(1) const T = @ptrCast(ptr);
     return p.*;
 }
 
@@ -371,7 +376,7 @@ pub export fn Prim_poke_string() callconv(.c) SCM {
     abi.primitiveHeader();
     abi.checkArg(3, abi.string_p);
     const s = abi.argRef(3);
-    _ = strncpy(alienAddressLoc(), obj.legacyStringData(s), @intCast(obj.legacyStringLength(s) + 1));
+    copyCStringZ(alienAddressLoc(), obj.legacyStringData(s), @intCast(obj.legacyStringLength(s) + 1));
     return obj.unspecific;
 }
 
@@ -382,7 +387,7 @@ pub export fn Prim_poke_string_bang() callconv(.c) SCM {
     const ptr = alienAddressLoc();
     const s = abi.argRef(3);
     const n_chars: usize = @intCast(obj.legacyStringLength(s) + 1);
-    _ = strncpy(ptr, obj.legacyStringData(s), n_chars);
+    copyCStringZ(ptr, obj.legacyStringData(s), n_chars);
     set_alien_address(abi.argRef(1), ptr + n_chars);
     return obj.unspecific;
 }
