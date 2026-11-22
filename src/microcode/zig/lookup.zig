@@ -540,9 +540,8 @@ fn unbindVariable1(cell: [*]obj.SchemeObject, frame: obj.SchemeObject, symbol: o
     if (obj.procedureFrameP(frame) and obj.extendedFrameP(frame)) {
         const start = obj.extendedFrameBindings(frame);
         const length = obj.extendedFrameLength(frame);
-        var idx: usize = 0;
         const len_u: usize = @intCast(length);
-        while (idx < len_u) : (idx += 1) {
+        for (0..len_u) |idx| {
             if (obj.pairCar(start[idx]) == symbol) {
                 if (idx < len_u - 1) {
                     start[idx] = start[len_u - 1];

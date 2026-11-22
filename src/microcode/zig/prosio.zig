@@ -50,8 +50,8 @@ pub export fn Prim_channel_synchronize() callconv(.c) obj.SchemeObject {
 //   "Return a vector of all channels in the channel table.")
 pub export fn Prim_channel_table() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    var channel: abi.Tchannel = 0;
-    while (channel < abi.OS_channel_table_size) : (channel += 1) {
+    for (0..abi.OS_channel_table_size) |ch_u| {
+        const channel: abi.Tchannel = @intCast(ch_u);
         if (abi.OS_channel_open_p(channel) != 0) {
             boot.scratch_obstack.grow(std.mem.asBytes(&channel));
         }
@@ -104,7 +104,7 @@ const channel_type_names = [_][*:0]const u8{
 pub export fn Prim_channel_type_name() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     const ch_type = abi.OS_channel_type(arg_channel(1));
-    if (ch_type == @intFromEnum(abi.ChannelType.unknown)) {
+    if (ch_type == @backingInt(abi.ChannelType.unknown)) {
         return obj.sharp_f;
     }
     const index: usize = @intCast(ch_type);
@@ -271,9 +271,9 @@ pub export fn Prim_test_selreg() callconv(.c) obj.SchemeObject {
     else
         abi.OS_test_select_registry(r, @intFromBool(blockp));
     if (result > 0) {
-        var i: c_uint = 0;
         var iv: usize = 0;
-        while (i < rl) : (i += 1) {
+        for (0..rl) |i_u| {
+            const i: c_uint = @intCast(i_u);
             var fd: c_int = undefined;
             var mode: c_uint = undefined;
             abi.OS_select_registry_result(r, i, &fd, &mode);
@@ -305,9 +305,9 @@ test "prosio channel, pipe, table, and select registry primitives" {
     defer boot.scratch_obstack.freeObj(null);
 
     // Open channel 2 and check CHANNEL-TYPE / CHANNEL-TYPE-NAME / CHANNEL-BLOCKING?
-    stubs.setMockChannel(2, @intFromEnum(abi.ChannelType.file), false);
+    stubs.setMockChannel(2, @backingInt(abi.ChannelType.file), false);
     stubs.setArgs(&.{obj.ulongToFixnum(2)});
-    try std.testing.expectEqual(@intFromEnum(abi.ChannelType.file), obj.fixnumToLong(Prim_channel_type()));
+    try std.testing.expectEqual(@backingInt(abi.ChannelType.file), obj.fixnumToLong(Prim_channel_type()));
     const type_name = Prim_channel_type_name();
     try std.testing.expectEqualStrings("file", obj.legacyStringData(type_name)[0..obj.legacyStringLength(type_name)]);
     try std.testing.expectEqual(obj.sharp_t, Prim_channel_blocking_p());
@@ -318,7 +318,7 @@ test "prosio channel, pipe, table, and select registry primitives" {
     _ = Prim_channel_synchronize();
 
     // Unknown channel type returns #F for CHANNEL-TYPE-NAME
-    stubs.setMockChannel(4, @intFromEnum(abi.ChannelType.unknown), false);
+    stubs.setMockChannel(4, @backingInt(abi.ChannelType.unknown), false);
     stubs.setArgs(&.{obj.ulongToFixnum(4)});
     try std.testing.expectEqual(obj.sharp_f, Prim_channel_type_name());
 

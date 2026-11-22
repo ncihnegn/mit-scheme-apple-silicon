@@ -25,7 +25,7 @@ pub const SyntaxCode = enum(u4) {
     max = 13,
 };
 
-const illegal: u8 = @intFromEnum(SyntaxCode.max);
+const illegal: u8 = @backingInt(SyntaxCode.max);
 
 const comstart_first_a: usize = 0x80;
 const comstart_first_b: usize = 0x40;
@@ -45,21 +45,21 @@ const comend_second: c_uint = 0x03;
 
 pub export var syntax_spec_code: [0x80]u8 = blk: {
     var t: [0x80]u8 = @splat(illegal);
-    t[' '] = @intFromEnum(SyntaxCode.whitespace);
-    t['"'] = @intFromEnum(SyntaxCode.string);
-    t['$'] = @intFromEnum(SyntaxCode.math);
-    t['\''] = @intFromEnum(SyntaxCode.quote);
-    t['('] = @intFromEnum(SyntaxCode.open);
-    t[')'] = @intFromEnum(SyntaxCode.close);
-    t['-'] = @intFromEnum(SyntaxCode.whitespace);
-    t['.'] = @intFromEnum(SyntaxCode.punct);
-    t['/'] = @intFromEnum(SyntaxCode.charquote);
-    t['<'] = @intFromEnum(SyntaxCode.comment);
-    t['>'] = @intFromEnum(SyntaxCode.endcomment);
-    t['W'] = @intFromEnum(SyntaxCode.word);
-    t['\\'] = @intFromEnum(SyntaxCode.escape);
-    t['_'] = @intFromEnum(SyntaxCode.symbol);
-    t['w'] = @intFromEnum(SyntaxCode.word);
+    t[' '] = @backingInt(SyntaxCode.whitespace);
+    t['"'] = @backingInt(SyntaxCode.string);
+    t['$'] = @backingInt(SyntaxCode.math);
+    t['\''] = @backingInt(SyntaxCode.quote);
+    t['('] = @backingInt(SyntaxCode.open);
+    t[')'] = @backingInt(SyntaxCode.close);
+    t['-'] = @backingInt(SyntaxCode.whitespace);
+    t['.'] = @backingInt(SyntaxCode.punct);
+    t['/'] = @backingInt(SyntaxCode.charquote);
+    t['<'] = @backingInt(SyntaxCode.comment);
+    t['>'] = @backingInt(SyntaxCode.endcomment);
+    t['W'] = @backingInt(SyntaxCode.word);
+    t['\\'] = @backingInt(SyntaxCode.escape);
+    t['_'] = @backingInt(SyntaxCode.symbol);
+    t['w'] = @backingInt(SyntaxCode.word);
     break :blk t;
 };
 
@@ -96,7 +96,7 @@ pub inline fn syntaxEntryPrefix(entry: obj.SchemeObject) bool {
 
 pub inline fn syntaxEntryQuote(entry: obj.SchemeObject) bool {
     const code = syntaxEntryCode(entry);
-    return code == @intFromEnum(SyntaxCode.escape) or code == @intFromEnum(SyntaxCode.charquote);
+    return code == @backingInt(SyntaxCode.escape) or code == @backingInt(SyntaxCode.charquote);
 }
 
 // DEFINE_PRIMITIVE ("STRING->SYNTAX-ENTRY", Prim_string_to_syntax_entry, 1, 1, 0)
@@ -116,7 +116,7 @@ pub export fn Prim_string_to_syntax_entry() callconv(.c) obj.SchemeObject {
         result = syntax_spec_code[c];
         if (result == illegal) abi.error_bad_range_arg(1);
     } else {
-        result = @intFromEnum(SyntaxCode.whitespace);
+        result = @backingInt(SyntaxCode.whitespace);
     }
 
     if (length > 0) {
@@ -147,8 +147,8 @@ pub export fn Prim_string_to_syntax_entry() callconv(.c) obj.SchemeObject {
             '7' => mergeBit(&result, comend_first_a << 12),
             '8' => mergeBit(&result, comend_second_a << 12),
             'b' => switch (syntaxEntryCode(result)) {
-                @intFromEnum(SyntaxCode.comment) => mergeBit(&result, comstart_first_b << 12),
-                @intFromEnum(SyntaxCode.endcomment) => mergeBit(&result, comend_first_b << 12),
+                @backingInt(SyntaxCode.comment) => mergeBit(&result, comstart_first_b << 12),
+                @backingInt(SyntaxCode.endcomment) => mergeBit(&result, comend_first_b << 12),
                 else => {},
             },
             'p' => mergeBit(&result, @as(usize, 1) << 20),
@@ -157,12 +157,12 @@ pub export fn Prim_string_to_syntax_entry() callconv(.c) obj.SchemeObject {
         }
     }
 
-    if (syntaxEntryCode(result) == @intFromEnum(SyntaxCode.comment) and
+    if (syntaxEntryCode(result) == @backingInt(SyntaxCode.comment) and
         (syntaxEntryCommentBits(result) & comstart_first) == 0)
     {
         mergeBit(&result, comstart_first_a << 12);
     }
-    if (syntaxEntryCode(result) == @intFromEnum(SyntaxCode.endcomment) and
+    if (syntaxEntryCode(result) == @backingInt(SyntaxCode.endcomment) and
         (syntaxEntryCommentBits(result) & comend_first) == 0)
     {
         mergeBit(&result, comend_first_a << 12);
@@ -320,7 +320,7 @@ pub export fn Prim_scan_backward_prefix_chars() callconv(.c) obj.SchemeObject {
         if (ctx.leftEndP(ctx.start)) return obj.longToUnsignedFixnum(ctx.scanToIndex(ctx.start));
         if (ctx.leftQuotedP(ctx.start)) return obj.longToUnsignedFixnum(ctx.scanToIndex(ctx.start));
         const sentry = ctx.peekLeft(ctx.start);
-        if (syntaxEntryCode(sentry) != @intFromEnum(SyntaxCode.quote) and !syntaxEntryPrefix(sentry)) {
+        if (syntaxEntryCode(sentry) != @backingInt(SyntaxCode.quote) and !syntaxEntryPrefix(sentry)) {
             return obj.longToUnsignedFixnum(ctx.scanToIndex(ctx.start));
         }
         ctx.moveLeft(&ctx.start);
@@ -334,7 +334,7 @@ pub export fn Prim_scan_forward_prefix_chars() callconv(.c) obj.SchemeObject {
         if (ctx.rightEndP(ctx.start)) return obj.longToUnsignedFixnum(ctx.scanToIndex(ctx.start));
         if (ctx.rightQuotedP(ctx.start)) return obj.longToUnsignedFixnum(ctx.scanToIndex(ctx.start));
         const sentry = ctx.peekRight(ctx.start);
-        if (syntaxEntryCode(sentry) != @intFromEnum(SyntaxCode.quote) and !syntaxEntryPrefix(sentry)) {
+        if (syntaxEntryCode(sentry) != @backingInt(SyntaxCode.quote) and !syntaxEntryPrefix(sentry)) {
             return obj.longToUnsignedFixnum(ctx.scanToIndex(ctx.start));
         }
         ctx.moveRight(&ctx.start);
@@ -348,7 +348,7 @@ pub export fn Prim_scan_forward_to_word() callconv(.c) obj.SchemeObject {
     var ctx = ScanCtx.initForward();
     while (true) {
         if (ctx.rightEndP(ctx.start)) return obj.sharp_f;
-        if (syntaxEntryCode(ctx.peekRight(ctx.start)) == @intFromEnum(SyntaxCode.word)) {
+        if (syntaxEntryCode(ctx.peekRight(ctx.start)) == @backingInt(SyntaxCode.word)) {
             return obj.longToUnsignedFixnum(ctx.scanToIndex(ctx.start));
         }
         ctx.moveRight(&ctx.start);
@@ -361,10 +361,10 @@ pub export fn Prim_scan_word_forward() callconv(.c) obj.SchemeObject {
     while (true) {
         if (ctx.rightEndP(ctx.start)) return obj.sharp_f;
         const sentry = ctx.readRight(&ctx.start);
-        if (syntaxEntryCode(sentry) == @intFromEnum(SyntaxCode.word)) break;
+        if (syntaxEntryCode(sentry) == @backingInt(SyntaxCode.word)) break;
     }
     while (true) {
-        if (ctx.rightEndP(ctx.start) or syntaxEntryCode(ctx.peekRight(ctx.start)) != @intFromEnum(SyntaxCode.word)) {
+        if (ctx.rightEndP(ctx.start) or syntaxEntryCode(ctx.peekRight(ctx.start)) != @backingInt(SyntaxCode.word)) {
             return obj.longToUnsignedFixnum(ctx.scanToIndex(ctx.start));
         }
         ctx.moveRight(&ctx.start);
@@ -377,10 +377,10 @@ pub export fn Prim_scan_word_backward() callconv(.c) obj.SchemeObject {
     while (true) {
         if (ctx.leftEndP(ctx.start)) return obj.sharp_f;
         const sentry = ctx.readLeft(&ctx.start);
-        if (syntaxEntryCode(sentry) == @intFromEnum(SyntaxCode.word)) break;
+        if (syntaxEntryCode(sentry) == @backingInt(SyntaxCode.word)) break;
     }
     while (true) {
-        if (ctx.leftEndP(ctx.start) or syntaxEntryCode(ctx.peekLeft(ctx.start)) != @intFromEnum(SyntaxCode.word)) {
+        if (ctx.leftEndP(ctx.start) or syntaxEntryCode(ctx.peekLeft(ctx.start)) != @backingInt(SyntaxCode.word)) {
             return obj.longToUnsignedFixnum(ctx.scanToIndex(ctx.start));
         }
         ctx.moveLeft(&ctx.start);
@@ -403,7 +403,7 @@ pub export fn Prim_scan_list_forward() callconv(.c) obj.SchemeObject {
         var sentry = ctx.readRight(&ctx.start);
 
         var style: c_uint = 0;
-        if (syntaxEntryCode(sentry) == @intFromEnum(SyntaxCode.comment)) {
+        if (syntaxEntryCode(sentry) == @backingInt(SyntaxCode.comment)) {
             style = syntaxEntryCommentStyle(sentry, comstart_first);
         } else if (!ctx.rightEndP(ctx.start)) {
             style = syntaxEntryCommentStyle(sentry, comstart_first) &
@@ -415,7 +415,7 @@ pub export fn Prim_scan_list_forward() callconv(.c) obj.SchemeObject {
             while (true) {
                 sentry = ctx.readRight(&ctx.start);
                 if ((syntaxEntryCommentBits(sentry) & comend_first & style) != 0) {
-                    if (syntaxEntryCode(sentry) == @intFromEnum(SyntaxCode.endcomment)) break;
+                    if (syntaxEntryCode(sentry) == @backingInt(SyntaxCode.endcomment)) break;
                     if (ctx.rightEndP(ctx.start)) return obj.sharp_f;
                     if ((syntaxEntryCommentBits(ctx.peekRight(ctx.start)) & comend_second & style) != 0) {
                         ctx.moveRight(&ctx.start);
@@ -427,14 +427,14 @@ pub export fn Prim_scan_list_forward() callconv(.c) obj.SchemeObject {
         }
         if (syntaxEntryPrefix(sentry)) continue;
 
-        switch (@as(SyntaxCode, @enumFromInt(syntaxEntryCode(sentry)))) {
+        switch (@as(SyntaxCode, @fromBackingInt(@intCast(syntaxEntryCode(sentry))))) {
             .escape, .charquote => {
                 if (ctx.rightEndP(ctx.start)) return obj.sharp_f;
                 ctx.moveRight(&ctx.start);
                 if (depth != 0 or !sexp_flag) continue;
                 while (true) {
                     if (ctx.rightEndP(ctx.start)) return obj.longToUnsignedFixnum(ctx.scanToIndex(ctx.start));
-                    const next_code: SyntaxCode = @enumFromInt(syntaxEntryCode(ctx.peekRight(ctx.start)));
+                    const next_code: SyntaxCode = @fromBackingInt(@intCast(syntaxEntryCode(ctx.peekRight(ctx.start))));
                     switch (next_code) {
                         .escape, .charquote => {
                             ctx.moveRight(&ctx.start);
@@ -450,7 +450,7 @@ pub export fn Prim_scan_list_forward() callconv(.c) obj.SchemeObject {
                 if (depth != 0 or !sexp_flag) continue;
                 while (true) {
                     if (ctx.rightEndP(ctx.start)) return obj.longToUnsignedFixnum(ctx.scanToIndex(ctx.start));
-                    const next_code: SyntaxCode = @enumFromInt(syntaxEntryCode(ctx.peekRight(ctx.start)));
+                    const next_code: SyntaxCode = @fromBackingInt(@intCast(syntaxEntryCode(ctx.peekRight(ctx.start))));
                     switch (next_code) {
                         .escape, .charquote => {
                             ctx.moveRight(&ctx.start);
@@ -528,7 +528,7 @@ pub export fn Prim_scan_list_backward() callconv(.c) obj.SchemeObject {
             sentry = ctx.readLeft(&ctx.start);
 
             var style: c_uint = 0;
-            if (syntaxEntryCode(sentry) == @intFromEnum(SyntaxCode.endcomment)) {
+            if (syntaxEntryCode(sentry) == @backingInt(SyntaxCode.endcomment)) {
                 if (ignore_comments) style = syntaxEntryCommentStyle(sentry, comend_second);
             } else if (!ctx.leftEndP(ctx.start)) {
                 quoted = ctx.leftQuotedP(ctx.start);
@@ -542,7 +542,7 @@ pub export fn Prim_scan_list_backward() callconv(.c) obj.SchemeObject {
                 if (ctx.leftEndP(ctx.start)) return obj.sharp_f;
                 while (true) {
                     sentry = ctx.readLeft(&ctx.start);
-                    if (syntaxEntryCode(sentry) == @intFromEnum(SyntaxCode.comment) and
+                    if (syntaxEntryCode(sentry) == @backingInt(SyntaxCode.comment) and
                         (syntaxEntryCommentBits(sentry) & comstart_first & style) != 0)
                     {
                         break;
@@ -559,7 +559,7 @@ pub export fn Prim_scan_list_backward() callconv(.c) obj.SchemeObject {
             }
         }
 
-        const code: SyntaxCode = if (word_entry) .word else @enumFromInt(syntaxEntryCode(sentry));
+        const code: SyntaxCode = if (word_entry) .word else @fromBackingInt(@intCast(syntaxEntryCode(sentry)));
         switch (code) {
             .word, .symbol => {
                 if (depth != 0 or !sexp_flag) continue;
@@ -570,7 +570,7 @@ pub export fn Prim_scan_list_backward() callconv(.c) obj.SchemeObject {
                     } else {
                         sentry = ctx.peekLeft(ctx.start);
                         const prev_code = syntaxEntryCode(sentry);
-                        if (prev_code != @intFromEnum(SyntaxCode.word) and prev_code != @intFromEnum(SyntaxCode.symbol)) {
+                        if (prev_code != @backingInt(SyntaxCode.word) and prev_code != @backingInt(SyntaxCode.symbol)) {
                             return obj.longToUnsignedFixnum(ctx.scanToIndex(ctx.start));
                         }
                     }
@@ -751,7 +751,7 @@ pub export fn Prim_scan_sexps_forward() callconv(.c) obj.SchemeObject {
             comment_start = ctx.start;
             sentry = ctx.readRight(&ctx.start);
             comment_style = syntaxEntryCommentStyle(sentry, comstart_first);
-            if (syntaxEntryCode(sentry) == @intFromEnum(SyntaxCode.comment)) continue :state .in_comment_1;
+            if (syntaxEntryCode(sentry) == @backingInt(SyntaxCode.comment)) continue :state .in_comment_1;
             if (comment_style == 0) continue :state .not_in_comment;
             continue :state .in_comment_2;
         },
@@ -768,7 +768,7 @@ pub export fn Prim_scan_sexps_forward() callconv(.c) obj.SchemeObject {
             if (ctx.rightEndP(ctx.start)) continue :state .done;
             sentry = ctx.readRight(&ctx.start);
             if ((syntaxEntryCommentBits(sentry) & comend_first & comment_style) != 0) {
-                if (syntaxEntryCode(sentry) == @intFromEnum(SyntaxCode.endcomment)) {
+                if (syntaxEntryCode(sentry) == @backingInt(SyntaxCode.endcomment)) {
                     in_comment = 0;
                     continue :state .main;
                 }
@@ -789,7 +789,7 @@ pub export fn Prim_scan_sexps_forward() callconv(.c) obj.SchemeObject {
         .not_in_comment => {
             in_comment = 0;
             if (syntaxEntryPrefix(sentry)) continue :state .main;
-            switch (@as(SyntaxCode, @enumFromInt(syntaxEntryCode(sentry)))) {
+            switch (@as(SyntaxCode, @fromBackingInt(@intCast(syntaxEntryCode(sentry))))) {
                 .escape, .charquote => {
                     if (stop_before) continue :state .stop;
                     levels[level_idx].last = ctx.start;
@@ -838,7 +838,7 @@ pub export fn Prim_scan_sexps_forward() callconv(.c) obj.SchemeObject {
         },
         .start_atom => {
             while (!ctx.rightEndP(ctx.start)) {
-                const next_code: SyntaxCode = @enumFromInt(syntaxEntryCode(ctx.peekRight(ctx.start)));
+                const next_code: SyntaxCode = @fromBackingInt(@intCast(syntaxEntryCode(ctx.peekRight(ctx.start))));
                 switch (next_code) {
                     .escape, .charquote => {
                         ctx.moveRight(&ctx.start);
@@ -938,25 +938,23 @@ pub export fn Prim_scan_sexps_forward() callconv(.c) obj.SchemeObject {
 }
 
 pub fn makeTestSyntaxTable() obj.SchemeObject {
-    const tbl = abi.make_vector(0x100, obj.ulongToFixnum(@intFromEnum(SyntaxCode.whitespace)), true);
-    var c: u8 = 'a';
-    while (c <= 'z') : (c += 1) {
-        obj.vectorSet(tbl, c, obj.ulongToFixnum(@intFromEnum(SyntaxCode.word)));
+    const tbl = abi.make_vector(0x100, obj.ulongToFixnum(@backingInt(SyntaxCode.whitespace)), true);
+    for ('a'..'z' + 1) |c| {
+        obj.vectorSet(tbl, c, obj.ulongToFixnum(@backingInt(SyntaxCode.word)));
     }
-    var uc: u8 = 'A';
-    while (uc <= 'Z') : (uc += 1) {
-        obj.vectorSet(tbl, uc, obj.ulongToFixnum(@intFromEnum(SyntaxCode.word)));
+    for ('A'..'Z' + 1) |uc| {
+        obj.vectorSet(tbl, uc, obj.ulongToFixnum(@backingInt(SyntaxCode.word)));
     }
-    obj.vectorSet(tbl, '-', obj.ulongToFixnum(@intFromEnum(SyntaxCode.symbol)));
-    obj.vectorSet(tbl, '"', obj.ulongToFixnum(@intFromEnum(SyntaxCode.string)));
-    obj.vectorSet(tbl, '\\', obj.ulongToFixnum(@intFromEnum(SyntaxCode.escape)));
-    obj.vectorSet(tbl, '\'', obj.ulongToFixnum(@intFromEnum(SyntaxCode.quote)));
-    obj.vectorSet(tbl, ';', obj.ulongToFixnum(@intFromEnum(SyntaxCode.comment) | (comstart_first_a << 12)));
-    obj.vectorSet(tbl, '\n', obj.ulongToFixnum(@intFromEnum(SyntaxCode.endcomment) | (comend_first_a << 12)));
-    obj.vectorSet(tbl, '(', obj.ulongToFixnum(@intFromEnum(SyntaxCode.open) | (@as(usize, ')') << 4)));
-    obj.vectorSet(tbl, ')', obj.ulongToFixnum(@intFromEnum(SyntaxCode.close) | (@as(usize, '(') << 4)));
-    obj.vectorSet(tbl, '/', obj.ulongToFixnum(@intFromEnum(SyntaxCode.punct) | (comstart_first_b << 12) | (comend_second_b << 12)));
-    obj.vectorSet(tbl, '*', obj.ulongToFixnum(@intFromEnum(SyntaxCode.punct) | (comstart_second_b << 12) | (comend_first_b << 12)));
+    obj.vectorSet(tbl, '-', obj.ulongToFixnum(@backingInt(SyntaxCode.symbol)));
+    obj.vectorSet(tbl, '"', obj.ulongToFixnum(@backingInt(SyntaxCode.string)));
+    obj.vectorSet(tbl, '\\', obj.ulongToFixnum(@backingInt(SyntaxCode.escape)));
+    obj.vectorSet(tbl, '\'', obj.ulongToFixnum(@backingInt(SyntaxCode.quote)));
+    obj.vectorSet(tbl, ';', obj.ulongToFixnum(@backingInt(SyntaxCode.comment) | (comstart_first_a << 12)));
+    obj.vectorSet(tbl, '\n', obj.ulongToFixnum(@backingInt(SyntaxCode.endcomment) | (comend_first_a << 12)));
+    obj.vectorSet(tbl, '(', obj.ulongToFixnum(@backingInt(SyntaxCode.open) | (@as(usize, ')') << 4)));
+    obj.vectorSet(tbl, ')', obj.ulongToFixnum(@backingInt(SyntaxCode.close) | (@as(usize, '(') << 4)));
+    obj.vectorSet(tbl, '/', obj.ulongToFixnum(@backingInt(SyntaxCode.punct) | (comstart_first_b << 12) | (comend_second_b << 12)));
+    obj.vectorSet(tbl, '*', obj.ulongToFixnum(@backingInt(SyntaxCode.punct) | (comstart_second_b << 12) | (comend_first_b << 12)));
     return tbl;
 }
 
@@ -982,7 +980,7 @@ test "syntax entry encoding, word/list scans across gap, and incremental scan-se
     // STRING->SYNTAX-ENTRY & CHAR->SYNTAX-CODE
     stubs.setArgs(&.{str.char_pointer_to_string("() 12p")});
     const entry = Prim_string_to_syntax_entry();
-    const expected = @intFromEnum(SyntaxCode.open) | (@as(usize, ')') << 4) |
+    const expected = @backingInt(SyntaxCode.open) | (@as(usize, ')') << 4) |
         ((comstart_first_b | comstart_second_b) << 12) | (@as(usize, 1) << 20);
     try std.testing.expectEqual(obj.ulongToFixnum(expected), entry);
 

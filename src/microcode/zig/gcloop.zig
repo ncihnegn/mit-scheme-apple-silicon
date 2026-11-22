@@ -343,30 +343,30 @@ pub export fn get_newspace_ptr() callconv(.c) [*]obj.SchemeObject {
     return newspace_next.?;
 }
 
+inline fn remapRange(
+    addr: usize,
+    src_start: ?[*]const obj.SchemeObject,
+    src_end: ?[*]const obj.SchemeObject,
+    dst_start: ?[*]const obj.SchemeObject,
+) ?*anyopaque {
+    const ss = @intFromPtr(src_start orelse return null);
+    const se = @intFromPtr(src_end orelse return null);
+    if (addr >= ss and addr <= se) {
+        return @ptrFromInt(@intFromPtr(dst_start.?) +% (addr -% ss));
+    }
+    return null;
+}
+
 pub export fn tospace_to_newspace(addr: ?*anyopaque) callconv(.c) ?*anyopaque {
     const p = addr orelse return null;
     const a = @intFromPtr(p);
     if (tospace_next != null) {
-        const ts = @intFromPtr(tospace_start.?);
-        const te = @intFromPtr(tospace_end.?);
-        if (a >= ts and a <= te) {
-            return @ptrFromInt(@intFromPtr(newspace_start.?) +% (a -% ts));
-        }
+        if (remapRange(a, tospace_start, tospace_end, newspace_start)) |mapped| return mapped;
     }
     if (code_tospace_next != null) {
-        const cs = @intFromPtr(code_tospace_start.?);
-        const ce = @intFromPtr(code_tospace_end.?);
-        if (a >= cs and a <= ce) {
-            return @ptrFromInt(@intFromPtr(code_newspace_start.?) +% (a -% cs));
-        }
+        if (remapRange(a, code_tospace_start, code_tospace_end, code_newspace_start)) |mapped| return mapped;
     }
-    if (stage_tospace_start != null) {
-        const ss = @intFromPtr(stage_tospace_start.?);
-        const se = @intFromPtr(stage_tospace_end.?);
-        if (a >= ss and a <= se) {
-            return @ptrFromInt(@intFromPtr(stage_newspace_start.?) +% (a -% ss));
-        }
-    }
+    if (remapRange(a, stage_tospace_start, stage_tospace_end, stage_newspace_start)) |mapped| return mapped;
     return p;
 }
 
@@ -374,25 +374,13 @@ pub export fn newspace_to_tospace(addr: ?*anyopaque) callconv(.c) ?*anyopaque {
     const p = addr orelse return null;
     const a = @intFromPtr(p);
     if (tospace_next != null) {
-        const ns = @intFromPtr(newspace_start.?);
-        const ne = @intFromPtr(newspace_end.?);
-        if (a >= ns and a <= ne) {
-            return @ptrFromInt(@intFromPtr(tospace_start.?) +% (a -% ns));
-        }
+        if (remapRange(a, newspace_start, newspace_end, tospace_start)) |mapped| return mapped;
     }
     if (code_tospace_next != null) {
-        const cns = @intFromPtr(code_newspace_start.?);
-        const cne = @intFromPtr(code_newspace_end.?);
-        if (a >= cns and a <= cne) {
-            return @ptrFromInt(@intFromPtr(code_tospace_start.?) +% (a -% cns));
-        }
+        if (remapRange(a, code_newspace_start, code_newspace_end, code_tospace_start)) |mapped| return mapped;
     }
     if (stage_tospace_start != null) {
-        const sns = @intFromPtr(stage_newspace_start.?);
-        const sne = @intFromPtr(stage_newspace_end.?);
-        if (a >= sns and a <= sne) {
-            return @ptrFromInt(@intFromPtr(stage_tospace_start.?) +% (a -% sns));
-        }
+        if (remapRange(a, stage_newspace_start, stage_newspace_end, stage_tospace_start)) |mapped| return mapped;
     }
     return p;
 }
@@ -408,7 +396,7 @@ pub export fn open_code_tospace(n_words: usize) callconv(.c) bool {
     }
     const max_words = std.math.maxInt(usize) / @sizeOf(obj.SchemeObject);
     if (n_words > max_words - 1) return false;
-    const alloc_words: usize = @as(usize, @intCast(n_words)) + 1;
+    const alloc_words = n_words + 1;
     const raw = std.c.malloc(alloc_words * @sizeOf(obj.SchemeObject)) orelse return false;
     const buf: [*]obj.SchemeObject = @ptrCast(@alignCast(raw));
 
@@ -489,7 +477,7 @@ pub export fn gc_scan_stage_tospace() callconv(.c) void {
 
 pub export fn initialize_gc_table(table: *abi.GcTable, transport_p: bool) callconv(.c) void {
     for (gc_type_map, 0..) |gt, idx| {
-        const handler: abi.GcHandler = switch (@as(abi.GcType, @enumFromInt(gt))) {
+        const handler: abi.GcHandler = switch (@as(abi.GcType, @fromBackingInt(@intCast(gt)))) {
             .non_pointer => &gc_handle_non_pointer,
             .cell => &gc_handle_cell,
             .pair => &gc_handle_pair,
@@ -598,7 +586,8 @@ fn runGcLoop(scan_init: [*]obj.SchemeObject, p_end: *[*]obj.SchemeObject) void {
     while (@intFromPtr(scan) < @intFromPtr(p_end.*)) {
         const object = scan[0];
         handleGcTrap(scan, object);
-        if (ignore_object_p != null and ignore_object_p.?(object)) {
+        const ignored = if (ignore_object_p) |ignore| ignore(object) else false;
+        if (ignored) {
             scan += 1;
         } else {
             current_scan = scan;
@@ -875,7 +864,7 @@ pub export fn gc_handle_linkage_section(scan_init: [*]obj.SchemeObject, object: 
         var count = abi.linkage_section_count(object);
         var scan = scan_init + 1;
         switch (abi.linkage_section_type(object)) {
-            @intFromEnum(abi.LinkageSectionType.reference), @intFromEnum(abi.LinkageSectionType.assignment) => {
+            @backingInt(abi.LinkageSectionType.reference), @backingInt(abi.LinkageSectionType.assignment) => {
                 while (count > 0) : (count -= 1) {
                     const slot: *[*]obj.SchemeObject = @ptrCast(scan);
                     const oaddr = slot.*;
@@ -885,7 +874,7 @@ pub export fn gc_handle_linkage_section(scan_init: [*]obj.SchemeObject, object: 
                     scan += 1;
                 }
             },
-            @intFromEnum(abi.LinkageSectionType.operator), @intFromEnum(abi.LinkageSectionType.global_operator) => {
+            @backingInt(abi.LinkageSectionType.operator), @backingInt(abi.LinkageSectionType.global_operator) => {
                 while (count > 0) : (count -= 1) {
                     const otarget = abi.read_uuo_target(scan);
                     const oentry = tbl.raw_address_to_cc_entry.?(otarget);
@@ -933,7 +922,7 @@ pub export fn gc_handle_undefined(scan: [*]obj.SchemeObject, object: obj.SchemeO
 }
 
 fn weakReferentAddress(object: obj.SchemeObject) ?[*]obj.SchemeObject {
-    return switch (@as(abi.GcPtrType, @enumFromInt(gc_ptr_type(object)))) {
+    return switch (@as(abi.GcPtrType, @fromBackingInt(@intCast(gc_ptr_type(object))))) {
         .normal => obj.objectAddress(object),
         .compiled_entry => if (comptime build_options.cc_support)
             abi.cc_entry_address_to_block_address(obj.objectRawAddress(object))
@@ -948,7 +937,7 @@ fn weakReferentAddress(object: obj.SchemeObject) ?[*]obj.SchemeObject {
 }
 
 fn weakReferentForward(object: obj.SchemeObject, collected: obj.SchemeObject) obj.SchemeObject {
-    switch (@as(abi.GcPtrType, @enumFromInt(gc_ptr_type(object)))) {
+    switch (@as(abi.GcPtrType, @fromBackingInt(@intCast(gc_ptr_type(object))))) {
         .normal => {
             const addr = obj.objectAddress(object);
             if (abi.code_address_p(@ptrCast(addr))) {
@@ -1013,7 +1002,7 @@ fn queueEphemeronsForKey(addr: [*]obj.SchemeObject) void {
         const entry_addr = obj.objectAddress(entry);
         const next_loc = newspaceToTospacePtr(entry_addr + abi.ephemeron_next);
         const key_addr = weakReferentAddress(read_tospace(entry_addr + abi.ephemeron_key));
-        if (key_addr != null and key_addr.? == addr) {
+        if (key_addr == addr) {
             entry_loc[0] = next_loc[0];
             next_loc[0] = ephemeron_queue;
             ephemeron_queue = entry;
@@ -1027,17 +1016,18 @@ fn gcTransportWeakPair(pair: obj.SchemeObject) obj.SchemeObject {
     const old_addr = obj.objectAddress(pair);
     const new_addr = current_gc_table.?.transport_words.?(old_addr, 2, false);
     const old_car = read_tospace(new_addr);
-    const caddr = weakReferentAddress(old_car);
 
-    if (caddr != null and addressCollectableP(@ptrCast(caddr.?))) {
-        write_tospace(new_addr, obj.objectNewType(obj.tc_false, old_car));
-        old_addr[1] = if (weak_chain) |wc|
-            obj.makePointerObject(obj.objectType(old_car), wc)
-        else
-            obj.makeObject(obj.objectType(old_car), 0);
-        weak_chain = old_addr;
-        if (comptime build_options.debugging) {
-            weak_chain_length += 1;
+    if (weakReferentAddress(old_car)) |ptr| {
+        if (addressCollectableP(@ptrCast(ptr))) {
+            write_tospace(new_addr, obj.objectNewType(obj.tc_false, old_car));
+            old_addr[1] = if (weak_chain) |wc|
+                obj.makePointerObject(obj.objectType(old_car), wc)
+            else
+                obj.makeObject(obj.objectType(old_car), 0);
+            weak_chain = old_addr;
+            if (comptime build_options.debugging) {
+                weak_chain_length += 1;
+            }
         }
     }
     return obj.objectNewAddress(pair, new_addr);
@@ -1086,7 +1076,9 @@ fn scanNewspaceAddr(addr_arg: [*]obj.SchemeObject) void {
     initializeGcHistory();
     const object = scan[0];
     handleGcTrap(scan, object);
-    if (ignore_object_p != null and ignore_object_p.?(object)) return;
+    if (ignore_object_p) |ignore| {
+        if (ignore(object)) return;
+    }
 
     current_scan = scan;
     current_object = object;
@@ -1173,16 +1165,16 @@ pub export fn update_weak_pointers() callconv(.c) void {
     updateWeakPairs();
 }
 
-const TNP = @intFromEnum(abi.GcType.non_pointer);
-const TPR = @intFromEnum(abi.GcType.pair);
-const TTR = @intFromEnum(abi.GcType.triple);
-const TQD = @intFromEnum(abi.GcType.quadruple);
-const TCL = @intFromEnum(abi.GcType.cell);
-const TVC = @intFromEnum(abi.GcType.vector);
-const TSP = @intFromEnum(abi.GcType.special);
-const TUD = @intFromEnum(abi.GcType.undefined);
-const TCE = @intFromEnum(abi.GcType.compiled_entry);
-const TCR = @intFromEnum(abi.GcType.compiled_return);
+const TNP = @backingInt(abi.GcType.non_pointer);
+const TPR = @backingInt(abi.GcType.pair);
+const TTR = @backingInt(abi.GcType.triple);
+const TQD = @backingInt(abi.GcType.quadruple);
+const TCL = @backingInt(abi.GcType.cell);
+const TVC = @backingInt(abi.GcType.vector);
+const TSP = @backingInt(abi.GcType.special);
+const TUD = @backingInt(abi.GcType.undefined);
+const TCE = @backingInt(abi.GcType.compiled_entry);
+const TCR = @backingInt(abi.GcType.compiled_return);
 
 pub export var gc_type_map: [obj.n_type_codes]c_int = .{
     TNP, // 0x00 TC_FALSE
@@ -1256,20 +1248,20 @@ pub export fn gc_type_code(type_code: c_uint) callconv(.c) c_int {
 }
 
 pub export fn gc_ptr_type(object: obj.SchemeObject) callconv(.c) c_int {
-    return switch (@as(abi.GcType, @enumFromInt(abi.gcType(object)))) {
+    return switch (@as(abi.GcType, @fromBackingInt(@intCast(abi.gcType(object))))) {
         .special => if (obj.objectType(object) == obj.tc_reference_trap and obj.objectDatum(object) >= obj.trap_max_immediate)
-            @intFromEnum(abi.GcPtrType.normal)
+            @backingInt(abi.GcPtrType.normal)
         else
-            @intFromEnum(abi.GcPtrType.not),
-        .cell, .pair, .triple, .quadruple, .vector => @intFromEnum(abi.GcPtrType.normal),
-        .compiled_entry => @intFromEnum(abi.GcPtrType.compiled_entry),
-        .compiled_return => @intFromEnum(abi.GcPtrType.compiled_return),
-        else => @intFromEnum(abi.GcPtrType.not),
+            @backingInt(abi.GcPtrType.not),
+        .cell, .pair, .triple, .quadruple, .vector => @backingInt(abi.GcPtrType.normal),
+        .compiled_entry => @backingInt(abi.GcPtrType.compiled_entry),
+        .compiled_return => @backingInt(abi.GcPtrType.compiled_return),
+        else => @backingInt(abi.GcPtrType.not),
     };
 }
 
 pub export fn get_object_address(object: obj.SchemeObject) callconv(.c) ?[*]obj.SchemeObject {
-    return switch (@as(abi.GcPtrType, @enumFromInt(gc_ptr_type(object)))) {
+    return switch (@as(abi.GcPtrType, @fromBackingInt(@intCast(gc_ptr_type(object))))) {
         .normal => obj.objectAddress(object),
         .compiled_entry => if (comptime build_options.cc_support)
             abi.cc_entry_to_block_address(object)
@@ -1322,21 +1314,21 @@ test "gcloop type map, copying pairs/vectors, weak pairs, ephemerons, code/stage
     defer stubs.resetMockRuntime();
 
     // 1. gc_type_map / gc_type_code / gc_ptr_type
-    try std.testing.expectEqual(@intFromEnum(abi.GcType.non_pointer), gc_type_code(@intCast(obj.tc_fixnum)));
-    try std.testing.expectEqual(@intFromEnum(abi.GcType.pair), gc_type_code(@intCast(obj.tc_pair)));
-    try std.testing.expectEqual(@intFromEnum(abi.GcType.triple), gc_type_code(@intCast(obj.tc_hunk3_a)));
-    try std.testing.expectEqual(@intFromEnum(abi.GcType.quadruple), gc_type_code(@intCast(obj.tc_quad)));
-    try std.testing.expectEqual(@intFromEnum(abi.GcType.vector), gc_type_code(@intCast(obj.tc_vector)));
-    try std.testing.expectEqual(@intFromEnum(abi.GcType.undefined), gc_type_code(0x0C));
-    try std.testing.expectEqual(@intFromEnum(abi.GcType.undefined), gc_type_code(0x2A));
-    try std.testing.expectEqual(@intFromEnum(abi.GcType.undefined), gc_type_code(0x30));
-    try std.testing.expectEqual(@intFromEnum(abi.GcType.undefined), gc_type_code(0x3F));
+    try std.testing.expectEqual(@backingInt(abi.GcType.non_pointer), gc_type_code(@intCast(obj.tc_fixnum)));
+    try std.testing.expectEqual(@backingInt(abi.GcType.pair), gc_type_code(@intCast(obj.tc_pair)));
+    try std.testing.expectEqual(@backingInt(abi.GcType.triple), gc_type_code(@intCast(obj.tc_hunk3_a)));
+    try std.testing.expectEqual(@backingInt(abi.GcType.quadruple), gc_type_code(@intCast(obj.tc_quad)));
+    try std.testing.expectEqual(@backingInt(abi.GcType.vector), gc_type_code(@intCast(obj.tc_vector)));
+    try std.testing.expectEqual(@backingInt(abi.GcType.undefined), gc_type_code(0x0C));
+    try std.testing.expectEqual(@backingInt(abi.GcType.undefined), gc_type_code(0x2A));
+    try std.testing.expectEqual(@backingInt(abi.GcType.undefined), gc_type_code(0x30));
+    try std.testing.expectEqual(@backingInt(abi.GcType.undefined), gc_type_code(0x3F));
 
-    try std.testing.expectEqual(@intFromEnum(abi.GcPtrType.not), gc_ptr_type(obj.unassigned_object));
+    try std.testing.expectEqual(@backingInt(abi.GcPtrType.not), gc_ptr_type(obj.unassigned_object));
     const heap_base = storage.heap_start.?;
     const trap_ptr_cell = heap_base + 10;
     const far_trap = obj.makePointerObject(obj.tc_reference_trap, trap_ptr_cell);
-    try std.testing.expectEqual(@intFromEnum(abi.GcPtrType.normal), gc_ptr_type(far_trap));
+    try std.testing.expectEqual(@backingInt(abi.GcPtrType.normal), gc_ptr_type(far_trap));
     try std.testing.expectEqual(trap_ptr_cell, get_object_address(far_trap).?);
     try std.testing.expectEqual(@as(?[*]obj.SchemeObject, null), get_object_address(obj.ulongToFixnum(5)));
 

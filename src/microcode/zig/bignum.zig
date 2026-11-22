@@ -218,8 +218,8 @@ pub export fn bignum_equal_p(x: obj.SchemeObject, y: obj.SchemeObject) callconv(
 }
 
 pub export fn bignum_test(bignum: obj.SchemeObject) callconv(.c) c_int {
-    if (bignumZeroP(bignum)) return @intFromEnum(abi.BignumComparison.equal);
-    return @intFromEnum(if (bignumNegativeP(bignum)) abi.BignumComparison.less else abi.BignumComparison.greater);
+    if (bignumZeroP(bignum)) return @backingInt(abi.BignumComparison.equal);
+    return @backingInt(if (bignumNegativeP(bignum)) abi.BignumComparison.less else abi.BignumComparison.greater);
 }
 
 pub export fn bignum_compare(x: obj.SchemeObject, y: obj.SchemeObject) callconv(.c) c_int {
@@ -231,7 +231,7 @@ pub export fn bignum_compare(x: obj.SchemeObject, y: obj.SchemeObject) callconv(
         (if (bignumNegativeP(y)) bignumCompareUnsigned(y, x) else .less)
     else
         (if (bignumNegativeP(y)) .greater else bignumCompareUnsigned(x, y));
-    return @intFromEnum(cmp);
+    return @backingInt(cmp);
 }
 
 fn bignumAddUnsigned(x_in: obj.SchemeObject, y_in: obj.SchemeObject, negative_p: bool) obj.SchemeObject {
@@ -1343,8 +1343,7 @@ pub export fn bignum_first_set_bit(bignum: obj.SchemeObject) callconv(.c) isize 
     if (bignumZeroP(bignum)) return -1;
     const ptr = bignumStartPtr(bignum);
     const len: usize = @intCast(bignumLength(bignum));
-    var i: usize = 0;
-    while (i < len) : (i += 1) {
+    for (0..len) |i| {
         if (ptr[i] != 0) {
             return @intCast(@as(usize, @ctz(ptr[i])) + (i * bignum_digit_length));
         }
@@ -1440,8 +1439,7 @@ fn bignumShiftRightUnsigned(n: obj.SchemeObject, digits_arg: usize, shift_bits: 
         const comp_sh: std.math.Log2Int(UnsignedDigit) = @intCast(bignum_digit_length - @as(usize, @intCast(shift_bits)));
         var extra = n_ptr[digits] >> sh;
         var out_idx: usize = 0;
-        var in_idx: usize = digits + 1;
-        while (in_idx < n_len) : (in_idx += 1) {
+        for (digits + 1..n_len) |in_idx| {
             const digit = n_ptr[in_idx];
             r_ptr[out_idx] = ((digit & mask) << comp_sh) | extra;
             out_idx += 1;

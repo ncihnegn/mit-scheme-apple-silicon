@@ -26,7 +26,6 @@ var grabbed_signal_mask: std.c.sigset_t = std.mem.zeroes(std.c.sigset_t);
 const tiocsctty: c_ulong = if (builtin.os.tag.isDarwin()) 0x20007461 else 0x540E;
 const RawSpeedT = @typeInfo(std.c.speed_t).@"enum".tag_type;
 
-extern "c" fn fork() std.c.pid_t;
 extern "c" fn kill(pid: std.c.pid_t, sig: c_int) c_int;
 extern "c" fn ioctl(fd: c_int, request: c_ulong, ...) c_int;
 extern "c" fn sigsuspend(mask: *const std.c.sigset_t) c_int;
@@ -102,9 +101,8 @@ pub fn uxInitializeProcesses() callconv(.c) void {
     };
     process_table_ptr = @ptrCast(@alignCast(raw));
     os_process_table_size = init_size;
-    var p: abi.Tprocess = 0;
-    while (p < os_process_table_size) : (p += 1) {
-        osProcessDeallocate(p);
+    for (0..os_process_table_size) |p_u| {
+        osProcessDeallocate(@intCast(p_u));
     }
     scheme_ctty_fd = abi.OS_ctty_fd();
     scheme_jc_status = if (scheme_ctty_fd < 0) .no_ctty else .jc;
@@ -129,7 +127,7 @@ fn processAllocateAbort(environment: ?*anyopaque) callconv(.c) void {
     const entry = &process_table_ptr.?[p];
     switch (entry.raw_status) {
         .stopped, .running => {
-            _ = kill(entry.id, @intFromEnum(std.c.SIG.KILL));
+            _ = std.c.kill(entry.id, .KILL);
         },
         else => {},
     }
@@ -154,9 +152,8 @@ fn processAllocate() abi.Tprocess {
         table = @ptrCast(@alignCast(raw));
         process_table_ptr = table;
         os_process_table_size = @intCast(new_size);
-        var idx: abi.Tprocess = @intCast(old_size);
-        while (idx < os_process_table_size) : (idx += 1) {
-            osProcessDeallocate(idx);
+        for (old_size..os_process_table_size) |idx_u| {
+            osProcessDeallocate(@intCast(idx_u));
         }
         p = @intCast(old_size);
         table[p].raw_status = .allocated;
@@ -178,7 +175,7 @@ fn clearOflagField(comptime name: []const u8, oflag: *std.c.tc_oflag_t) void {
     if (@hasField(std.c.tc_oflag_t, name)) {
         const FieldT = @TypeOf(@field(oflag.*, name));
         @field(oflag.*, name) = switch (@typeInfo(FieldT)) {
-            .@"enum" => @enumFromInt(0),
+            .@"enum" => @fromBackingInt(@intCast(0)),
             .int => 0,
             .bool => false,
             else => unreachable,
@@ -208,10 +205,10 @@ fn childSetupTty(fd: c_int) c_int {
     s.lflag.ECHONL = false;
     s.lflag.ICANON = true;
     s.lflag.ISIG = true;
-    s.cc[@intFromEnum(std.c.V.EOF)] = 0o004;
-    s.cc[@intFromEnum(std.c.V.ERASE)] = disabled_char;
-    s.cc[@intFromEnum(std.c.V.KILL)] = disabled_char;
-    const b9600: RawSpeedT = @intFromEnum(std.c.speed_t.B9600);
+    s.cc[@backingInt(std.c.V.EOF)] = 0o004;
+    s.cc[@backingInt(std.c.V.ERASE)] = disabled_char;
+    s.cc[@backingInt(std.c.V.KILL)] = disabled_char;
+    const b9600: RawSpeedT = @backingInt(std.c.speed_t.B9600);
     _ = cfsetispeed(&s, b9600);
     _ = cfsetospeed(&s, b9600);
     return std.c.tcsetattr(fd, .DRAIN, &s);
@@ -255,7 +252,7 @@ fn execChildProcess(
             const fd = std.c.open(name, .{ .ACCMODE = .RDWR }, @as(std.c.mode_t, 0));
             if (fd < 0 or std.c.isatty(fd) == 0) std.c._exit(1);
             if (ioctl(fd, tiocsctty, @as(c_int, 0)) < 0) std.c._exit(1);
-            if (tcsetpgrp(fd, child_pid) < 0 and std.c._errno().* != @intFromEnum(std.c.E.NOSYS)) {
+            if (tcsetpgrp(fd, child_pid) < 0 and std.c._errno().* != @backingInt(std.c.E.NOSYS)) {
                 std.c._exit(1);
             }
             if (childSetupTty(fd) < 0) std.c._exit(1);
@@ -328,10 +325,10 @@ pub fn osMakeSubprocess(
         blockSigchld();
     }
 
-    var child_pid = fork();
+    var child_pid = std.c.fork();
     while (child_pid < 0) {
         abi.UX_prim_check_errno(abi.syscall_vfork);
-        child_pid = fork();
+        child_pid = std.c.fork();
     }
 
     if (child_pid > 0) {
@@ -466,27 +463,27 @@ pub fn osProcessSendSignal(process: abi.Tprocess, sig: c_int) callconv(.c) void 
 
 /// Send `SIGKILL` to `process`.
 pub fn osProcessKill(process: abi.Tprocess) callconv(.c) void {
-    osProcessSendSignal(process, @intFromEnum(std.c.SIG.KILL));
+    osProcessSendSignal(process, @backingInt(std.c.SIG.KILL));
 }
 
 /// Send `SIGTSTP` to `process`.
 pub fn osProcessStop(process: abi.Tprocess) callconv(.c) void {
-    osProcessSendSignal(process, @intFromEnum(std.c.SIG.TSTP));
+    osProcessSendSignal(process, @backingInt(std.c.SIG.TSTP));
 }
 
 /// Send `SIGINT` to `process`.
 pub fn osProcessInterrupt(process: abi.Tprocess) callconv(.c) void {
-    osProcessSendSignal(process, @intFromEnum(std.c.SIG.INT));
+    osProcessSendSignal(process, @backingInt(std.c.SIG.INT));
 }
 
 /// Send `SIGQUIT` to `process`.
 pub fn osProcessQuit(process: abi.Tprocess) callconv(.c) void {
-    osProcessSendSignal(process, @intFromEnum(std.c.SIG.QUIT));
+    osProcessSendSignal(process, @backingInt(std.c.SIG.QUIT));
 }
 
 /// Send `SIGHUP` to `process`.
 pub fn osProcessHangup(process: abi.Tprocess) callconv(.c) void {
-    osProcessSendSignal(process, @intFromEnum(std.c.SIG.HUP));
+    osProcessSendSignal(process, @backingInt(std.c.SIG.HUP));
 }
 
 /// Resume stopped `process` in the background via `SIGCONT`.
@@ -495,7 +492,7 @@ pub fn osProcessContinueBackground(process: abi.Tprocess) callconv(.c) void {
     blockSigchld();
     if (process_table_ptr.?[process].raw_status == .stopped) {
         newRawStatus(process, .running, 0);
-        processSendSignal(process, @intFromEnum(std.c.SIG.CONT));
+        processSendSignal(process, @backingInt(std.c.SIG.CONT));
     }
     transact.transaction_commit();
 }
@@ -508,7 +505,7 @@ pub fn osProcessContinueForeground(process: abi.Tprocess) callconv(.c) void {
     giveTerminalTo(process);
     if (process_table_ptr.?[process].raw_status == .stopped) {
         newRawStatus(process, .running, 0);
-        processSendSignal(process, @intFromEnum(std.c.SIG.CONT));
+        processSendSignal(process, @backingInt(std.c.SIG.CONT));
     }
     processWait(process);
     transact.transaction_commit();
@@ -536,8 +533,8 @@ fn giveTerminalTo(process: abi.Tprocess) void {
         abi.OS_restore_external_state();
         while (tcsetpgrp(scheme_ctty_fd, entry.id) < 0) {
             const err = std.c._errno().*;
-            if (err == @intFromEnum(std.c.E.NOSYS)) break;
-            if (err != @intFromEnum(std.c.E.INTR)) {
+            if (err == @backingInt(std.c.E.NOSYS)) break;
+            if (err != @backingInt(std.c.E.INTR)) {
                 utils.error_system_call(err, abi.syscall_tcsetpgrp);
             }
         }
@@ -547,7 +544,7 @@ fn giveTerminalTo(process: abi.Tprocess) void {
 fn getTerminalBack() void {
     if (foreground_child_process != abi.no_process) {
         while (tcsetpgrp(scheme_ctty_fd, getpgrp()) < 0) {
-            if (std.c._errno().* != @intFromEnum(std.c.E.INTR)) break;
+            if (std.c._errno().* != @backingInt(std.c.E.INTR)) break;
         }
         abi.OS_save_external_state();
         abi.OS_restore_internal_state();
@@ -563,9 +560,8 @@ fn processWait(process: abi.Tprocess) void {
 
 fn findProcess(pid: abi.PidT) abi.Tprocess {
     const table = process_table_ptr orelse return abi.no_process;
-    var p: abi.Tprocess = 0;
-    while (p < os_process_table_size) : (p += 1) {
-        if (table[p].id == pid) return p;
+    for (0..os_process_table_size) |p_u| {
+        if (table[p_u].id == pid) return @intCast(p_u);
     }
     return abi.no_process;
 }
@@ -578,9 +574,9 @@ pub fn subprocessDeath(pid: abi.PidT, status: *c_int) callconv(.c) void {
     if (std.c.W.IFEXITED(raw)) {
         newRawStatus(p, .exited, std.c.W.EXITSTATUS(raw));
     } else if (std.c.W.IFSTOPPED(raw)) {
-        newRawStatus(p, .stopped, @intCast(@intFromEnum(std.c.W.STOPSIG(raw))));
+        newRawStatus(p, .stopped, @intCast(@backingInt(std.c.W.STOPSIG(raw))));
     } else if (std.c.W.IFSIGNALED(raw)) {
-        newRawStatus(p, .signalled, @intCast(@intFromEnum(std.c.W.TERMSIG(raw))));
+        newRawStatus(p, .signalled, @intCast(@backingInt(std.c.W.TERMSIG(raw))));
     }
 }
 

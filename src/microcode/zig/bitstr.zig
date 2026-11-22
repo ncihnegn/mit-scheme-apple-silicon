@@ -476,7 +476,7 @@ fn btbsConsumer(result_ptr_raw: ?*anyopaque, digit: isize) callconv(.c) void {
 }
 
 fn bignumToBitString(length: usize, bignum: obj.SchemeObject) obj.SchemeObject {
-    return switch (@as(abi.BignumComparison, @enumFromInt(abi.bignum_test(bignum)))) {
+    return switch (@as(abi.BignumComparison, @fromBackingInt(@intCast(abi.bignum_test(bignum))))) {
         .equal => zeroToBitString(length),
         .less => abi.error_bad_range_arg(2),
         .greater => blk: {
@@ -636,8 +636,7 @@ pub export fn Prim_bitstr_find_next_set_bit() callconv(.c) obj.SchemeObject {
     const end_w: usize = @intCast(end_m1 / object_length);
     const end_bit = (end_m1 % object_length) + 1;
 
-    var w = start_w;
-    while (w <= end_w) : (w += 1) {
+    for (start_w..end_w + 1) |w| {
         var word = obj.memoryRef(bit_string, bit_string_first_word + w);
         if (w == start_w) word &= (~@as(obj.SchemeObject, 0)) << start_bit;
         if (w == end_w) word &= lowMask(end_bit);
@@ -702,8 +701,7 @@ test "bitstr allocation, excess MSB masking, copy_bits alignments, integer conve
                 const dst = Prim_make_bit_string();
                 stubs.setArgs(&.{ src, obj.ulongToFixnum(so), obj.ulongToFixnum(so + len), dst, obj.ulongToFixnum(do) });
                 _ = Prim_bit_substring_move_right_x();
-                var k: usize = 0;
-                while (k < 150) : (k += 1) {
+                for (0..150) |k| {
                     stubs.setArgs(&.{ dst, obj.ulongToFixnum(k) });
                     const got = Prim_bit_string_ref();
                     if (k >= do and k < do + len) {

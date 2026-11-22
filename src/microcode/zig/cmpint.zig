@@ -593,8 +593,7 @@ pub fn guaranteeInterpReturn() callconv(.c) void {
 fn openStackGap(offset: usize, n_words: usize) void {
     const sp = abi.stack_pointer;
     const dst = sp - n_words;
-    var i: usize = 0;
-    while (i < offset) : (i += 1) {
+    for (0..offset) |i| {
         dst[i] = sp[i];
     }
     abi.stack_pointer = dst;
@@ -1480,7 +1479,7 @@ pub fn reflectToInterfaceFrameType(frame: [*]obj.SchemeObject) callconv(.c) c_in
     const code_object = frame[1];
     std.debug.assert(obj.fixnumP(code_object) and obj.fixnumToUlongP(code_object));
     const code = obj.fixnumToUlong(code_object);
-    return @intFromEnum(switch (code) {
+    return @backingInt(switch (code) {
         reflect_code_internal_apply => abi.ReturnFrameType.cc_internal_apply,
         reflect_code_restore_interrupt_mask => abi.ReturnFrameType.cc_restore_interrupt_mask,
         reflect_code_stack_marker => abi.ReturnFrameType.cc_stack_marker,
@@ -1649,8 +1648,7 @@ fn setupLexprInvocation(procedure: obj.SchemeObject, n_args: usize, n_max: usize
     const n_max_u: usize = @intCast(n_max);
     const n_args_u: usize = @intCast(n_args);
     var p1 = abi.stackLoc(n_max_u);
-    var i: usize = n_max_u;
-    while (i < n_args_u) : (i += 1) {
+    for (n_max_u..n_args_u) |_| {
         abi.Free[0] = p1[0];
         p1 += 1;
         abi.Free[1] = obj.makePointerObject(obj.tc_list, abi.Free + 2);
@@ -1660,8 +1658,7 @@ fn setupLexprInvocation(procedure: obj.SchemeObject, n_args: usize, n_max: usize
     p1 -= 1;
     p1[0] = rest_arg;
     var p2 = abi.stackLoc(n_max_u);
-    var j: usize = 0;
-    while (j < n_max_u) : (j += 1) {
+    for (0..n_max_u) |_| {
         p2 -= 1;
         p1 -= 1;
         p1[0] = p2[0];
@@ -1773,11 +1770,11 @@ pub fn plausibleCcBlockP(block: [*]obj.SchemeObject) callconv(.c) c_int {
 inline fn linkageSectionTypeEnum(marker: obj.SchemeObject) abi.LinkageSectionType {
     const t = obj.objectDatum(marker) >> 16;
     std.debug.assert(t < 4);
-    return @enumFromInt(@as(c_uint, @intCast(t)));
+    return @fromBackingInt(@intCast(@as(c_uint, @intCast(t))));
 }
 
 pub fn linkageSectionType(marker: obj.SchemeObject) callconv(.c) c_uint {
-    return @intFromEnum(linkageSectionTypeEnum(marker));
+    return @backingInt(linkageSectionTypeEnum(marker));
 }
 
 pub fn linkageSectionCount(marker: obj.SchemeObject) callconv(.c) usize {
@@ -1787,7 +1784,7 @@ pub fn linkageSectionCount(marker: obj.SchemeObject) callconv(.c) usize {
 }
 
 pub fn makeLinkageSectionMarker(sec_type: abi.LinkageSectionType, count: usize) callconv(.c) obj.SchemeObject {
-    const t_val = @intFromEnum(sec_type);
+    const t_val = @backingInt(sec_type);
     std.debug.assert(t_val < 4);
     const n_words = if (sec_type == .operator or sec_type == .global_operator) count * uuo_link_size else count;
     std.debug.assert(n_words < 0x10000);
@@ -2723,7 +2720,7 @@ test "cmpint linkage markers, reflect frame types, and cpoint offsets" {
     };
     for (types) |t| {
         const m = makeLinkageSectionMarker(t, 7);
-        try std.testing.expectEqual(@intFromEnum(t), linkageSectionType(m));
+        try std.testing.expectEqual(@backingInt(t), linkageSectionType(m));
         try std.testing.expectEqual(@as(usize, 7), linkageSectionCount(m));
     }
 
@@ -2732,11 +2729,11 @@ test "cmpint linkage markers, reflect frame types, and cpoint offsets" {
         obj.ulongToFixnum(reflect_code_compiled_invocation),
         obj.sharp_f,
     };
-    try std.testing.expectEqual(@intFromEnum(abi.ReturnFrameType.cc_invocation), reflectToInterfaceFrameType(&frame));
+    try std.testing.expectEqual(@backingInt(abi.ReturnFrameType.cc_invocation), reflectToInterfaceFrameType(&frame));
     frame[1] = obj.ulongToFixnum(reflect_code_internal_apply);
-    try std.testing.expectEqual(@intFromEnum(abi.ReturnFrameType.cc_internal_apply), reflectToInterfaceFrameType(&frame));
+    try std.testing.expectEqual(@backingInt(abi.ReturnFrameType.cc_internal_apply), reflectToInterfaceFrameType(&frame));
     frame[1] = obj.ulongToFixnum(99);
-    try std.testing.expectEqual(@intFromEnum(abi.ReturnFrameType.undefined), reflectToInterfaceFrameType(&frame));
+    try std.testing.expectEqual(@backingInt(abi.ReturnFrameType.undefined), reflectToInterfaceFrameType(&frame));
 
     var cpoint_words: [12]obj.SchemeObject align(16) = @splat(0);
     cpoint_words[0] = obj.makeVectorHeader(11);

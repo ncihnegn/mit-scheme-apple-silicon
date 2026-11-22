@@ -70,7 +70,7 @@ inline fn syntaxConstituentP(syntax_table: obj.SchemeObject, code: u4, ch: u8) b
 }
 
 inline fn wordConstituentP(syntax_table: obj.SchemeObject, ch: u8) bool {
-    return syntaxConstituentP(syntax_table, @intFromEnum(syntax.SyntaxCode.word), ch);
+    return syntaxConstituentP(syntax_table, @backingInt(syntax.SyntaxCode.word), ch);
 }
 
 inline fn charSetMemberInternal(char_set: [*]const u8, ascii: usize) bool {
@@ -147,9 +147,9 @@ pub export fn re_compile_fastmap(
 
         const op_byte = pattern_pc[0];
         pattern_pc += 1;
-        if (op_byte > @intFromEnum(RegexpCode.not_syntax_spec)) return -2;
+        if (op_byte > @backingInt(RegexpCode.not_syntax_spec)) return -2;
 
-        switch (@as(RegexpCode, @enumFromInt(op_byte))) {
+        switch (@as(RegexpCode, @fromBackingInt(@intCast(op_byte)))) {
             .unused,
             .line_start,
             .buffer_start,
@@ -246,7 +246,7 @@ pub export fn re_compile_fastmap(
                 if (@intFromPtr(pattern_pc) >= @intFromPtr(pattern_end)) return -2;
                 const code_byte = pattern_pc[0];
                 pattern_pc += 1;
-                if (code_byte >= @intFromEnum(syntax.SyntaxCode.max)) return -2;
+                if (code_byte >= @backingInt(syntax.SyntaxCode.max)) return -2;
                 const code: u4 = @intCast(code_byte);
                 for (0..max_ascii) |ascii| {
                     if (syntaxConstituentP(syntax_table, code, @intCast(ascii))) {
@@ -260,7 +260,7 @@ pub export fn re_compile_fastmap(
                 if (@intFromPtr(pattern_pc) >= @intFromPtr(pattern_end)) return -2;
                 const code_byte = pattern_pc[0];
                 pattern_pc += 1;
-                if (code_byte >= @intFromEnum(syntax.SyntaxCode.max)) return -2;
+                if (code_byte >= @backingInt(syntax.SyntaxCode.max)) return -2;
                 const code: u4 = @intCast(code_byte);
                 for (0..max_ascii) |ascii| {
                     if (!syntaxConstituentP(syntax_table, code, @intCast(ascii))) {
@@ -294,7 +294,7 @@ pub export fn re_compile_fastmap(
                 if (off > 0) continue;
 
                 if (@intFromPtr(pattern_pc) >= @intFromPtr(pattern_end)) return -2;
-                if (pattern_pc[0] != @intFromEnum(RegexpCode.on_failure_jump)) continue;
+                if (pattern_pc[0] != @backingInt(RegexpCode.on_failure_jump)) continue;
                 const off2 = readPatternOffset(&pattern_pc, pattern_start, pattern_end) orelse return -2;
                 pattern_pc = offsetPtr(pattern_pc, off2, pattern_start, pattern_end).?;
                 if (stack_sp > 0 and stack_buf[stack_sp - 1] == pattern_pc) {
@@ -320,8 +320,7 @@ pub export fn re_compile_fastmap(
 }
 
 fn beqTranslate(scan1: [*]const u8, scan2: [*]const u8, length: usize, translation: ?[*]const u8) bool {
-    var i: usize = 0;
-    while (i < length) : (i += 1) {
+    for (0..length) |i| {
         if (translateChar(translation, scan1[i]) != translateChar(translation, scan2[i])) {
             return false;
         }
@@ -378,7 +377,7 @@ pub export fn re_match(
 
         const op_byte = pattern_pc[0];
         pattern_pc += 1;
-        if (op_byte > @intFromEnum(RegexpCode.not_syntax_spec)) return -2;
+        if (op_byte > @backingInt(RegexpCode.not_syntax_spec)) return -2;
 
         const readMatchChar = struct {
             inline fn apply(mpc: *[*]const u8, mend: [*]const u8, gs: [*]const u8, ge: [*]const u8, trans: ?[*]const u8) ?u8 {
@@ -390,7 +389,7 @@ pub export fn re_match(
             }
         }.apply;
 
-        switch (@as(RegexpCode, @enumFromInt(op_byte))) {
+        switch (@as(RegexpCode, @fromBackingInt(@intCast(op_byte)))) {
             .unused => continue,
 
             .exact_1 => {
@@ -582,7 +581,7 @@ pub export fn re_match(
                     if (@intFromPtr(pattern_pc) >= @intFromPtr(pattern_end)) return -2;
                     const code_byte = pattern_pc[0];
                     pattern_pc += 1;
-                    if (code_byte >= @intFromEnum(syntax.SyntaxCode.max)) return -2;
+                    if (code_byte >= @backingInt(syntax.SyntaxCode.max)) return -2;
                     const is_match = syntaxConstituentP(syntax_table, @intCast(code_byte), ascii);
                     failed = if (kind == .syntax_spec) !is_match else is_match;
                 } else {
@@ -611,7 +610,7 @@ pub export fn re_match(
                 if (pattern_pc == pattern_end) {
                     do_finalize = true;
                 } else {
-                    const next_ascii: ?u8 = switch (@as(RegexpCode, @enumFromInt(pattern_pc[0]))) {
+                    const next_ascii: ?u8 = switch (@as(RegexpCode, @fromBackingInt(@intCast(pattern_pc[0])))) {
                         .exact_1 => pattern_pc[1],
                         .exact_n => pattern_pc[2],
                         .line_end => '\n',
@@ -619,7 +618,7 @@ pub export fn re_match(
                     };
                     if (next_ascii) |ascii| {
                         const target = offsetPtr(pattern_pc, off, pattern_start, pattern_end).?;
-                        switch (@as(RegexpCode, @enumFromInt(target[0]))) {
+                        switch (@as(RegexpCode, @fromBackingInt(@intCast(target[0])))) {
                             .exact_1 => {
                                 if (ascii != target[1]) do_finalize = true;
                             },
@@ -638,10 +637,10 @@ pub export fn re_match(
                 }
                 pattern_pc -= 2;
                 if (do_finalize) {
-                    (pattern_pc - 1)[0] = @intFromEnum(RegexpCode.finalize_jump);
+                    (pattern_pc - 1)[0] = @backingInt(RegexpCode.finalize_jump);
                     stack_used -= 2;
                 } else {
-                    (pattern_pc - 1)[0] = @intFromEnum(RegexpCode.jump);
+                    (pattern_pc - 1)[0] = @backingInt(RegexpCode.jump);
                 }
                 const jump_off = readPatternOffset(&pattern_pc, pattern_start, pattern_end) orelse return -2;
                 pattern_pc = offsetPtr(pattern_pc, jump_off, pattern_start, pattern_end).?;
@@ -813,14 +812,15 @@ test "regex compile_fastmap, match captures/backrefs, smart repeat rewrite, gap 
     // 16: stop_memory 1
     // 18: duplicate 1
     var pat = [_]u8{
-        @intFromEnum(RegexpCode.start_memory), 1,
-        @intFromEnum(RegexpCode.exact_n), 2, 'f', 'o',
-        @intFromEnum(RegexpCode.exact_1), 'o', // one required 'o'
-        @intFromEnum(RegexpCode.on_failure_jump), 5, 0, // +5 -> byte 16
-        @intFromEnum(RegexpCode.exact_1), 'o',
-        @intFromEnum(RegexpCode.maybe_finalize_jump), 0xF8, 0xFF, // -8 -> byte 8
-        @intFromEnum(RegexpCode.stop_memory), 1,
-        @intFromEnum(RegexpCode.duplicate), 1,
+        @backingInt(RegexpCode.start_memory), 1,
+        @backingInt(RegexpCode.exact_n),      2,
+        'f',                                  'o',
+        @backingInt(RegexpCode.exact_1), 'o', // one required 'o'
+        @backingInt(RegexpCode.on_failure_jump), 5,   0, // +5 -> byte 16
+        @backingInt(RegexpCode.exact_1),         'o',
+        @backingInt(RegexpCode.maybe_finalize_jump), 0xF8, 0xFF, // -8 -> byte 8
+        @backingInt(RegexpCode.stop_memory),         1,    @backingInt(RegexpCode.duplicate),
+        1,
     };
 
     const pat_ptr: [*]u8 = &pat;
@@ -840,13 +840,13 @@ test "regex compile_fastmap, match captures/backrefs, smart repeat rewrite, gap 
     try std.testing.expectEqual(@as(isize, 3), regs.start[1]);
     try std.testing.expectEqual(@as(isize, 8), regs.end[1]);
     // Verify maybe_finalize_jump was rewritten to jump because stop_memory follows.
-    try std.testing.expectEqual(@intFromEnum(RegexpCode.jump), pat[13]);
+    try std.testing.expectEqual(@backingInt(RegexpCode.jump), pat[13]);
 
     // Backward search from end for nullable pattern `a*` (`on_failure_jump +5`, `exact_1 'a'`, `finalize_jump -8`)
     var null_pat = [_]u8{
-        @intFromEnum(RegexpCode.on_failure_jump), 5, 0,
-        @intFromEnum(RegexpCode.exact_1), 'a',
-        @intFromEnum(RegexpCode.finalize_jump), 0xF8, 0xFF,
+        @backingInt(RegexpCode.on_failure_jump), 5,    0,
+        @backingInt(RegexpCode.exact_1),         'a',  @backingInt(RegexpCode.finalize_jump),
+        0xF8,                                    0xFF,
     };
     const np_ptr: [*]u8 = &null_pat;
     const b_res = re_search_backward(np_ptr, np_ptr + null_pat.len, &buf, null, buf.text_start, buf.text_end);

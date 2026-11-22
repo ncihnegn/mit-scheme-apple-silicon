@@ -40,8 +40,8 @@ pub fn failWsa(syscall_id: c_int) noreturn {
 }
 
 fn closeAllChannelsCleanup() callconv(.c) void {
-    var i: abi.Tchannel = 0;
-    while (i < os_channel_table_size) : (i += 1) {
+    for (0..os_channel_table_size) |i_u| {
+        const i: abi.Tchannel = @intCast(i_u);
         if (win_channels[i].open) {
             osChannelCloseNoerror(i);
         }
@@ -334,10 +334,9 @@ pub fn osDeallocateSelectRegistry(registry: abi.SelectRegistry) callconv(.c) voi
 
 pub fn osAddToSelectRegistry(registry: abi.SelectRegistry, desc: c_int, mode: c_uint) callconv(.c) void {
     const r: *WinSelectRegistry = @ptrCast(@alignCast(registry orelse return));
-    var i: c_uint = 0;
-    while (i < r.length) : (i += 1) {
-        if (r.entries[i].desc == desc) {
-            r.entries[i].req_mode |= mode;
+    for (r.entries[0..r.length]) |*entry| {
+        if (entry.desc == desc) {
+            entry.req_mode |= mode;
             return;
         }
     }
@@ -352,14 +351,12 @@ pub fn osAddToSelectRegistry(registry: abi.SelectRegistry, desc: c_int, mode: c_
 
 pub fn osRemoveFromSelectRegistry(registry: abi.SelectRegistry, desc: c_int, mode: c_uint) callconv(.c) void {
     const r: *WinSelectRegistry = @ptrCast(@alignCast(registry orelse return));
-    var i: c_uint = 0;
-    while (i < r.length) : (i += 1) {
+    for (0..r.length) |i| {
         if (r.entries[i].desc == desc) {
             r.entries[i].req_mode &= ~mode;
             if (r.entries[i].req_mode == 0) {
                 r.length -= 1;
-                var j = i;
-                while (j < r.length) : (j += 1) {
+                for (i..r.length) |j| {
                     r.entries[j] = r.entries[j + 1];
                 }
             }
@@ -444,10 +441,9 @@ pub fn osTestSelectRegistry(registry: abi.SelectRegistry, blockp: c_int) callcon
         if (osscheme.pending_interrupts_p() != 0) return abi.select_interrupt;
 
         var ready_count: c_int = 0;
-        var i: c_uint = 0;
-        while (i < r.length) : (i += 1) {
-            const ready = probeDescReady(r.entries[i].desc, r.entries[i].req_mode);
-            r.entries[i].ready_mode = ready;
+        for (r.entries[0..r.length]) |*entry| {
+            const ready = probeDescReady(entry.desc, entry.req_mode);
+            entry.ready_mode = ready;
             if (ready != 0) ready_count += 1;
         }
         if (ready_count > 0 or blockp == 0) return ready_count;

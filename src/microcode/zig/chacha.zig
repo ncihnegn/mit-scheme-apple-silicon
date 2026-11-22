@@ -107,8 +107,7 @@ fn chachaCore(
     }
 
     var x = j;
-    var i: usize = 0;
-    while (i < rounds / 2) : (i += 1) {
+    for (0..rounds / 2) |_| {
         quarterRound(&x[0], &x[4], &x[8], &x[12]);
         quarterRound(&x[1], &x[5], &x[9], &x[13]);
         quarterRound(&x[2], &x[6], &x[10], &x[14]);

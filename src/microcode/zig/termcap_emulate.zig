@@ -327,23 +327,25 @@ pub fn tgetent(bp_arg: ?[*]u8, name: [*:0]const u8) callconv(.c) c_int {
     var tcenv: ?[*:0]const u8 = null;
     var indirect: ?[*:0]u8 = null;
 
-    if (tem != null and !filep) {
-        const term_env = std.c.getenv("TERM");
-        if (term_env != null and std.mem.eql(u8, std.mem.span(name), std.mem.span(term_env.?))) {
-            const t = tem.?;
-            indirect = tgetst1(findCapability(t, 't', 'c'), null);
-            if (indirect == null) {
-                if (bp_arg) |bp| {
-                    const slice = std.mem.span(t);
-                    @memcpy(bp[0 .. slice.len + 1], slice.ptr[0 .. slice.len + 1]);
-                    term_entry = @ptrCast(bp);
-                } else {
-                    term_entry = t;
+    if (!filep) {
+        if (tem) |t| {
+            if (std.c.getenv("TERM")) |term_env| {
+                if (std.mem.eql(u8, std.mem.span(name), std.mem.span(term_env))) {
+                    indirect = tgetst1(findCapability(t, 't', 'c'), null);
+                    if (indirect == null) {
+                        if (bp_arg) |bp| {
+                            const slice = std.mem.span(t);
+                            @memcpy(bp[0 .. slice.len + 1], slice.ptr[0 .. slice.len + 1]);
+                            term_entry = @ptrCast(bp);
+                        } else {
+                            term_entry = t;
+                        }
+                        return 1;
+                    } else {
+                        tcenv = t;
+                        tem = null;
+                    }
                 }
-                return 1;
-            } else {
-                tcenv = t;
-                tem = null;
             }
         }
     }
@@ -385,8 +387,8 @@ pub fn tgetent(bp_arg: ?[*]u8, name: [*:0]const u8) callconv(.c) c_int {
     };
     var bp_len: usize = 0;
 
-    if (indirect != null) {
-        const tc_slice = std.mem.span(tcenv.?);
+    if (tcenv) |tc| {
+        const tc_slice = std.mem.span(tc);
         @memcpy(bp[0 .. tc_slice.len + 1], tc_slice.ptr[0 .. tc_slice.len + 1]);
         bp_len = tc_slice.len;
     }

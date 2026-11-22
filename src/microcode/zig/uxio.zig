@@ -73,8 +73,8 @@ fn fdIsSet(fd: c_int, set: *const FdSet) bool {
 }
 
 fn uxChannelCloseAll() callconv(.c) void {
-    var ch: abi.Tchannel = 0;
-    while (ch < os_channel_table_size) : (ch += 1) {
+    for (0..os_channel_table_size) |ch_u| {
+        const ch: abi.Tchannel = @intCast(ch_u);
         if (channel_table_ptr.?[ch].descriptor >= 0) {
             osChannelCloseNoerror(ch);
         }
@@ -148,9 +148,9 @@ pub fn osChannelClose(channel: abi.Tchannel) callconv(.c) void {
     entry.descriptor = -1;
     if (status < 0) {
         const err = std.c._errno().*;
-        if (err == @intFromEnum(std.c.E.INTR)) {
+        if (err == @backingInt(std.c.E.INTR)) {
             osscheme.deliver_pending_interrupts();
-        } else if (err == @intFromEnum(std.c.E.BADF)) {
+        } else if (err == @backingInt(std.c.E.BADF)) {
             utils.error_system_call(err, abi.syscall_close);
         }
     }
@@ -178,15 +178,15 @@ pub fn osChannelCloseOnAbort(channel: abi.Tchannel) callconv(.c) void {
 
 fn fsyncCheckErrno(syscall_name: c_int) bool {
     const err = std.c._errno().*;
-    if (err == @intFromEnum(std.c.E.INTR)) {
+    if (err == @backingInt(std.c.E.INTR)) {
         osscheme.deliver_pending_interrupts();
         return false;
     }
-    if (err == @intFromEnum(std.c.E.BADF) or
-        err == @intFromEnum(std.c.E.INVAL) or
-        err == @intFromEnum(std.c.E.NOSYS) or
-        err == @intFromEnum(std.c.E.NOTTY) or
-        err == @intFromEnum(std.c.E.ROFS))
+    if (err == @backingInt(std.c.E.BADF) or
+        err == @backingInt(std.c.E.INVAL) or
+        err == @backingInt(std.c.E.NOSYS) or
+        err == @backingInt(std.c.E.NOTTY) or
+        err == @backingInt(std.c.E.ROFS))
     {
         return true;
     }
@@ -228,8 +228,8 @@ pub fn osChannelRead(channel: abi.Tchannel, buffer: ?*anyopaque, nbytes: usize) 
         const scr = std.c.read(entry.descriptor, dst, nbytes);
         if (scr < 0) {
             const err = std.c._errno().*;
-            if (err == @intFromEnum(std.c.E.AGAIN)) return -1;
-            if (entry.type == .unix_pty_master and err == @intFromEnum(std.c.E.IO)) return 0;
+            if (err == @backingInt(std.c.E.AGAIN)) return -1;
+            if (entry.type == .unix_pty_master and err == @backingInt(std.c.E.IO)) return 0;
             abi.UX_prim_check_errno(abi.syscall_read);
             continue;
         }
@@ -248,7 +248,7 @@ pub fn osChannelWrite(channel: abi.Tchannel, buffer: ?*const anyopaque, nbytes: 
     while (true) {
         const scr = std.c.write(fd, src, nbytes);
         if (scr < 0) {
-            if (std.c._errno().* == @intFromEnum(std.c.E.AGAIN)) return -1;
+            if (std.c._errno().* == @backingInt(std.c.E.AGAIN)) return -1;
             abi.UX_prim_check_errno(abi.syscall_write);
             continue;
         }
@@ -457,7 +457,7 @@ const PollSelectRegistry = struct {
         _ = std.c.sigfillset(&new);
         _ = std.c.sigprocmask(std.c.SIG.SETMASK, &new, &old);
         const n: c_int = if (abi.OS_process_any_status_change() != 0 or osscheme.pending_interrupts_p() != 0) blk: {
-            std.c._errno().* = @intFromEnum(std.c.E.INTR);
+            std.c._errno().* = @backingInt(std.c.E.INTR);
             break :blk -1;
         } else std.c.ppoll(fds, nfds, null, &old);
         _ = std.c.sigprocmask(std.c.SIG.SETMASK, &old, null);
@@ -471,7 +471,7 @@ const PollSelectRegistry = struct {
             if (nfds > 0) return nfds;
             if (nfds < 0) {
                 const err = std.c._errno().*;
-                if (err != @intFromEnum(std.c.E.INTR)) {
+                if (err != @backingInt(std.c.E.INTR)) {
                     utils.error_system_call(err, abi.syscall_select);
                 }
             }
@@ -492,7 +492,7 @@ const PollSelectRegistry = struct {
             if (nfds > 0) return @intCast(encodeMode(pfds[0].revents));
             if (nfds < 0) {
                 const err = std.c._errno().*;
-                if (err != @intFromEnum(std.c.E.INTR)) {
+                if (err != @backingInt(std.c.E.INTR)) {
                     utils.error_system_call(err, abi.syscall_select);
                 }
             }
@@ -563,8 +563,8 @@ const FdSetSelectRegistry = struct {
     fn result(registry: abi.SelectRegistry, index: c_uint, fd_r: *c_int, mode_r: *c_uint) void {
         const r: *const Impl = @ptrCast(@alignCast(registry.?));
         var i: c_uint = 0;
-        var fd: c_int = 0;
-        while (fd < fd_setsize) : (fd += 1) {
+        for (0..@intCast(fd_setsize)) |fd_u| {
+            const fd: c_int = @intCast(fd_u);
             if (isRegistered(r, fd)) {
                 if (i < index) {
                     i += 1;
@@ -587,7 +587,7 @@ const FdSetSelectRegistry = struct {
         _ = std.c.sigfillset(&new);
         _ = std.c.sigprocmask(std.c.SIG.SETMASK, &new, &old);
         const n: c_int = if (abi.OS_process_any_status_change() != 0 or osscheme.pending_interrupts_p() != 0) blk: {
-            std.c._errno().* = @intFromEnum(std.c.E.INTR);
+            std.c._errno().* = @backingInt(std.c.E.INTR);
             break :blk -1;
         } else DarwinSelect.pselect(nfds, readfds, writefds, null, null, &old);
         _ = std.c.sigprocmask(std.c.SIG.SETMASK, &old, null);
@@ -603,7 +603,7 @@ const FdSetSelectRegistry = struct {
             if (nfds > 0) return nfds;
             if (nfds < 0) {
                 const err = std.c._errno().*;
-                if (err != @intFromEnum(std.c.E.INTR)) {
+                if (err != @backingInt(std.c.E.INTR)) {
                     utils.error_system_call(err, abi.syscall_select);
                 }
             }
@@ -628,7 +628,7 @@ const FdSetSelectRegistry = struct {
             }
             if (nfds < 0) {
                 const err = std.c._errno().*;
-                if (err != @intFromEnum(std.c.E.INTR)) {
+                if (err != @backingInt(std.c.E.INTR)) {
                     utils.error_system_call(err, abi.syscall_select);
                 }
             }

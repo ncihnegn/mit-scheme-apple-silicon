@@ -201,8 +201,7 @@ pub export fn Prim_substring_move_right() callconv(.c) obj.SchemeObject {
 // DEFINE_PRIMITIVE ("SUBSTRING-MOVE-LEFT!", Prim_substring_move_left, 5, 5, 0)
 pub export fn Prim_substring_move_left() callconv(.c) obj.SchemeObject {
     const a = substringMovePrefix();
-    var i: usize = 0;
-    while (i < a.length) : (i += 1) {
+    for (0..a.length) |i| {
         a.ptr2[a.start2 + i] = a.ptr1[a.start1 + i];
     }
     return obj.unspecific;
@@ -261,8 +260,7 @@ pub export fn Prim_vec_8b_fill() callconv(.c) obj.SchemeObject {
 // DEFINE_PRIMITIVE ("VECTOR-8B-FIND-NEXT-CHAR", Prim_vec_8b_find_next_char, 4, 4, 0)
 pub export fn Prim_vec_8b_find_next_char() callconv(.c) obj.SchemeObject {
     const a = vec8bSubstringPrefix();
-    var i = a.start;
-    while (i < a.end) : (i += 1) {
+    for (a.start..a.end) |i| {
         if (a.ptr[i] == a.ascii) return obj.longToUnsignedFixnum(@intCast(i));
     }
     return obj.sharp_f;
@@ -287,8 +285,7 @@ inline fn asciiUpcaseByte(c: u8) u8 {
 pub export fn Prim_vec_8b_find_next_char_ci() callconv(.c) obj.SchemeObject {
     const a = vec8bSubstringPrefix();
     const target = asciiUpcaseByte(a.ascii);
-    var i = a.start;
-    while (i < a.end) : (i += 1) {
+    for (a.start..a.end) |i| {
         if (asciiUpcaseByte(a.ptr[i]) == target) return obj.longToUnsignedFixnum(@intCast(i));
     }
     return obj.sharp_f;
@@ -329,8 +326,7 @@ fn substrFindCharInSetPrefix() struct { ptr: [*]const u8, start: usize, end: usi
 // DEFINE_PRIMITIVE ("SUBSTRING-FIND-NEXT-CHAR-IN-SET", Prim_find_next_char_in_set, 4, 4, 0)
 pub export fn Prim_find_next_char_in_set() callconv(.c) obj.SchemeObject {
     const a = substrFindCharInSetPrefix();
-    var i = a.start;
-    while (i < a.end) : (i += 1) {
+    for (a.start..a.end) |i| {
         if (a.char_set[a.ptr[i]] != 0) return obj.longToUnsignedFixnum(@intCast(i));
     }
     return obj.sharp_f;
@@ -397,8 +393,7 @@ pub export fn Prim_substring_ci_equal() callconv(.c) obj.SchemeObject {
     const len1 = a.end1 - a.start1;
     const len2 = a.end2 - a.start2;
     if (len1 != len2) return obj.sharp_f;
-    var i: usize = 0;
-    while (i < len1) : (i += 1) {
+    for (0..len1) |i| {
         if (asciiUpcaseByte(a.s1[a.start1 + i]) != asciiUpcaseByte(a.s2[a.start2 + i])) {
             return obj.sharp_f;
         }
@@ -412,8 +407,7 @@ pub export fn Prim_substring_less() callconv(.c) obj.SchemeObject {
     const len1 = a.end1 - a.start1;
     const len2 = a.end2 - a.start2;
     const limit = @min(len1, len2);
-    var i: usize = 0;
-    while (i < limit) : (i += 1) {
+    for (0..limit) |i| {
         const c1 = a.s1[a.start1 + i];
         const c2 = a.s2[a.start2 + i];
         if (c1 != c2) return obj.booleanToObject(c1 < c2);
@@ -424,8 +418,7 @@ pub export fn Prim_substring_less() callconv(.c) obj.SchemeObject {
 fn matchForwardImpl(comptime ci: bool) obj.SchemeObject {
     const a = substringComparePrefix();
     const length = @min(a.end1 - a.start1, a.end2 - a.start2);
-    var i: usize = 0;
-    while (i < length) : (i += 1) {
+    for (0..length) |i| {
         const c1 = a.s1[a.start1 + i];
         const c2 = a.s2[a.start2 + i];
         const same = if (ci) asciiUpcaseByte(c1) == asciiUpcaseByte(c2) else c1 == c2;
@@ -437,8 +430,7 @@ fn matchForwardImpl(comptime ci: bool) obj.SchemeObject {
 fn matchBackwardImpl(comptime ci: bool) obj.SchemeObject {
     const a = substringComparePrefix();
     const length = @min(a.end1 - a.start1, a.end2 - a.start2);
-    var matched: usize = 0;
-    while (matched < length) : (matched += 1) {
+    for (0..length) |matched| {
         const c1 = a.s1[a.end1 - 1 - matched];
         const c2 = a.s2[a.end2 - 1 - matched];
         const same = if (ci) asciiUpcaseByte(c1) == asciiUpcaseByte(c2) else c1 == c2;
@@ -580,14 +572,12 @@ fn htLookup(table: *HashTable, key: usize) ?*HtRecord {
 fn htInsert(table: *HashTable, rec: *HtRecord) usize {
     const key = htInsertRaw(table, rec);
     if (table.n_records >= table.n_buckets and table.n_buckets < exptToN(ht_max_expt)) {
-        var e: u5 = ht_min_expt;
-        while (e <= ht_max_expt) : (e += 1) {
-            const n = exptToN(e);
+        for (ht_min_expt..@as(usize, ht_max_expt) + 1) |eu| {
+            const n = exptToN(@intCast(eu));
             if (n > table.n_buckets) {
                 htResize(table, n);
                 break;
             }
-            if (e == ht_max_expt) break;
         }
     }
     return key;

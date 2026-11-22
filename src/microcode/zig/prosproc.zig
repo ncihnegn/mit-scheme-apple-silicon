@@ -81,8 +81,8 @@ pub export fn Prim_process_delete() callconv(.c) obj.SchemeObject {
 //   "Return a vector of all processes in the process table.")
 pub export fn Prim_process_table() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
-    var process: abi.Tprocess = 0;
-    while (process < abi.OS_process_table_size) : (process += 1) {
+    for (0..abi.OS_process_table_size) |p_u| {
+        const process: abi.Tprocess = @intCast(p_u);
         if (abi.OS_process_valid_p(process) != 0) {
             boot.scratch_obstack.grow(std.mem.asBytes(&process));
         }
@@ -118,7 +118,7 @@ pub export fn Prim_process_id() callconv(.c) obj.SchemeObject {
 pub export fn Prim_process_jc_status() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     const status = abi.OS_process_jc_status(argProcess(1));
-    return switch (@as(abi.ProcessJcStatus, @enumFromInt(status))) {
+    return switch (@as(abi.ProcessJcStatus, @fromBackingInt(@intCast(status)))) {
         .no_ctty => obj.ulongToFixnum(0),
         .unrelated => obj.ulongToFixnum(1),
         .no_jc => obj.ulongToFixnum(2),
@@ -147,7 +147,7 @@ pub export fn Prim_process_status_sync_all() callconv(.c) obj.SchemeObject {
 pub export fn Prim_process_status() callconv(.c) obj.SchemeObject {
     abi.primitiveHeader();
     const status = abi.OS_process_status(argProcess(1));
-    return switch (@as(abi.ProcessStatus, @enumFromInt(status))) {
+    return switch (@as(abi.ProcessStatus, @fromBackingInt(@intCast(status)))) {
         .running => obj.ulongToFixnum(0),
         .stopped => obj.ulongToFixnum(1),
         .exited => obj.ulongToFixnum(2),
@@ -388,7 +388,7 @@ test "prosproc environment, process table, status, signals, and make-subprocess"
     const env_list_vec = abi.allocate_vector(1, true);
     obj.vectorSet(env_list_vec, 0, string.char_pointer_to_string("FOO=bar"));
     const env_pair = abi.cons(env_list_vec, string.char_pointer_to_string("/tmp"));
-    stubs.setMockChannel(1, @intFromEnum(abi.ChannelType.unix_pipe), false);
+    stubs.setMockChannel(1, @backingInt(abi.ChannelType.unix_pipe), false);
     stubs.setArgs(&.{
         prog,
         argv_vec,
