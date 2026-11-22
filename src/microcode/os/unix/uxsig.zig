@@ -440,10 +440,10 @@ fn mapsLineBounds(line: []const u8) ?struct { start: usize, end: usize } {
 
 /// Prints the /proc/self/maps line containing `addr` (Linux only), so a
 /// fault address can be attributed to the heap, the code arena, or a file
-/// mapping.
+/// mapping. When `addr` is 0, dumps every mapping (capped), which reveals
+/// e.g. the code arena's actual permissions.
 fn printMapsRegionContaining(addr: usize) void {
     if (comptime builtin.os.tag != .linux) return;
-    if (addr == 0) return;
     const fd = linux_maps.open("/proc/self/maps", 0); // O_RDONLY
     if (fd < 0) return;
     defer _ = linux_maps.close(fd);
@@ -452,12 +452,19 @@ fn printMapsRegionContaining(addr: usize) void {
     var chunk: [4096]u8 = undefined;
     var line: [256]u8 = undefined;
     var line_len: usize = 0;
+    var dumped: usize = 0;
     while (true) {
         const n = linux_maps.read(fd, &chunk, chunk.len);
         if (n <= 0) break;
         for (chunk[0..@intCast(n)]) |ch| {
             if (ch == '\n') {
-                if (mapsLineBounds(line[0..line_len])) |b| {
+                const bounds = mapsLineBounds(line[0..line_len]);
+                if (addr == 0) {
+                    if (dumped < 200) {
+                        writeFmt(err, ";;; maps: {s}\n", .{line[0..line_len]});
+                        dumped += 1;
+                    }
+                } else if (bounds) |b| {
                     if (addr >= b.start and addr < b.end) {
                         writeFmt(err, ";;; maps[pc]: {s}\n", .{line[0..line_len]});
                         _ = abi.fflush(err);
@@ -472,6 +479,41 @@ fn printMapsRegionContaining(addr: usize) void {
         }
         if (line_len == line.len) return; // pathological line; give up
     }
+    _ = abi.fflush(err);
+}
+
+/// Prints machine words around a faulting address: the presumed Scheme
+/// object header before it and the would-be code bytes at it.
+fn dumpWordsAround(addr: usize) void {
+    if (addr == 0) return;
+    const err = abi.cStderr();
+    var i: usize = 4;
+    while (i > 0) : (i -= 1) {
+        const word: *align(1) const usize = @ptrFromInt(addr - i * @sizeOf(usize));
+        writeFmt(err, ";;; before[pc-0x{x}] = 0x{x}\n", .{ i * @sizeOf(usize), word.* });
+    }
+    i = 0;
+    while (i < 8) : (i += 1) {
+        const word: *align(1) const usize = @ptrFromInt(addr + i * @sizeOf(usize));
+        writeFmt(err, ";;; at[pc+0x{x}] = 0x{x}\n", .{ i * @sizeOf(usize), word.* });
+    }
+    _ = abi.fflush(err);
+}
+
+/// Prints the first 12 general-purpose registers from a trap ucontext.
+/// Names follow the Linux x86_64 `gregs` layout (R8 first); other
+/// platforms print generic reg[N].
+fn dumpRegisters(pscp: ?*anyopaque) void {
+    const regs = uxtrap.sigcontextFirstReg(pscp) orelse return;
+    const err = abi.cStderr();
+    const names = if (comptime builtin.os.tag == .linux and builtin.cpu.arch == .x86_64)
+        [_][]const u8{ "r8", "r9", "r10", "r11", "rbx", "rcx", "rdx", "rsi", "rdi", "rbp", "rsp", "r12" }
+    else
+        [_][]const u8{ "reg0", "reg1", "reg2", "reg3", "reg4", "reg5", "reg6", "reg7", "reg8", "reg9", "reg10", "reg11" };
+    for (names, 0..) |name, i| {
+        writeFmt(err, ";;; reg[{s}] = 0x{x}\n", .{ name, regs[i] });
+    }
+    _ = abi.fflush(err);
 }
 
 /// Prints machine words at the trap stack pointer; return addresses usually
@@ -509,9 +551,8 @@ fn reportFatalFault(signo: c_int, info: ?*std.c.siginfo_t, pscp: ?*anyopaque) vo
     });
     _ = abi.fflush(err);
     printMapsRegionContaining(pc);
-    if (faultAddress(info.?) != pc) {
-        printMapsRegionContaining(faultAddress(info.?));
-    }
+    dumpWordsAround(pc);
+    dumpRegisters(pscp);
     dumpStackWords(sp);
 }
 

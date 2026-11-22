@@ -241,12 +241,13 @@ fn sigcontextRfree(scp: ?*const Ucontext) usize {
     return if (builtin.cpu.arch == .aarch64) @intCast(uc.uc_mcontext.regs[20]) else @bitCast(uc.uc_mcontext.gregs[8]);
 }
 
-fn sigcontextFirstReg(scp: ?*const Ucontext) ?[*]const usize {
-    const uc = scp orelse return null;
+pub fn sigcontextFirstReg(scp: ?*const anyopaque) ?[*]const usize {
+    const uc: ?*const Ucontext = if (scp) |p| @ptrCast(@alignCast(p)) else null;
+    const u = uc orelse return null;
     if (builtin.os.tag.isDarwin()) {
-        return @ptrCast(@alignCast(&uc.uc_mcontext.ss));
+        return @ptrCast(@alignCast(&u.uc_mcontext.ss));
     }
-    return if (builtin.cpu.arch == .aarch64) @ptrCast(&uc.uc_mcontext.regs[0]) else @ptrCast(&uc.uc_mcontext.gregs[0]);
+    return if (builtin.cpu.arch == .aarch64) @ptrCast(&u.uc_mcontext.regs[0]) else @ptrCast(&u.uc_mcontext.gregs[0]);
 }
 
 fn pcAlignedP(pc: usize) bool {
