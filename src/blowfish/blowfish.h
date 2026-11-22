@@ -74,6 +74,4 @@ unsigned
 
 int	blowfish_selftest(void);
 
-extern void *(*volatile blowfish_explicit_memset_impl)(void *, int, size_t);
-
 #endif	/* BLOWFISH_H */
