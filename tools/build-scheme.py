@@ -251,10 +251,10 @@ def run_cmd(
 
 
 def query_scheme(exe: Path, expr: str, env: dict[str, str], extra_args: list[str] | None = None) -> str:
-    cmd = [str(exe), "--batch-mode", "--no-init-file"]
+    cmd = [str(exe), "--batch-mode"]
     if extra_args:
         cmd.extend(extra_args)
-    cmd.extend(["--eval", expr, "(%exit)"])
+    cmd.extend(["--no-init-file", "--eval", expr, "(%exit)"])
     proc = subprocess.run(
         cmd,
         cwd=str(SRC_DIR),
@@ -646,11 +646,12 @@ class SchemeContext:
         if self.scheme_arch != "svm1-64le":
             return
         env = self.host_env(host_lib)
-        cmd = [str(host_exe), "--batch-mode", "--no-init-file"]
+        cmd = [str(host_exe), "--batch-mode"]
         if host_lib:
             cmd.extend(["--library", host_lib])
         if has_runtime_com:
             cmd.extend(["--band", "runtime.com"])
+        cmd.append("--no-init-file")
         run_cmd(
             cmd,
             cwd=SRC_DIR,
@@ -697,11 +698,12 @@ class SchemeContext:
             '(set! cref/object-root (pathname-simplify (merge-pathnames "tools/"))) '
             '(set! cref/source-root (pathname-simplify (merge-pathnames "./")))'
         )
-        host_compiler_cmd = [str(host_exe), "--batch-mode", "--no-init-file"]
+        host_compiler_cmd = [str(host_exe), "--batch-mode"]
         if host_lib:
             host_compiler_cmd.extend(["--library", host_lib])
         host_compiler_cmd.extend(
             [
+                "--no-init-file",
                 "--load",
                 "runtime/host-adapter.scm",
                 "--eval",
@@ -711,11 +713,14 @@ class SchemeContext:
             ]
         )
 
-        host_syntaxer_cmd = [str(host_exe), "--batch-mode", "--no-init-file"]
+        host_syntaxer_cmd = [str(host_exe), "--batch-mode"]
         if host_lib:
             host_syntaxer_cmd.extend(["--library", host_lib])
         if has_runtime_com:
-            host_syntaxer_cmd.extend(["--band", "runtime.com", "--eval", "(load-option (quote SF))"])
+            host_syntaxer_cmd.extend(["--band", "runtime.com"])
+        host_syntaxer_cmd.append("--no-init-file")
+        if has_runtime_com:
+            host_syntaxer_cmd.extend(["--eval", "(load-option (quote SF))"])
         host_syntaxer_cmd.extend(
             [
                 "--load",
@@ -864,11 +869,25 @@ class SchemeContext:
                 ),
             ),
             "tools:syntax-compiler": (
-                ["tools:syntax-runtime", "tools:syntax-sf"],
+                ["tools:syntax-runtime", "tools:syntax-sf"]
+                if has_runtime_com
+                else ["tools/syntaxer.com"],
                 lambda: run_cmd(
-                    host_syntaxer_cmd,
+                    host_syntaxer_cmd
+                    if has_runtime_com
+                    else [
+                        str(host_exe),
+                        "--batch-mode",
+                        "--library",
+                        "tools",
+                        "--band",
+                        "tools/syntaxer.com",
+                        "--no-init-file",
+                        "--eval",
+                        f"(begin {cref_settings} {sf_settings})",
+                    ],
                     cwd=SRC_DIR,
-                    env=env,
+                    env=env if has_runtime_com else self.host_env(str(tools_dir)),
                     stdin_text='(begin (cd "compiler") (load "compiler.sf"))\n',
                     label="tools:syntax-compiler",
                 ),

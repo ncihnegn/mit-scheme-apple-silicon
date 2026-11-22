@@ -135,11 +135,37 @@ fn dldUnloadAll() callconv(.c) void {
 fn dldLookup(handle: ?*anyopaque, symbol: [*:0]const u8) ?*anyopaque {
     if (comptime builtin.os.tag == .windows) {
         const h: win.HMODULE = @ptrCast(handle orelse signalWinDlError("GetProcAddress"));
-        const addr = win.kernel32.GetProcAddress(h, symbol);
-        if (addr == null) {
-            signalWinDlError("GetProcAddress");
+        if (win.kernel32.GetProcAddress(h, symbol)) |addr| {
+            return addr;
         }
-        return addr;
+        // Mirror POSIX dlopen(NULL, RTLD_GLOBAL): when querying the process handle,
+        // also search already-loaded dynamic handles and standard CRT/system DLLs.
+        if (win.kernel32.GetModuleHandleA(null)) |self_mod| {
+            if (h == self_mod) {
+                if (loaded_handles) |handles| {
+                    for (0..n_loaded_handles) |i| {
+                        const mod: win.HMODULE = @ptrCast(handles[i]);
+                        if (mod == self_mod) continue;
+                        if (win.kernel32.GetProcAddress(mod, symbol)) |addr| {
+                            return addr;
+                        }
+                    }
+                }
+                const fallback_dlls = [_][*:0]const u8{
+                    "ucrtbase.dll",
+                    "msvcrt.dll",
+                    "kernel32.dll",
+                };
+                for (fallback_dlls) |dll| {
+                    if (win.kernel32.GetModuleHandleA(dll)) |mod| {
+                        if (win.kernel32.GetProcAddress(mod, symbol)) |addr| {
+                            return addr;
+                        }
+                    }
+                }
+            }
+        }
+        signalWinDlError("GetProcAddress");
     } else {
         _ = std.c.dlerror(); // discard any outstanding errors
         const address = std.c.dlsym(handle, symbol);
@@ -241,4 +267,21 @@ test "pruxdld dlopen self, dlsym, dlclose, invoke-c-thunk, and address-to-string
     stubs.setArgs(&.{handle});
     _ = Prim_dld_unload_file();
     try std.testing.expectEqual(@as(usize, 0), n_loaded_handles);
+
+    if (comptime builtin.os.tag == .windows) {
+        const k32_wc = abi.system_pair_cons(@intCast(obj.tc_weak_cons), obj.sharp_f, obj.sharp_f);
+        stubs.setArgs(&.{ string.char_pointer_to_string("kernel32.dll"), k32_wc });
+        _ = Prim_dld_load_file();
+        const k32_handle = obj.pairCdr(k32_wc);
+        try std.testing.expect(k32_handle != obj.sharp_f);
+        try std.testing.expectEqual(@as(usize, 1), n_loaded_handles);
+
+        stubs.setArgs(&.{ k32_handle, string.char_pointer_to_string("GetCurrentProcessId") });
+        const pid_sym = Prim_dld_lookup_symbol();
+        try std.testing.expect(artutl.integer_to_ulong(pid_sym) != 0);
+
+        stubs.setArgs(&.{k32_handle});
+        _ = Prim_dld_unload_file();
+        try std.testing.expectEqual(@as(usize, 0), n_loaded_handles);
+    }
 }

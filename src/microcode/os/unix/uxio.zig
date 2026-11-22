@@ -186,9 +186,19 @@ fn fsyncCheckErrno(syscall_name: c_int) bool {
         err == @backingInt(std.c.E.INVAL) or
         err == @backingInt(std.c.E.NOSYS) or
         err == @backingInt(std.c.E.NOTTY) or
-        err == @backingInt(std.c.E.ROFS))
+        err == @backingInt(std.c.E.OPNOTSUPP) or
+        err == @backingInt(std.c.E.ROFS) or
+        err == @backingInt(std.c.E.SPIPE))
     {
         return true;
+    }
+    if (comptime @hasField(std.c.E, "NOTSUP")) {
+        if (err == @backingInt(std.c.E.NOTSUP)) return true;
+    }
+    if (comptime builtin.os.tag.isDarwin()) {
+        // Darwin's <sys/errno.h> defines ENOTSUP=45 (std.c.E.OPNOTSUPP) and POSIX EOPNOTSUPP=102.
+        const darwin_eopnotsupp: c_int = 102;
+        if (err == darwin_eopnotsupp) return true;
     }
     utils.error_system_call(err, syscall_name);
 }
@@ -804,7 +814,7 @@ test "uxio pipe channels nonblocking sync select registry and pause" {
     try std.testing.expectEqual(@as(isize, 6), nread);
     try std.testing.expectEqualStrings("zig-io", buf[0..6]);
 
-    // Synchronize on a pipe (ENOTTY/EINVAL ignored cleanly) and on a real temp file.
+    // Synchronize on a pipe (ENOTTY/EINVAL/ESPIPE/ENOTSUP ignored cleanly) and on a real temp file.
     osChannelSynchronize(w_ch);
 
     var tmp_buf: [64]u8 = undefined;

@@ -859,23 +859,44 @@ test "option quoting, parsePathString, parseStandardOptions, and readBandSizes" 
     boot.scratch_obstack.init(&boot.obstack_chunk_alloc, &std.c.free);
     defer boot.scratch_obstack.freeObj(null);
 
-    // Quote / unquote round-trip
-    const orig: [*:0]const u8 = "a:b\\c";
-    const quoted = quoteString(orig);
-    defer abi.OS_free(@ptrCast(quoted));
-    try std.testing.expectEqualStrings("a\\:b\\\\c", std.mem.span(quoted));
-    const unquoted = unquoteString(quoted);
-    defer abi.OS_free(@ptrCast(unquoted));
-    try std.testing.expectEqualStrings("a:b\\c", std.mem.span(unquoted));
+    if (comptime builtin.os.tag == .windows) {
+        // On Windows, backslash is a directory separator and ';' is the path delimiter,
+        // so quoteString / unquoteString preserve paths verbatim.
+        const orig: [*:0]const u8 = "C:\\scheme\\lib";
+        const quoted = quoteString(orig);
+        defer abi.OS_free(@ptrCast(quoted));
+        try std.testing.expectEqualStrings("C:\\scheme\\lib", std.mem.span(quoted));
+        const unquoted = unquoteString(quoted);
+        defer abi.OS_free(@ptrCast(unquoted));
+        try std.testing.expectEqualStrings("C:\\scheme\\lib", std.mem.span(unquoted));
 
-    // parsePathString with absolute, escaped colon, and empty segment (= wd)
-    const parsed = parsePathString("/abs/one/:/dir\\:two::rel/");
-    defer freeParsedPath(parsed);
-    try std.testing.expectEqualStrings("/abs/one", std.mem.span(parsed[0].?));
-    try std.testing.expectEqualStrings("/dir:two", std.mem.span(parsed[1].?));
-    try std.testing.expectEqualStrings("/mock/wd", std.mem.span(parsed[2].?));
-    try std.testing.expectEqualStrings("/mock/wd/rel", std.mem.span(parsed[3].?));
-    try std.testing.expect(parsed[4] == null);
+        // parsePathString splits on ';', preserves drive roots, and maps empty segments to wd.
+        const parsed = parsePathString("C:\\abs\\one\\;C:\\;;rel\\");
+        defer freeParsedPath(parsed);
+        try std.testing.expectEqualStrings("C:\\abs\\one", std.mem.span(parsed[0].?));
+        try std.testing.expectEqualStrings("C:\\", std.mem.span(parsed[1].?));
+        try std.testing.expectEqualStrings("/mock/wd", std.mem.span(parsed[2].?));
+        try std.testing.expectEqualStrings("/mock/wd/rel", std.mem.span(parsed[3].?));
+        try std.testing.expect(parsed[4] == null);
+    } else {
+        // Quote / unquote round-trip
+        const orig: [*:0]const u8 = "a:b\\c";
+        const quoted = quoteString(orig);
+        defer abi.OS_free(@ptrCast(quoted));
+        try std.testing.expectEqualStrings("a\\:b\\\\c", std.mem.span(quoted));
+        const unquoted = unquoteString(quoted);
+        defer abi.OS_free(@ptrCast(unquoted));
+        try std.testing.expectEqualStrings("a:b\\c", std.mem.span(unquoted));
+
+        // parsePathString with absolute, escaped colon, and empty segment (= wd)
+        const parsed = parsePathString("/abs/one/:/dir\\:two::rel/");
+        defer freeParsedPath(parsed);
+        try std.testing.expectEqualStrings("/abs/one", std.mem.span(parsed[0].?));
+        try std.testing.expectEqualStrings("/dir:two", std.mem.span(parsed[1].?));
+        try std.testing.expectEqualStrings("/mock/wd", std.mem.span(parsed[2].?));
+        try std.testing.expectEqualStrings("/mock/wd/rel", std.mem.span(parsed[3].?));
+        try std.testing.expect(parsed[4] == null);
+    }
 
     // parseStandardOptions flags, numeric options, and --version pass-through
     var argv1 = [_]?[*:0]const u8{ "mit-scheme", "--batch-mode", "--heap", "0x2000", "--extra" };
