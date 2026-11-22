@@ -71,56 +71,56 @@ const std_c_sources = [_][]const u8{
 };
 
 const zig_prim_sources = [_][]const u8{
-    "src/microcode/zig/bigprm.zig",
-    "src/microcode/zig/bitstr.zig",
-    "src/microcode/zig/boot.zig",
-    "src/microcode/zig/bytevector.zig",
-    "src/microcode/zig/char.zig",
-    "src/microcode/zig/comutl.zig",
-    "src/microcode/zig/daemon.zig",
-    "src/microcode/zig/debug.zig",
-    "src/microcode/zig/dfloat.zig",
-    "src/microcode/zig/extern_prim.zig",
-    "src/microcode/zig/fasdump.zig",
-    "src/microcode/zig/fasload.zig",
-    "src/microcode/zig/fixnum.zig",
-    "src/microcode/zig/floenv.zig",
-    "src/microcode/zig/flonum.zig",
-    "src/microcode/zig/generic.zig",
-    "src/microcode/zig/hooks.zig",
-    "src/microcode/zig/hunk.zig",
-    "src/microcode/zig/intern.zig",
-    "src/microcode/zig/intprm.zig",
-    "src/microcode/zig/list.zig",
-    "src/microcode/zig/lookprm.zig",
-    "src/microcode/zig/memmag.zig",
-    "src/microcode/zig/prchacha.zig",
-    "src/microcode/zig/prentropy.zig",
-    "src/microcode/zig/prim.zig",
-    "src/microcode/zig/prkeccak.zig",
-    "src/microcode/zig/prmd5.zig",
-    "src/microcode/zig/prosenv.zig",
-    "src/microcode/zig/prosfile.zig",
-    "src/microcode/zig/prosfs.zig",
-    "src/microcode/zig/prosio.zig",
-    "src/microcode/zig/prosproc.zig",
-    "src/microcode/zig/prospty.zig",
-    "src/microcode/zig/prosterm.zig",
-    "src/microcode/zig/prostty.zig",
-    "src/microcode/zig/pruxdld.zig",
-    "src/microcode/zig/pruxenv.zig",
-    "src/microcode/zig/pruxffi.zig",
-    "src/microcode/zig/pruxfs.zig",
-    "src/microcode/zig/pruxio.zig",
-    "src/microcode/zig/pruxsock.zig",
-    "src/microcode/zig/purify.zig",
-    "src/microcode/zig/purutl.zig",
-    "src/microcode/zig/rgxprim.zig",
-    "src/microcode/zig/step.zig",
-    "src/microcode/zig/string.zig",
-    "src/microcode/zig/syntax.zig",
-    "src/microcode/zig/sysprim.zig",
-    "src/microcode/zig/vector.zig",
+    "src/microcode/arith/bigprm.zig",
+    "src/microcode/arith/dfloat.zig",
+    "src/microcode/arith/fixnum.zig",
+    "src/microcode/arith/floenv.zig",
+    "src/microcode/arith/flonum.zig",
+    "src/microcode/arith/generic.zig",
+    "src/microcode/arith/intprm.zig",
+    "src/microcode/compiler/comutl.zig",
+    "src/microcode/core/boot.zig",
+    "src/microcode/crypto/prchacha.zig",
+    "src/microcode/crypto/prentropy.zig",
+    "src/microcode/crypto/prkeccak.zig",
+    "src/microcode/crypto/prmd5.zig",
+    "src/microcode/data/bitstr.zig",
+    "src/microcode/data/bytevector.zig",
+    "src/microcode/data/char.zig",
+    "src/microcode/data/hunk.zig",
+    "src/microcode/data/list.zig",
+    "src/microcode/data/string.zig",
+    "src/microcode/data/vector.zig",
+    "src/microcode/gc/fasdump.zig",
+    "src/microcode/gc/fasload.zig",
+    "src/microcode/gc/memmag.zig",
+    "src/microcode/gc/purify.zig",
+    "src/microcode/gc/purutl.zig",
+    "src/microcode/prims/prosenv.zig",
+    "src/microcode/prims/prosfile.zig",
+    "src/microcode/prims/prosfs.zig",
+    "src/microcode/prims/prosio.zig",
+    "src/microcode/prims/prosproc.zig",
+    "src/microcode/prims/prospty.zig",
+    "src/microcode/prims/prosterm.zig",
+    "src/microcode/prims/prostty.zig",
+    "src/microcode/prims/pruxdld.zig",
+    "src/microcode/prims/pruxenv.zig",
+    "src/microcode/prims/pruxffi.zig",
+    "src/microcode/prims/pruxfs.zig",
+    "src/microcode/prims/pruxio.zig",
+    "src/microcode/prims/pruxsock.zig",
+    "src/microcode/runtime/daemon.zig",
+    "src/microcode/runtime/debug.zig",
+    "src/microcode/runtime/extern_prim.zig",
+    "src/microcode/runtime/hooks.zig",
+    "src/microcode/runtime/intern.zig",
+    "src/microcode/runtime/lookprm.zig",
+    "src/microcode/runtime/prim.zig",
+    "src/microcode/runtime/step.zig",
+    "src/microcode/runtime/sysprim.zig",
+    "src/microcode/text/rgxprim.zig",
+    "src/microcode/text/syntax.zig",
 };
 
 fn configureMicrocodeModule(
@@ -144,6 +144,49 @@ fn configureMicrocodeModule(
     if (termcap == .ncurses) {
         mod.linkSystemLibrary("ncurses", .{});
     }
+}
+
+const SmokeUnit = enum {
+    none,
+    runtime,
+    fasl,
+    gcloop,
+    cmpintmd,
+    cmpint,
+};
+
+fn createMicrocodeSmokeModule(
+    b: *std.Build,
+    unit: SmokeUnit,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    zig_options_mod: *std.Build.Module,
+) *std.Build.Module {
+    const smoke_options = b.addOptions();
+    smoke_options.addOption(SmokeUnit, "unit", unit);
+    const mod = b.createModule(.{
+        .root_source_file = b.path("src/microcode/smoke.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    mod.addImport("build_options", zig_options_mod);
+    mod.addOptions("smoke_options", smoke_options);
+    return mod;
+}
+
+fn addMicrocodeSmokeObj(
+    b: *std.Build,
+    name: []const u8,
+    unit: SmokeUnit,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    zig_options_mod: *std.Build.Module,
+) *std.Build.Step.Compile {
+    return b.addObject(.{
+        .name = name,
+        .root_module = createMicrocodeSmokeModule(b, unit, target, optimize, zig_options_mod),
+    });
 }
 
 fn addMicrocodeObj(
@@ -333,7 +376,7 @@ pub fn build(b: *std.Build) void {
     const findprim = b.addExecutable(.{
         .name = "findprim",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/microcode/zig/findprim.zig"),
+            .root_source_file = b.path("src/microcode/tools/findprim.zig"),
             .target = b.graph.host,
             .optimize = .fast,
         }),
@@ -346,7 +389,7 @@ pub fn build(b: *std.Build) void {
         fp_run.addFileArg(b.path(src_rel));
     }
     if (termcap_opt != .none) {
-        fp_run.addFileArg(b.path("src/microcode/zig/tterm.zig"));
+        fp_run.addFileArg(b.path("src/microcode/prims/tterm.zig"));
     }
 
     const cmpauxmd_s: ?std.Build.LazyPath = if (arch.cmpauxmd) |asm_arch|
@@ -365,10 +408,10 @@ pub fn build(b: *std.Build) void {
     zig_options.addOption([]const u8, "default_library_path", default_library_path);
     zig_options.addOption(c_uint, "compiler_processor_type", arch.cc_arch_id);
 
-    const microcode_zig_obj = addMicrocodeObj(b, "microcode_zig", "src/microcode/zig/root.zig", target, optimize, zig_options);
+    const microcode_zig_obj = addMicrocodeObj(b, "microcode_zig", "src/microcode/root.zig", target, optimize, zig_options);
 
     const scheme_obj_mod = b.createModule(.{
-        .root_source_file = b.path("src/microcode/zig/scheme_obj.zig"),
+        .root_source_file = b.path("src/microcode/core/scheme_obj.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -434,7 +477,7 @@ pub fn build(b: *std.Build) void {
         const starter = b.addExecutable(.{
             .name = "macosx-starter",
             .root_module = b.createModule(.{
-                .root_source_file = b.path("src/microcode/zig/macosx_starter.zig"),
+                .root_source_file = b.path("src/microcode/tools/macosx_starter.zig"),
                 .target = target,
                 .optimize = optimize,
                 .link_libc = true,
@@ -454,19 +497,13 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_scheme.step);
 
     // `zig build test-smoke`
-    const smoke_runtime_obj = addMicrocodeObj(b, "smoke_runtime", "src/microcode/zig/smoke_runtime.zig", target, optimize, zig_options);
-    const fasl_smoke_obj = addMicrocodeObj(b, "fasl_smoke", "src/microcode/zig/fasl.zig", target, optimize, zig_options);
-    const gcloop_smoke_obj = addMicrocodeObj(b, "gcloop_smoke", "src/microcode/zig/gcloop.zig", target, optimize, zig_options);
-    const cmpintmd_smoke_obj = addMicrocodeObj(b, "cmpintmd_smoke", "src/microcode/zig/cmpintmd.zig", target, optimize, zig_options);
-    const cmpint_smoke_obj = addMicrocodeObj(b, "cmpint_smoke", "src/microcode/zig/cmpint.zig", target, optimize, zig_options);
     const zig_options_mod = zig_options.createModule();
-    const prim_abi_mod = b.createModule(.{
-        .root_source_file = b.path("src/microcode/zig/prim_abi.zig"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-    });
-    prim_abi_mod.addImport("build_options", zig_options_mod);
+    const smoke_runtime_obj = addMicrocodeSmokeObj(b, "smoke_runtime", .runtime, target, optimize, zig_options_mod);
+    const fasl_smoke_obj = addMicrocodeSmokeObj(b, "fasl_smoke", .fasl, target, optimize, zig_options_mod);
+    const gcloop_smoke_obj = addMicrocodeSmokeObj(b, "gcloop_smoke", .gcloop, target, optimize, zig_options_mod);
+    const cmpintmd_smoke_obj = addMicrocodeSmokeObj(b, "cmpintmd_smoke", .cmpintmd, target, optimize, zig_options_mod);
+    const cmpint_smoke_obj = addMicrocodeSmokeObj(b, "cmpint_smoke", .cmpint, target, optimize, zig_options_mod);
+    const microcode_smoke_mod = createMicrocodeSmokeModule(b, .none, target, optimize, zig_options_mod);
     const smoke_step = b.step("test-smoke", "Build and run standalone microcode Zig smoke tests");
     const smoke_specs = [_]struct {
         name: []const u8,
@@ -524,7 +561,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         smoke_exe.root_module.addImport("build_options", zig_options_mod);
-        smoke_exe.root_module.addImport("prim_abi", prim_abi_mod);
+        smoke_exe.root_module.addImport("microcode_smoke", microcode_smoke_mod);
         if (target.result.os.tag == .linux) {
             smoke_exe.root_module.linkSystemLibrary("m", .{});
         }
@@ -565,7 +602,7 @@ pub fn build(b: *std.Build) void {
     const unit_tests = b.addTest(.{
         .name = "microcode-zig-unit",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/microcode/zig/root.zig"),
+            .root_source_file = b.path("src/microcode/root.zig"),
             .target = target,
             .optimize = optimize,
             .link_libc = true,
@@ -588,7 +625,7 @@ pub fn build(b: *std.Build) void {
     const findprim_tests = b.addTest(.{
         .name = "findprim-unit",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/microcode/zig/findprim.zig"),
+            .root_source_file = b.path("src/microcode/tools/findprim.zig"),
             .target = b.graph.host,
             .optimize = optimize,
         }),
@@ -599,7 +636,7 @@ pub fn build(b: *std.Build) void {
         const starter_tests = b.addTest(.{
             .name = "macosx-starter-unit",
             .root_module = b.createModule(.{
-                .root_source_file = b.path("src/microcode/zig/macosx_starter.zig"),
+                .root_source_file = b.path("src/microcode/tools/macosx_starter.zig"),
                 .target = target,
                 .optimize = optimize,
                 .link_libc = true,

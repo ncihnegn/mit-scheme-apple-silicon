@@ -26,7 +26,7 @@ USA.
 */
 
 /* OUTF C ABI shim (declared in pruxffi.h / mit-scheme.h for FFI plugins).
-   Internal microcode output uses src/microcode/zig/outf.zig. */
+   Internal microcode output uses src/microcode/support/outf.zig. */
 
 #ifdef __MINGW32__
 #  ifndef __USE_MINGW_ANSI_STDIO

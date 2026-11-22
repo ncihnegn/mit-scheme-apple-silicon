@@ -2,7 +2,7 @@
 // Derived from tests/microcode/gc-arena-smoke.c (GPL v2 or later).
 
 const std = @import("std");
-const abi = @import("prim_abi");
+const abi = @import("microcode_smoke").prim_abi;
 const smoke = @import("smoke_common.zig");
 
 comptime {

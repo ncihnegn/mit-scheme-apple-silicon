@@ -63,7 +63,8 @@ jobs:
               hashFiles(
                 'build.zig',
                 'tools/build-scheme.py',
-                'src/microcode/zig/**',
+                'src/microcode/*.zig',
+                'src/microcode/**/*.zig',
                 'src/microcode/cmpauxmd/aarch64.S',
                 'src/compiler/**',
                 'src/runtime/**',

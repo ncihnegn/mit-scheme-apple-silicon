@@ -4,7 +4,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const build_options = @import("build_options");
-const abi = @import("prim_abi");
+const abi = @import("microcode_smoke").prim_abi;
 const smoke = @import("smoke_common.zig");
 
 var free_storage: ?[*]smoke.SchemeObject = null;
