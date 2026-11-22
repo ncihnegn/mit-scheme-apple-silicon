@@ -16,7 +16,6 @@ const TermcapOption = enum {
 
 const ArchConfig = struct {
     scheme_arch: []const u8,
-    cmpintmd: []const u8,
     cmpauxmd: ?[]const u8,
     is_native: bool,
     is_svm: bool,
@@ -37,7 +36,6 @@ fn resolveArch(option: ArchOption, cpu: std.Target.Cpu) ArchConfig {
         .auto => unreachable,
         .aarch64le => .{
             .scheme_arch = "aarch64le",
-            .cmpintmd = "aarch64",
             .cmpauxmd = "aarch64",
             .is_native = true,
             .is_svm = false,
@@ -45,7 +43,6 @@ fn resolveArch(option: ArchOption, cpu: std.Target.Cpu) ArchConfig {
         },
         .x86_64 => .{
             .scheme_arch = "x86-64",
-            .cmpintmd = "x86-64",
             .cmpauxmd = "x86-64",
             .is_native = true,
             .is_svm = false,
@@ -53,7 +50,6 @@ fn resolveArch(option: ArchOption, cpu: std.Target.Cpu) ArchConfig {
         },
         .svm1_64le => .{
             .scheme_arch = "svm1-64le",
-            .cmpintmd = "svm1",
             .cmpauxmd = null,
             .is_native = false,
             .is_svm = true,
@@ -61,7 +57,6 @@ fn resolveArch(option: ArchOption, cpu: std.Target.Cpu) ArchConfig {
         },
         .none => .{
             .scheme_arch = "none",
-            .cmpintmd = "none",
             .cmpauxmd = null,
             .is_native = false,
             .is_svm = false,
@@ -128,333 +123,12 @@ const zig_prim_sources = [_][]const u8{
     "src/microcode/zig/vector.zig",
 };
 
-const config_h_bottom =
-    \\#ifndef SCM_CONFIG_H
-    \\#define SCM_CONFIG_H
-    \\
-    \\#include "config_defs.h"
-    \\
-    \\#ifndef __unix__
-    \\#  define __unix__
-    \\#endif
-    \\
-    \\#define _GNU_SOURCE
-    \\
-    \\#include <sys/types.h>
-    \\
-    \\#include <time.h>
-    \\#ifdef HAVE_SYS_TIME_H
-    \\#  include <sys/time.h>
-    \\#endif
-    \\
-    \\#ifdef HAVE_TERMIOS_H
-    \\#  include <termios.h>
-    \\#else
-    \\#  ifdef HAVE_TERMIO_H
-    \\#    include <termio.h>
-    \\#  endif
-    \\#endif
-    \\
-    \\#ifdef HAVE_SYS_MMAN_H
-    \\#  include <sys/mman.h>
-    \\#endif
-    \\
-    \\#ifdef HAVE_MMAP
-    \\#  if defined(MAP_ANON) && !defined(MAP_ANONYMOUS)
-    \\#    define MAP_ANONYMOUS MAP_ANON
-    \\#  endif
-    \\#  ifdef MAP_ANONYMOUS
-    \\#    define USE_MMAP_HEAP_MALLOC
-    \\#  endif
-    \\#endif
-    \\
-    \\#include "confshared.h"
-    \\
-    \\#endif /* SCM_CONFIG_H */
-    \\
-;
-
-fn flag(cond: bool) ?i64 {
-    return if (cond) 1 else null;
-}
-
-fn addMicrocodeConfig(
-    b: *std.Build,
-    resolved: std.Build.ResolvedTarget,
-    termcap: TermcapOption,
-) std.Build.LazyPath {
-    const t = resolved.result;
-    const is_darwin = t.os.tag.isDarwin();
-    const is_linux = t.os.tag == .linux;
-    const is_gnu = t.abi.isGnu();
-    const ptr_bytes: i64 = @intCast(t.ptrBitWidth() / 8);
-    const long_bytes: i64 = @intCast((t.cTypeBitSize(.long) orelse t.ptrBitWidth()) / 8);
-    const int_bytes: i64 = @intCast((t.cTypeBitSize(.int) orelse 32) / 8);
-    const short_bytes: i64 = @intCast((t.cTypeBitSize(.short) orelse 16) / 8);
-    const is_big_endian = t.cpu.arch.endian() == .big;
-
-    const use_termcap = termcap != .none;
-    const have_ncurses_headers = termcap == .ncurses;
-
-    // On macOS Apple Silicon (Darwin), MAP_JIT + pthread_jit_write_protect_np +
-    // sys_icache_invalidate are always present on arm64 SDKs.
-    const is_apple_jit = is_darwin and t.cpu.arch == .aarch64;
-
-    const package_version = "13.0.50";
-    const defs_header = b.addConfigHeader(.{
-        .style = .blank,
-        .include_path = "config_defs.h",
-        .include_guard = "SCM_CONFIG_DEFS_H",
-    }, .{
-        .PACKAGE_BUGREPORT = "bug-mit-scheme@gnu.org",
-        .PACKAGE_NAME = "MIT/GNU Scheme",
-        .PACKAGE_STRING = "MIT/GNU Scheme " ++ package_version,
-        .PACKAGE_TARNAME = "mit-scheme",
-        .PACKAGE_URL = "",
-        .PACKAGE_VERSION = package_version,
-
-        .PROTOTYPES = @as(i64, 1),
-        .__PROTOTYPES = @as(i64, 1),
-        .STDC_HEADERS = @as(i64, 1),
-        .HAVE_STRINGIZE = @as(i64, 1),
-        .HAVE_C_BACKSLASH_A = @as(i64, 1),
-        .HAVE__BOOL = @as(i64, 1),
-        .HAVE_LONG_LONG_INT = @as(i64, 1),
-        .HAVE_UNSIGNED_LONG_LONG_INT = @as(i64, 1),
-
-        .SIZEOF_CHAR = @as(i64, 1),
-        .SIZEOF_UNSIGNED_CHAR = @as(i64, 1),
-        .SIZEOF_SHORT = short_bytes,
-        .SIZEOF_UNSIGNED_SHORT = short_bytes,
-        .SIZEOF_INT = int_bytes,
-        .SIZEOF_UNSIGNED_INT = int_bytes,
-        .SIZEOF_LONG = long_bytes,
-        .SIZEOF_UNSIGNED_LONG = long_bytes,
-        .SIZEOF_VOID_P = ptr_bytes,
-        .SIZEOF_INTPTR_T = ptr_bytes,
-        .SIZEOF_UINTPTR_T = ptr_bytes,
-        .SIZEOF_INTMAX_T = @as(i64, 8),
-        .SIZEOF_UINTMAX_T = @as(i64, 8),
-        .SIZEOF_TIME_T = @as(i64, 8),
-        .SIZEOF_OFF_T = @as(i64, 8),
-
-        .WORDS_BIGENDIAN = flag(is_big_endian),
-
-        // Types & time
-        .HAVE_INTTYPES_H = @as(i64, 1),
-        .HAVE_STDINT_H = @as(i64, 1),
-        .HAVE_STDBOOL_H = @as(i64, 1),
-        .HAVE_STDIO_H = @as(i64, 1),
-        .HAVE_STDLIB_H = @as(i64, 1),
-        .HAVE_STRING_H = @as(i64, 1),
-        .HAVE_STRINGS_H = @as(i64, 1),
-        .HAVE_INTPTR_T = @as(i64, 1),
-        .HAVE_UINTPTR_T = @as(i64, 1),
-        .HAVE_INTMAX_T = @as(i64, 1),
-        .HAVE_UINTMAX_T = @as(i64, 1),
-        .HAVE_STRUCT_TM_TM_ZONE = @as(i64, 1),
-        .HAVE_TM_ZONE = @as(i64, 1),
-        .HAVE_TM_GMTOFF = @as(i64, 1),
-        .TM_GMTOFF = .tm_gmtoff,
-        .HAVE_TZNAME = @as(i64, 1),
-        .HAVE_TIMEZONE = flag(!is_darwin),
-        .TIMEZONE = null,
-
-        // Standard POSIX headers
-        .HAVE_DIRENT_H = @as(i64, 1),
-        .HAVE_DLFCN_H = @as(i64, 1),
-        .HAVE_FCNTL_H = @as(i64, 1),
-        .HAVE_FENV_H = @as(i64, 1),
-        .HAVE_FENV_T = @as(i64, 1),
-        .HAVE_FEXCEPT_T = @as(i64, 1),
-        .HAVE_NETDB_H = @as(i64, 1),
-        .HAVE_HOSTENT_H_ADDR_LIST = @as(i64, 1),
-        .HAVE_POLL_H = @as(i64, 1),
-        .HAVE_PTHREAD_H = @as(i64, 1),
-        .HAVE_SYS_FILE_H = @as(i64, 1),
-        .HAVE_SYS_IOCTL_H = @as(i64, 1),
-        .HAVE_SYS_MMAN_H = @as(i64, 1),
-        .HAVE_SYS_MOUNT_H = flag(is_darwin or is_linux),
-        .HAVE_SYS_PARAM_H = @as(i64, 1),
-        .HAVE_SYS_SOCKET_H = @as(i64, 1),
-        .HAVE_SYS_STAT_H = @as(i64, 1),
-        .HAVE_SYS_TIME_H = @as(i64, 1),
-        .HAVE_SYS_TYPES_H = @as(i64, 1),
-        .HAVE_SYS_UN_H = @as(i64, 1),
-        .HAVE_SYS_UTSNAME_H = @as(i64, 1),
-        .HAVE_SYS_WAIT_H = @as(i64, 1),
-        .HAVE_TERMIOS_H = @as(i64, 1),
-        .HAVE_UNISTD_H = @as(i64, 1),
-        .HAVE_UTIME_H = @as(i64, 1),
-
-        // Darwin / Linux specific headers
-        .HAVE_LIBKERN_OSCACHECONTROL_H = flag(is_darwin),
-        .HAVE_UTIL_H = flag(is_darwin),
-        .HAVE_MALLOC_H = flag(is_linux),
-        .HAVE_SYS_TIMEX_H = flag(is_linux),
-        .HAVE_SYS_VFS_H = flag(is_linux),
-        .HAVE_STRUCT_NTPTIMEVAL = flag(is_linux and is_gnu),
-        .HAVE_NTPTIMEVAL_TAI = flag(is_linux and is_gnu),
-        .HAVE_NTPTIMEVAL_TIME_TV_NSEC = null,
-        .HAVE_STRUCT_TIMEX = flag(is_linux and is_gnu),
-        .HAVE_TIMEX_TAI = flag(is_linux and is_gnu),
-        .HAVE_TIMEX_TIME_TV_USEC = flag(is_linux and is_gnu),
-
-        // Absent / intentionally unused legacy headers
-        .HAVE_BSDTTY_H = null,
-        .HAVE_IEEEFP_H = null,
-        .HAVE_NDIR_H = null,
-        .HAVE_SGTTY_H = null,
-        .HAVE_STROPTS_H = null,
-        .HAVE_STRUCT_LTCHARS = null,
-        .HAVE_STRUCT_SIGCONTEXT = null,
-        .HAVE_SYS_DIR_H = null,
-        .HAVE_SYS_NDIR_H = null,
-        .HAVE_SYS_PTYIO_H = null,
-        .HAVE_TERMIO_H = null,
-        .HAVE_VFORK_H = null,
-        .HAVE_DOPRNT = null,
-        .TM_IN_SYS_TIME = null,
-        .HAVE_FPGETROUND_FPSETROUND = null,
-
-        // Process & environment declarations
-        .GETPGRP_VOID = @as(i64, 1),
-        .SETPGRP_VOID = @as(i64, 1),
-        .HAVE_GETPGRP = @as(i64, 1),
-        .HAVE_SETPGRP = @as(i64, 1),
-        .HAVE_SETPGRP2 = null,
-        .HAVE_DECL_ENVIRON = @as(i64, if (is_linux) 1 else 0),
-        .HAVE_DECL___ENVIRON = @as(i64, if (is_linux and is_gnu) 1 else 0),
-        .HAVE_DECL_TZNAME = @as(i64, 1),
-
-        // POSIX functions
-        .HAVE_CLOCK_GETTIME = @as(i64, 1),
-        .HAVE_CTERMID = @as(i64, 1),
-        .HAVE_DUP2 = @as(i64, 1),
-        .HAVE_EXPM1 = @as(i64, 1),
-        .HAVE_FCNTL = @as(i64, 1),
-        .HAVE_FLOOR = @as(i64, 1),
-        .HAVE_FMA = @as(i64, 1),
-        .HAVE_FMOD = @as(i64, 1),
-        .HAVE_FORK = @as(i64, 1),
-        .HAVE_WORKING_FORK = @as(i64, 1),
-        .HAVE_VFORK = flag(is_linux),
-        .HAVE_WORKING_VFORK = flag(is_linux),
-        .HAVE_FPATHCONF = @as(i64, 1),
-        .HAVE_FREXP = @as(i64, 1),
-        .HAVE_FSYNC = @as(i64, 1),
-        .HAVE_FTRUNCATE = @as(i64, 1),
-        .HAVE_GETCWD = @as(i64, 1),
-        .HAVE_GETHOSTBYNAME = @as(i64, 1),
-        .HAVE_GETHOSTNAME = @as(i64, 1),
-        .HAVE_GETLOGIN = @as(i64, 1),
-        .HAVE_GETPAGESIZE = @as(i64, 1),
-        .HAVE_GETTIMEOFDAY = @as(i64, 1),
-        .HAVE_GRANTPT = @as(i64, 1),
-        .HAVE_KILL = @as(i64, 1),
-        .HAVE_LGAMMA_R = @as(i64, 1),
-        .HAVE_LIBM = @as(i64, 1),
-        .HAVE_LOG1P = @as(i64, 1),
-        .HAVE_MADVISE = @as(i64, 1),
-        .HAVE_MEMCPY = @as(i64, 1),
-        .HAVE_MKDIR = @as(i64, 1),
-        .HAVE_MKTIME = @as(i64, 1),
-        .HAVE_MMAP = @as(i64, 1),
-        .HAVE_MODF = @as(i64, 1),
-        .HAVE_NICE = @as(i64, 1),
-        .HAVE_POLL = @as(i64, 1),
-        .HAVE_POSIX_MADVISE = @as(i64, 1),
-        .HAVE_POSIX_OPENPT = @as(i64, 1),
-        .HAVE_PSELECT = @as(i64, 1),
-        .HAVE_RENAME = @as(i64, 1),
-        .HAVE_RMDIR = @as(i64, 1),
-        .HAVE_SELECT = @as(i64, 1),
-        .HAVE_SETITIMER = @as(i64, 1),
-        .HAVE_SIGACTION = @as(i64, 1),
-        .HAVE_SIGSUSPEND = @as(i64, 1),
-        .HAVE_SOCKET = @as(i64, 1),
-        .HAVE_STATFS = @as(i64, 1),
-        .HAVE_STRCHR = @as(i64, 1),
-        .HAVE_STRERROR = @as(i64, 1),
-        .HAVE_STRTOUL = @as(i64, 1),
-        .HAVE_SYMLINK = @as(i64, 1),
-        .HAVE_SYSCONF = @as(i64, 1),
-        .HAVE_TIMES = @as(i64, 1),
-        .HAVE_TRUNCATE = @as(i64, 1),
-        .HAVE_UTIME = @as(i64, 1),
-        .HAVE_UTIME_NULL = @as(i64, 1),
-        .HAVE_VPRINTF = @as(i64, 1),
-        .HAVE_WAITPID = @as(i64, 1),
-        .HAVE_LONG_FILE_NAMES = @as(i64, 1),
-
-        // Leave legacy SIGHOLD and GETWD undefined to use sigaction and getcwd.
-        .HAVE_SIGHOLD = null,
-        .HAVE_GETWD = null,
-
-        // Standard C99 <fenv.h> functions
-        .HAVE_FECLEAREXCEPT = @as(i64, 1),
-        .HAVE_FEGETENV = @as(i64, 1),
-        .HAVE_FEGETEXCEPTFLAG = @as(i64, 1),
-        .HAVE_FEGETROUND = @as(i64, 1),
-        .HAVE_FEHOLDEXCEPT = @as(i64, 1),
-        .HAVE_FERAISEEXCEPT = @as(i64, 1),
-        .HAVE_FESETENV = @as(i64, 1),
-        .HAVE_FESETEXCEPTFLAG = @as(i64, 1),
-        .HAVE_FESETROUND = @as(i64, 1),
-        .HAVE_FETESTEXCEPT = @as(i64, 1),
-        .HAVE_FEUPDATEENV = @as(i64, 1),
-
-        // GNU extensions & platform-specific syscalls
-        .HAVE_CLOSEFROM = null,
-        .HAVE_POLLTS = null,
-        .HAVE_FSYNC_RANGE = null,
-        .HAVE_OPENPTY = flag(is_darwin),
-        .HAVE_MAP_JIT = flag(is_darwin),
-        .HAVE_PTHREAD_JIT_WRITE_PROTECT_NP = flag(is_darwin),
-        .HAVE_SYS_ICACHE_INVALIDATE = flag(is_darwin),
-        .SCM_JIT_APPLE = flag(is_apple_jit),
-
-        .HAVE_FDATASYNC = flag(is_linux),
-        .HAVE_PPOLL = flag(is_linux),
-        .HAVE_SYNC_FILE_RANGE = flag(is_linux),
-        .HAVE_LIBDL = flag(is_linux),
-        .HAVE_GETPT = flag(is_linux and is_gnu),
-        .HAVE_FEENABLEEXCEPT = flag(is_linux and is_gnu),
-        .HAVE_FEDISABLEEXCEPT = flag(is_linux and is_gnu),
-        .HAVE_FEGETEXCEPT = flag(is_linux and is_gnu),
-        .HAVE_NTP_ADJTIME = flag(is_linux and is_gnu),
-        .HAVE_NTP_GETTIME = flag(is_linux and is_gnu),
-
-        // Dynamic loading & termcap
-        .UX_DLD_ENABLED = @as(i64, 1),
-        .USE_TERMCAP = flag(use_termcap),
-        .HAVE_NCURSES_H = flag(have_ncurses_headers),
-        .HAVE_CURSES_H = flag(have_ncurses_headers),
-        .HAVE_TERM_H = flag(have_ncurses_headers),
-        .HAVE_TERMCAP_H = flag(have_ncurses_headers),
-    });
-    if (!is_darwin) {
-        defs_header.addIdent("TIMEZONE", "timezone");
-    }
-
-    const wf = b.addWriteFiles();
-    _ = wf.addCopyFile(defs_header.getOutputFile(), "config_defs.h");
-    _ = wf.add("config.h", config_h_bottom);
-    return wf.getDirectory();
-}
-
 fn configureMicrocodeModule(
-    b: *std.Build,
     mod: *std.Build.Module,
     resolved: std.Build.ResolvedTarget,
-    config_dir: std.Build.LazyPath,
-    arch_headers_dir: std.Build.LazyPath,
     termcap: TermcapOption,
 ) void {
     const t = resolved.result;
-    mod.addIncludePath(config_dir);
-    mod.addIncludePath(arch_headers_dir);
-    mod.addIncludePath(b.path("src/microcode"));
 
     if (t.os.tag.isDarwin()) {
         mod.linkFramework("CoreFoundation", .{});
@@ -529,61 +203,8 @@ pub fn build(b: *std.Build) void {
     else
         b.fmt("/usr/local/lib/{s}", .{auxdir_name});
 
-    const target_config_dir = addMicrocodeConfig(b, target, termcap_opt);
-
-    const arch_headers = b.addWriteFiles();
-    _ = arch_headers.add(
-        "cmpintmd.h",
-        b.fmt("#include \"cmpintmd/{s}.h\"\n", .{arch.cmpintmd}),
-    );
-    _ = arch_headers.add(
-        "cmpintmd-config.h",
-        b.fmt("#include \"cmpintmd/{s}-config.h\"\n", .{arch.cmpintmd}),
-    );
-    const arch_headers_dir = arch_headers.getDirectory();
-
-    var c_flags_list: std.ArrayList([]const u8) = .empty;
-    c_flags_list.appendSlice(b.allocator, &.{
-        "-DHAVE_CONFIG_H",
-        "-DMIT_SCHEME",
-        b.fmt("-DDEFAULT_LIBRARY_PATH=\"{s}\"", .{default_library_path}),
-        "-fno-builtin-floor",
-        "-Wall",
-        "-Wempty-body",
-        "-Wignored-qualifiers",
-        "-Wimplicit-fallthrough",
-        "-Wmissing-field-initializers",
-        "-Wnested-externs",
-        "-Wpointer-arith",
-        "-Wredundant-decls",
-        "-Wshift-negative-value",
-        "-Wstrict-prototypes",
-        "-Wtype-limits",
-        "-Wundef",
-        "-Wuninitialized",
-        "-Wwrite-strings",
-    }) catch @panic("OOM");
-
-    if (target.result.os.tag.isDarwin()) {
-        c_flags_list.appendSlice(b.allocator, &.{
-            "-fconstant-cfstrings",
-            "-DSIGNAL_HANDLERS_CAN_USE_SCHEME_STACK",
-            "-D_REENTRANT",
-        }) catch @panic("OOM");
-    } else if (target.result.os.tag == .linux) {
-        c_flags_list.append(b.allocator, "-D_init=__executable_start") catch @panic("OOM");
-        if (target.result.abi.isMusl()) {
-            c_flags_list.append(b.allocator, "-DMUSL") catch @panic("OOM");
-        }
-    }
-
-    if (debugging) {
-        c_flags_list.append(b.allocator, "-DENABLE_DEBUGGING_TOOLS") catch @panic("OOM");
-    }
-    if (valgrind) {
-        c_flags_list.append(b.allocator, "-DVALGRIND_MODE") catch @panic("OOM");
-    }
-    const c_flags = c_flags_list.items;
+    _ = valgrind;
+    const c_flags = &[_][]const u8{ "-Wall", "-Wstrict-prototypes" };
 
     // Build host-native Zig findprim and generate usrdef.zig out-of-tree.
     const findprim = b.addExecutable(.{
@@ -667,11 +288,8 @@ pub fn build(b: *std.Build) void {
     scheme_exe.rdynamic = true;
     scheme_exe.link_gc_sections = false;
     configureMicrocodeModule(
-        b,
         scheme_exe.root_module,
         target,
-        target_config_dir,
-        arch_headers_dir,
         termcap_opt,
     );
     scheme_exe.root_module.addObject(microcode_zig_obj);
@@ -776,66 +394,74 @@ pub fn build(b: *std.Build) void {
         .name = "cmpint_smoke",
         .root_module = cmpint_smoke_mod,
     });
-    const smoke_step = b.step("test-smoke", "Build and run standalone microcode C smoke tests");
+    const zig_options_mod = zig_options.createModule();
+    const prim_abi_mod = b.createModule(.{
+        .root_source_file = b.path("src/microcode/zig/prim_abi.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    prim_abi_mod.addImport("build_options", zig_options_mod);
+    const smoke_step = b.step("test-smoke", "Build and run standalone microcode Zig smoke tests");
     const smoke_specs = [_]struct {
         name: []const u8,
         src: []const u8,
-        deps: []const []const u8,
         needs_cmpint: bool,
         needs_cmpintmd: bool,
         needs_native: bool,
         needs_fasl: bool,
         needs_gcloop: bool,
+        needs_setjmp: bool,
     }{
         .{
             .name = "jit-smoke",
-            .src = "tests/microcode/jit-smoke.c",
-            .deps = &.{},
+            .src = "tests/microcode/jit-smoke.zig",
             .needs_cmpint = false,
             .needs_cmpintmd = true,
             .needs_native = false,
             .needs_fasl = false,
             .needs_gcloop = false,
+            .needs_setjmp = true,
         },
         .{
             .name = "arena-smoke",
-            .src = "tests/microcode/arena-smoke.c",
-            .deps = &.{},
+            .src = "tests/microcode/arena-smoke.zig",
             .needs_cmpint = false,
             .needs_cmpintmd = false,
             .needs_native = false,
             .needs_fasl = false,
             .needs_gcloop = false,
+            .needs_setjmp = false,
         },
         .{
             .name = "gc-arena-smoke",
-            .src = "tests/microcode/gc-arena-smoke.c",
-            .deps = &.{},
+            .src = "tests/microcode/gc-arena-smoke.zig",
             .needs_cmpint = false,
             .needs_cmpintmd = true,
             .needs_native = false,
             .needs_fasl = false,
             .needs_gcloop = true,
+            .needs_setjmp = false,
         },
         .{
             .name = "fasl-code-smoke",
-            .src = "tests/microcode/fasl-code-smoke.c",
-            .deps = &.{},
+            .src = "tests/microcode/fasl-code-smoke.zig",
             .needs_cmpint = false,
             .needs_cmpintmd = true,
             .needs_native = false,
             .needs_fasl = true,
             .needs_gcloop = true,
+            .needs_setjmp = false,
         },
         .{
             .name = "trampoline-smoke",
-            .src = "tests/microcode/trampoline-smoke.c",
-            .deps = &.{},
+            .src = "tests/microcode/trampoline-smoke.zig",
             .needs_cmpint = true,
             .needs_cmpintmd = true,
             .needs_native = true,
             .needs_fasl = false,
             .needs_gcloop = true,
+            .needs_setjmp = false,
         },
     };
 
@@ -844,15 +470,15 @@ pub fn build(b: *std.Build) void {
         const smoke_exe = b.addExecutable(.{
             .name = spec.name,
             .root_module = b.createModule(.{
+                .root_source_file = b.path(spec.src),
                 .target = target,
                 .optimize = optimize,
                 .link_libc = true,
                 .sanitize_c = .off,
             }),
         });
-        smoke_exe.root_module.addIncludePath(target_config_dir);
-        smoke_exe.root_module.addIncludePath(arch_headers_dir);
-        smoke_exe.root_module.addIncludePath(b.path("src/microcode"));
+        smoke_exe.root_module.addImport("build_options", zig_options_mod);
+        smoke_exe.root_module.addImport("prim_abi", prim_abi_mod);
         if (target.result.os.tag == .linux) {
             smoke_exe.root_module.linkSystemLibrary("m", .{});
         }
@@ -863,14 +489,22 @@ pub fn build(b: *std.Build) void {
         if (spec.needs_gcloop) {
             smoke_exe.root_module.addObject(gcloop_smoke_obj);
         }
-        smoke_exe.root_module.addCSourceFile(.{ .file = b.path(spec.src), .flags = c_flags });
+        smoke_exe.root_module.addCSourceFile(.{
+            .file = b.path("src/microcode/outf.c"),
+            .flags = c_flags,
+        });
+        if (spec.needs_setjmp) {
+            smoke_exe.root_module.addCSourceFile(.{
+                .file = b.path("src/microcode/scm_setjmp.c"),
+                .flags = c_flags,
+            });
+        }
         if (spec.needs_cmpintmd) {
             smoke_exe.root_module.addObject(cmpintmd_smoke_obj);
         }
         if (spec.needs_cmpint) {
             smoke_exe.root_module.addObject(cmpint_smoke_obj);
         }
-        smoke_exe.root_module.addCSourceFiles(.{ .files = spec.deps, .flags = c_flags });
         if (spec.needs_native) {
             if (cmpauxmd_s) |asm_file| {
                 smoke_exe.root_module.addCSourceFile(.{
