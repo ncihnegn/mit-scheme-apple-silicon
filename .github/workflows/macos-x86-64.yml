@@ -22,35 +22,9 @@ concurrency:
 
 jobs:
   macos-x86-64:
-    name: macOS x86-64 (Intel)
-    runs-on: macos-15-intel
-    timeout-minutes: 60
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Setup Zig
-        uses: mlugg/setup-zig@v2
-        with:
-          version: 0.17.1
-
-      - name: Check Zig formatting
-        run: |
-          zig fmt --check build.zig src/microcode src/blowfish src/gdbm src/x11 tests/microcode tests/plugins
-
-      - name: Build microcode variants
-        run: |
-          zig build --release=fast
-          zig build -Ddebugging=true
-          zig build -Dtermcap=emulate
-          zig build -Darch=svm1_64le --release=fast
-
-      - name: Run unit & plugin tests
-        run: |
-          zig build test-unit --summary all
-          zig build test-unit -Darch=svm1_64le --summary all
-
-      - name: Run smoke tests
-        run: |
-          zig build test-smoke --summary all
-          zig build test-smoke -Darch=svm1_64le --summary all
+    uses: ./.github/workflows/_zig-microcode-ci.yml
+    with:
+      job_name: macOS x86-64 (Intel)
+      runs_on: macos-15-intel
+      arch: x86_64
+      test_termcap_emulate: true

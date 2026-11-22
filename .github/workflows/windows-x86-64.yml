@@ -1,0 +1,30 @@
+name: Windows x86-64 CI
+
+on:
+  push:
+    branches:
+      - master
+      - apple-silicon
+      - zig
+  pull_request:
+    branches:
+      - master
+      - apple-silicon
+      - zig
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-x86-64-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  windows-x86-64:
+    uses: ./.github/workflows/_zig-microcode-ci.yml
+    with:
+      job_name: Windows x86-64
+      runs_on: windows-latest
+      target: x86_64-windows-gnu
+      arch: x86_64

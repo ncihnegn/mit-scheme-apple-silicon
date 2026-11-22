@@ -1,4 +1,4 @@
-name: AArch64 Native CI
+name: Linux aarch64 CI
 
 on:
   push:
@@ -23,75 +23,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: aarch64-ci-${{ github.workflow }}-${{ github.ref }}
+  group: linux-aarch64-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  macos-arm64:
-    name: macOS arm64 (Apple Silicon)
-    runs-on: macos-latest
-    timeout-minutes: 180
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Setup Zig
-        uses: mlugg/setup-zig@v2
-        with:
-          version: 0.17.1
-
-      - name: Check Zig formatting and run unit & plugin tests
-        run: |
-          zig fmt --check build.zig src/microcode src/blowfish src/gdbm src/x11 tests/microcode tests/plugins
-          zig build test-unit --summary all
-
-      - name: Install Homebrew build dependencies
-        run: |
-          brew install mit-scheme
-
-      - name: Restore Stage 2 native aarch64le host cache
-        id: stage2-cache
-        if: ${{ inputs.force_full_bootstrap != true }}
-        uses: actions/cache/restore@v6
-        with:
-          path: ${{ runner.temp }}/mit-scheme-stage2-native
-          key: >-
-            macos-arm64-stage2-${{
-              hashFiles(
-                'build.zig',
-                'tools/build-scheme.py',
-                'src/microcode/*.zig',
-                'src/microcode/**/*.zig',
-                'src/microcode/outf.c',
-                'src/microcode/scm_setjmp.c',
-                'src/microcode/cmpauxmd/aarch64.S',
-                'src/compiler/**',
-                'src/runtime/**',
-                'src/sf/**',
-                'src/cref/**',
-                'src/sos/**'
-              )
-            }}
-
-      - name: Build Stage 2 native aarch64le host
-        if: ${{ steps.stage2-cache.outputs.cache-hit != 'true' }}
-        run: |
-          ./tests/ci/bootstrap-and-test.sh \
-            --stage2-only \
-            --stage2-prefix "${{ runner.temp }}/mit-scheme-stage2-native"
-
-      - name: Save Stage 2 native aarch64le host cache
-        if: ${{ inputs.force_full_bootstrap != true && steps.stage2-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ runner.temp }}/mit-scheme-stage2-native
-          key: ${{ steps.stage2-cache.outputs.cache-primary-key }}
-
-      - name: Build and verify native aarch64le (Stage 3)
-        run: |
-          ./tests/ci/bootstrap-and-test.sh \
-            --native-host "${{ runner.temp }}/mit-scheme-stage2-native/bin/mit-scheme"
-
   linux-aarch64:
     name: Linux aarch64 (Ubuntu 24.04 ARM)
     runs-on: ubuntu-24.04-arm
@@ -101,9 +36,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Zig
-        uses: mlugg/setup-zig@v2
-        with:
-          version: 0.17.1
+        uses: ./.github/actions/setup-zig
 
       - name: Install APT build dependencies
         run: |
@@ -111,10 +44,8 @@ jobs:
           sudo apt-get install -y \
             build-essential libncurses-dev curl ca-certificates python3
 
-      - name: Check Zig formatting and run unit & plugin tests
-        run: |
-          zig fmt --check build.zig src/microcode src/blowfish src/gdbm src/x11 tests/microcode tests/plugins
-          zig build test-unit --summary all
+      - name: Run unit & plugin tests
+        run: zig build test-unit --summary all
 
       - name: Restore Stage 2 native aarch64le host cache
         id: stage2-cache

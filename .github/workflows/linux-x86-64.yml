@@ -36,9 +36,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Zig
-        uses: mlugg/setup-zig@v2
-        with:
-          version: 0.17.1
+        uses: ./.github/actions/setup-zig
 
       - name: Install APT build dependencies
         run: |
@@ -46,67 +44,21 @@ jobs:
           sudo apt-get install -y \
             build-essential mit-scheme libncurses-dev libgdbm-dev libpq-dev libx11-dev pkg-config python3
 
-      - name: Check Zig formatting, build variants, unit & smoke tests
+      - name: Build variants and run unit & smoke tests
         run: |
-          zig fmt --check build.zig src/microcode src/blowfish src/gdbm src/x11 tests/microcode tests/plugins
           zig build -Darch=x86_64 -Ddebugging=true
           zig build -Darch=x86_64 -Dtermcap=emulate
           zig build test-unit -Darch=x86_64 --summary all
           zig build test-smoke -Darch=x86_64 --summary all
 
-      - name: Restore Stage 2 native x86-64 host cache
-        id: stage2-cache
-        if: ${{ inputs.force_full_bootstrap != true }}
-        uses: actions/cache/restore@v6
+      - name: Prepare Stage 2 native x86-64 host (cached)
+        uses: ./.github/actions/stage2-bootstrap
         with:
-          path: ${{ runner.temp }}/mit-scheme-stage2-x86-64
-          key: >-
-            linux-x86-64-stage2-${{
-              hashFiles(
-                'build.zig',
-                'tools/build-scheme.py',
-                'src/microcode/*.zig',
-                'src/microcode/**/*.zig',
-                'src/microcode/outf.c',
-                'src/microcode/scm_setjmp.c',
-                'src/microcode/cmpauxmd/x86-64.S',
-                'src/compiler/**',
-                'src/runtime/**',
-                'src/sf/**',
-                'src/cref/**',
-                'src/sos/**'
-              )
-            }}
-
-      - name: Build Stage 2 native x86-64 host
-        if: ${{ steps.stage2-cache.outputs.cache-hit != 'true' }}
-        run: |
-          ALL_COM=$(find /usr/lib /usr/local/lib -name all.com -path '*mit-scheme*' 2>/dev/null | head -n 1)
-          if [ -z "${ALL_COM}" ]; then
-            echo "error: could not find host mit-scheme all.com" >&2
-            exit 1
-          fi
-          HOST_LIB=$(dirname "${ALL_COM}")
-          STAGE2_PREFIX="${{ runner.temp }}/mit-scheme-stage2-x86-64"
-          python3 tools/build-scheme.py clean
-          python3 tools/build-scheme.py build \
-            --install \
-            --arch x86-64 \
-            --optimize ReleaseFast \
-            --cross \
-            --host-scheme "$(command -v mit-scheme)" \
-            --host-lib "${HOST_LIB}" \
-            --prefix "${STAGE2_PREFIX}" \
-            --jobs "$(nproc)"
-          "${STAGE2_PREFIX}/bin/mit-scheme" --batch-mode --no-init-file --eval '(%exit)' </dev/null >/dev/null
-          python3 tools/build-scheme.py clean
-
-      - name: Save Stage 2 native x86-64 host cache
-        if: ${{ inputs.force_full_bootstrap != true && steps.stage2-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ runner.temp }}/mit-scheme-stage2-x86-64
-          key: ${{ steps.stage2-cache.outputs.cache-primary-key }}
+          cache_prefix: linux-x86-64-stage2
+          stage2_prefix: ${{ runner.temp }}/mit-scheme-stage2-x86-64
+          mode: build-scheme-apt
+          arch: x86-64
+          force_full_bootstrap: ${{ inputs.force_full_bootstrap }}
 
       - name: Build Stage 3 self-hosted native x86-64 and FFI plugins
         run: |
@@ -159,9 +111,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Zig
-        uses: mlugg/setup-zig@v2
-        with:
-          version: 0.17.1
+        uses: ./.github/actions/setup-zig
 
       - name: Install APT build dependencies
         run: |
@@ -176,58 +126,14 @@ jobs:
           zig build test-unit -Darch=svm1_64le --summary all
           zig build test-smoke -Darch=svm1_64le --summary all
 
-      - name: Restore Stage 2 SVM1 host cache
-        id: stage2-cache
-        if: ${{ inputs.force_full_bootstrap != true }}
-        uses: actions/cache/restore@v6
+      - name: Prepare Stage 2 SVM1 host (cached)
+        uses: ./.github/actions/stage2-bootstrap
         with:
-          path: ${{ runner.temp }}/mit-scheme-stage2-svm1
-          key: >-
-            linux-x86-64-svm1-stage2-${{
-              hashFiles(
-                'build.zig',
-                'tools/build-scheme.py',
-                'src/microcode/*.zig',
-                'src/microcode/**/*.zig',
-                'src/microcode/outf.c',
-                'src/microcode/scm_setjmp.c',
-                'src/compiler/**',
-                'src/runtime/**',
-                'src/sf/**',
-                'src/cref/**',
-                'src/sos/**'
-              )
-            }}
-
-      - name: Build Stage 2 SVM1 host
-        if: ${{ steps.stage2-cache.outputs.cache-hit != 'true' }}
-        run: |
-          ALL_COM=$(find /usr/lib /usr/local/lib -name all.com -path '*mit-scheme*' 2>/dev/null | head -n 1)
-          if [ -z "${ALL_COM}" ]; then
-            echo "error: could not find host mit-scheme all.com" >&2
-            exit 1
-          fi
-          HOST_LIB=$(dirname "${ALL_COM}")
-          STAGE2_PREFIX="${{ runner.temp }}/mit-scheme-stage2-svm1"
-          python3 tools/build-scheme.py clean
-          python3 tools/build-scheme.py build \
-            --install \
-            --arch svm1-64le \
-            --optimize ReleaseFast \
-            --cross \
-            --host-scheme "$(command -v mit-scheme)" \
-            --host-lib "${HOST_LIB}" \
-            --prefix "${STAGE2_PREFIX}" \
-            --jobs "$(nproc)"
-          "${STAGE2_PREFIX}/bin/mit-scheme" --batch-mode --no-init-file --eval '(%exit)' </dev/null >/dev/null
-          python3 tools/build-scheme.py clean
-
-      - name: Save Stage 2 SVM1 host cache
-        if: ${{ inputs.force_full_bootstrap != true && steps.stage2-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ runner.temp }}/mit-scheme-stage2-svm1
-          key: ${{ steps.stage2-cache.outputs.cache-primary-key }}
+          cache_prefix: linux-x86-64-svm1-stage2
+          stage2_prefix: ${{ runner.temp }}/mit-scheme-stage2-svm1
+          mode: build-scheme-apt
+          arch: svm1-64le
+          force_full_bootstrap: ${{ inputs.force_full_bootstrap }}
 
       - name: Build Stage 3 self-hosted SVM1 and run Scheme test suite
         run: |
@@ -242,30 +148,3 @@ jobs:
             --src-dir src \
             --scheme-exe zig-out/bin/mit-scheme \
             --library-path src/lib
-
-  cross-compile:
-    name: Zig Cross-Compilation Matrix
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Setup Zig
-        uses: mlugg/setup-zig@v2
-        with:
-          version: 0.17.1
-
-      - name: Cross-compile all non-Darwin microcode targets
-        run: |
-          zig build -Dtarget=x86_64-linux-gnu -Darch=x86_64 -Dtermcap=emulate --release=fast
-          zig build -Dtarget=x86_64-linux-gnu -Darch=x86_64 -Dtermcap=none
-          zig build -Dtarget=x86_64-linux-gnu -Darch=svm1_64le -Dtermcap=emulate --release=fast
-          zig build -Dtarget=aarch64-linux-gnu -Darch=aarch64le -Dtermcap=emulate --release=fast
-          zig build -Dtarget=aarch64-linux-gnu -Darch=svm1_64le -Dtermcap=emulate --release=fast
-          zig build -Dtarget=x86_64-windows-gnu -Darch=x86_64 --release=fast
-          zig build -Dtarget=x86_64-windows-gnu -Darch=x86_64 -Ddebugging=true
-          zig build -Dtarget=x86_64-windows-gnu -Darch=svm1_64le --release=fast
-          zig build -Dtarget=aarch64-windows-gnu -Darch=aarch64le --release=fast
-          zig build -Dtarget=aarch64-windows-gnu -Darch=aarch64le -Ddebugging=true
-          zig build -Dtarget=aarch64-windows-gnu -Darch=svm1_64le --release=fast

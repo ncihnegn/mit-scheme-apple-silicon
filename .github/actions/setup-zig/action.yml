@@ -1,0 +1,21 @@
+name: Setup Zig
+description: Install the repository's minimum Zig version from build.zig.zon
+
+runs:
+  using: composite
+  steps:
+    - name: Read Zig version from build.zig.zon
+      id: zig-version
+      shell: bash
+      run: |
+        ZIG_VERSION=$(sed -n 's/.*\.minimum_zig_version = "\([^"]*\)".*/\1/p' build.zig.zon | head -n 1)
+        if [ -z "${ZIG_VERSION}" ]; then
+          echo "error: failed to parse .minimum_zig_version from build.zig.zon" >&2
+          exit 1
+        fi
+        echo "version=${ZIG_VERSION}" >> "${GITHUB_OUTPUT}"
+
+    - name: Install Zig
+      uses: mlugg/setup-zig@v2
+      with:
+        version: ${{ steps.zig-version.outputs.version }}

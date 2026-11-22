@@ -1,0 +1,82 @@
+name: Zig Microcode CI (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      job_name:
+        description: Display name for the CI job
+        type: string
+        required: true
+      runs_on:
+        description: GitHub Actions runner label
+        type: string
+        required: true
+      arch:
+        description: Native Scheme -Darch value to test alongside svm1_64le
+        type: string
+        required: true
+      target:
+        description: Optional Zig -Dtarget triple
+        type: string
+        required: false
+        default: ''
+      test_termcap_emulate:
+        description: Whether to also test -Dtermcap=emulate
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  zig-microcode:
+    name: ${{ inputs.job_name }}
+    runs-on: ${{ inputs.runs_on }}
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Zig
+        uses: ./.github/actions/setup-zig
+
+      - name: Build microcode variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET="${{ inputs.target }}"
+          if [ -n "${TARGET}" ]; then
+            TARGET_ARGS=("-Dtarget=${TARGET}")
+          else
+            TARGET_ARGS=()
+          fi
+          zig build ${TARGET_ARGS[@]+"${TARGET_ARGS[@]}"} -Darch=${{ inputs.arch }} --release=fast
+          zig build ${TARGET_ARGS[@]+"${TARGET_ARGS[@]}"} -Darch=${{ inputs.arch }} -Ddebugging=true
+          if [ "${{ inputs.test_termcap_emulate }}" = "true" ]; then
+            zig build ${TARGET_ARGS[@]+"${TARGET_ARGS[@]}"} -Darch=${{ inputs.arch }} -Dtermcap=emulate
+          fi
+          zig build ${TARGET_ARGS[@]+"${TARGET_ARGS[@]}"} -Darch=svm1_64le --release=fast
+
+      - name: Run unit & plugin tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET="${{ inputs.target }}"
+          if [ -n "${TARGET}" ]; then
+            TARGET_ARGS=("-Dtarget=${TARGET}")
+          else
+            TARGET_ARGS=()
+          fi
+          zig build test-unit ${TARGET_ARGS[@]+"${TARGET_ARGS[@]}"} -Darch=${{ inputs.arch }} --summary all
+          zig build test-unit ${TARGET_ARGS[@]+"${TARGET_ARGS[@]}"} -Darch=svm1_64le --summary all
+
+      - name: Run smoke tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET="${{ inputs.target }}"
+          if [ -n "${TARGET}" ]; then
+            TARGET_ARGS=("-Dtarget=${TARGET}")
+          else
+            TARGET_ARGS=()
+          fi
+          zig build test-smoke ${TARGET_ARGS[@]+"${TARGET_ARGS[@]}"} -Darch=${{ inputs.arch }} --summary all
+          zig build test-smoke ${TARGET_ARGS[@]+"${TARGET_ARGS[@]}"} -Darch=svm1_64le --summary all

@@ -1,0 +1,62 @@
+name: Zig Checks
+
+on:
+  push:
+    branches:
+      - master
+      - apple-silicon
+      - zig
+  pull_request:
+    branches:
+      - master
+      - apple-silicon
+      - zig
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zig-checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  format:
+    name: Zig Format Check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Zig
+        uses: ./.github/actions/setup-zig
+
+      - name: Check Zig formatting
+        run: |
+          zig fmt --check build.zig src/microcode src/blowfish src/gdbm src/x11 tests/microcode tests/plugins
+
+  cross-compile:
+    name: Zig Cross-Compilation Matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Zig
+        uses: ./.github/actions/setup-zig
+
+      - name: Cross-compile all non-Darwin microcode targets
+        run: |
+          zig build -Dtarget=x86_64-linux-gnu -Darch=x86_64 -Dtermcap=emulate --release=fast
+          zig build -Dtarget=x86_64-linux-gnu -Darch=x86_64 -Dtermcap=none
+          zig build -Dtarget=x86_64-linux-gnu -Darch=svm1_64le -Dtermcap=emulate --release=fast
+          zig build -Dtarget=aarch64-linux-gnu -Darch=aarch64le -Dtermcap=emulate --release=fast
+          zig build -Dtarget=aarch64-linux-gnu -Darch=svm1_64le -Dtermcap=emulate --release=fast
+          zig build -Dtarget=x86_64-windows-gnu -Darch=x86_64 --release=fast
+          zig build -Dtarget=x86_64-windows-gnu -Darch=x86_64 -Ddebugging=true
+          zig build -Dtarget=x86_64-windows-gnu -Darch=svm1_64le --release=fast
+          zig build -Dtarget=aarch64-windows-gnu -Darch=aarch64le --release=fast
+          zig build -Dtarget=aarch64-windows-gnu -Darch=aarch64le -Ddebugging=true
+          zig build -Dtarget=aarch64-windows-gnu -Darch=svm1_64le --release=fast

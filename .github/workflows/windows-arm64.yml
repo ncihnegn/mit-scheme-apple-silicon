@@ -1,0 +1,30 @@
+name: Windows ARM64 CI
+
+on:
+  push:
+    branches:
+      - master
+      - apple-silicon
+      - zig
+  pull_request:
+    branches:
+      - master
+      - apple-silicon
+      - zig
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-arm64-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  windows-arm64:
+    uses: ./.github/workflows/_zig-microcode-ci.yml
+    with:
+      job_name: Windows ARM64
+      runs_on: windows-11-arm
+      target: aarch64-windows-gnu
+      arch: aarch64le

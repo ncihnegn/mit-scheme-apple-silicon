@@ -1,0 +1,86 @@
+name: Stage 2 Bootstrap Cache
+description: Restore, build if needed, and cache Stage 2 host mit-scheme
+
+inputs:
+  cache_prefix:
+    description: Cache key prefix for this target platform
+    required: true
+  stage2_prefix:
+    description: Install prefix path for the Stage 2 host
+    required: true
+  mode:
+    description: Bootstrap mode ('bootstrap-script' or 'build-scheme-apt')
+    required: true
+  arch:
+    description: Scheme architecture passed to tools/build-scheme.py (build-scheme-apt mode)
+    required: false
+    default: ''
+  force_full_bootstrap:
+    description: Whether to bypass the Stage 2 cache ('true' or 'false')
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Restore Stage 2 host cache
+      id: stage2-cache
+      if: ${{ inputs.force_full_bootstrap != 'true' }}
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ inputs.stage2_prefix }}
+        key: >-
+          ${{ inputs.cache_prefix }}-${{
+            hashFiles(
+              'build.zig',
+              'tools/build-scheme.py',
+              'src/microcode/*.zig',
+              'src/microcode/**/*.zig',
+              'src/microcode/outf.c',
+              'src/microcode/scm_setjmp.c',
+              'src/microcode/cmpauxmd/**',
+              'src/compiler/**',
+              'src/runtime/**',
+              'src/sf/**',
+              'src/cref/**',
+              'src/sos/**'
+            )
+          }}
+
+    - name: Build Stage 2 host (bootstrap-and-test.sh)
+      if: ${{ inputs.mode == 'bootstrap-script' && steps.stage2-cache.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: |
+        ./tests/ci/bootstrap-and-test.sh \
+          --stage2-only \
+          --stage2-prefix "${{ inputs.stage2_prefix }}"
+
+    - name: Build Stage 2 host (tools/build-scheme.py from APT mit-scheme)
+      if: ${{ inputs.mode == 'build-scheme-apt' && steps.stage2-cache.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: |
+        ALL_COM=$(find /usr/lib /usr/local/lib -name all.com -path '*mit-scheme*' 2>/dev/null | head -n 1)
+        if [ -z "${ALL_COM}" ]; then
+          echo "error: could not find host mit-scheme all.com" >&2
+          exit 1
+        fi
+        HOST_LIB=$(dirname "${ALL_COM}")
+        python3 tools/build-scheme.py clean
+        python3 tools/build-scheme.py build \
+          --install \
+          --arch "${{ inputs.arch }}" \
+          --optimize ReleaseFast \
+          --cross \
+          --host-scheme "$(command -v mit-scheme)" \
+          --host-lib "${HOST_LIB}" \
+          --prefix "${{ inputs.stage2_prefix }}" \
+          --jobs "$(nproc)"
+        "${{ inputs.stage2_prefix }}/bin/mit-scheme" --batch-mode --no-init-file --eval '(%exit)' </dev/null >/dev/null
+        python3 tools/build-scheme.py clean
+
+    - name: Save Stage 2 host cache
+      if: ${{ inputs.force_full_bootstrap != 'true' && steps.stage2-cache.outputs.cache-hit != 'true' }}
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ inputs.stage2_prefix }}
+        key: ${{ steps.stage2-cache.outputs.cache-primary-key }}

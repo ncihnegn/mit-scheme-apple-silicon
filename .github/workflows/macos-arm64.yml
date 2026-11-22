@@ -1,0 +1,59 @@
+name: macOS arm64 CI
+
+on:
+  push:
+    branches:
+      - master
+      - apple-silicon
+      - zig
+  pull_request:
+    branches:
+      - master
+      - apple-silicon
+      - zig
+  workflow_dispatch:
+    inputs:
+      force_full_bootstrap:
+        description: Force clean full bootstrap (skip Stage 2 cache)
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-arm64-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  macos-arm64:
+    name: macOS arm64 (Apple Silicon)
+    runs-on: macos-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Zig
+        uses: ./.github/actions/setup-zig
+
+      - name: Run unit & plugin tests
+        run: zig build test-unit --summary all
+
+      - name: Install Homebrew build dependencies
+        run: |
+          brew install mit-scheme
+
+      - name: Prepare Stage 2 native aarch64le host (cached)
+        uses: ./.github/actions/stage2-bootstrap
+        with:
+          cache_prefix: macos-arm64-stage2
+          stage2_prefix: ${{ runner.temp }}/mit-scheme-stage2-native
+          mode: bootstrap-script
+          force_full_bootstrap: ${{ inputs.force_full_bootstrap }}
+
+      - name: Build and verify native aarch64le (Stage 3)
+        run: |
+          ./tests/ci/bootstrap-and-test.sh \
+            --native-host "${{ runner.temp }}/mit-scheme-stage2-native/bin/mit-scheme"
