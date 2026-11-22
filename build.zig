@@ -146,6 +146,112 @@ fn configureMicrocodeModule(
     }
 }
 
+fn addMicrocodeObj(
+    b: *std.Build,
+    name: []const u8,
+    src_rel: []const u8,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    zig_options: *std.Build.Step.Options,
+) *std.Build.Step.Compile {
+    const mod = b.createModule(.{
+        .root_source_file = b.path(src_rel),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    mod.addOptions("build_options", zig_options);
+    return b.addObject(.{
+        .name = name,
+        .root_module = mod,
+    });
+}
+
+const MockPluginTestSpec = struct {
+    test_name: []const u8,
+    header_path: []const u8,
+    include_dir: []const u8,
+    c_mod_name: []const u8,
+    adapter_name: []const u8,
+    adapter_path: []const u8,
+    test_path: []const u8,
+    extra_c_source: ?[]const u8 = null,
+    sanitize_c: ?std.zig.SanitizeC = null,
+};
+
+fn addMockPluginTest(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    spec: MockPluginTestSpec,
+) *std.Build.Step.Run {
+    const tc = b.addTranslateC(.{
+        .root_source_file = b.path(spec.header_path),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    tc.addIncludePath(b.path("tests/plugins/mock-include"));
+    tc.addIncludePath(b.path(spec.include_dir));
+    const c_mod = tc.createModule();
+
+    const adapter_mod = b.createModule(.{
+        .root_source_file = b.path(spec.adapter_path),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    adapter_mod.addImport(spec.c_mod_name, c_mod);
+
+    const test_exe = b.addTest(.{
+        .name = spec.test_name,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path(spec.test_path),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .sanitize_c = spec.sanitize_c,
+        }),
+    });
+    test_exe.root_module.addImport(spec.c_mod_name, c_mod);
+    test_exe.root_module.addImport(spec.adapter_name, adapter_mod);
+    if (spec.extra_c_source) |c_src| {
+        test_exe.root_module.addCSourceFile(.{
+            .file = b.path(c_src),
+            .flags = &.{},
+        });
+    }
+    return b.addRunArtifact(test_exe);
+}
+
+fn addSchemeCheckStep(
+    b: *std.Build,
+    name: []const u8,
+    description: []const u8,
+    scheme_exe: *std.Build.Step.Compile,
+    library_path: ?[]const u8,
+    test_suite: ?[]const u8,
+) void {
+    const step = b.step(name, description);
+    const cmd = b.addSystemCommand(&.{
+        "python3",
+        "tests/ci/check-results.py",
+        "--src-dir",
+        "src",
+        "--allow-arm64-flonum-except",
+        "--scheme-exe",
+    });
+    cmd.addFileArg(scheme_exe.getEmittedBin());
+    if (library_path) |lib_path| {
+        cmd.addArgs(&.{ "--library-path", lib_path });
+    }
+    if (test_suite) |suite| {
+        cmd.addArgs(&.{ "--test", suite });
+    }
+    cmd.setCwd(b.path("."));
+    step.dependOn(&cmd.step);
+}
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -166,12 +272,6 @@ pub fn build(b: *std.Build) void {
         bool,
         "debugging",
         "Enable microcode debugging checks (ENABLE_DEBUGGING_TOOLS)",
-    ) orelse false;
-
-    const valgrind = b.option(
-        bool,
-        "valgrind",
-        "Enable Valgrind support (VALGRIND_MODE)",
     ) orelse false;
 
     const host_scheme = b.option(
@@ -227,7 +327,6 @@ pub fn build(b: *std.Build) void {
     else
         b.fmt("/usr/local/lib/{s}", .{auxdir_name});
 
-    _ = valgrind;
     const c_flags = &[_][]const u8{ "-Wall", "-Wstrict-prototypes" };
 
     // Build host-native Zig findprim and generate usrdef.zig out-of-tree.
@@ -266,17 +365,7 @@ pub fn build(b: *std.Build) void {
     zig_options.addOption([]const u8, "default_library_path", default_library_path);
     zig_options.addOption(c_uint, "compiler_processor_type", arch.cc_arch_id);
 
-    const microcode_zig_mod = b.createModule(.{
-        .root_source_file = b.path("src/microcode/zig/root.zig"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-    });
-    microcode_zig_mod.addOptions("build_options", zig_options);
-    const microcode_zig_obj = b.addObject(.{
-        .name = "microcode_zig",
-        .root_module = microcode_zig_mod,
-    });
+    const microcode_zig_obj = addMicrocodeObj(b, "microcode_zig", "src/microcode/zig/root.zig", target, optimize, zig_options);
 
     const scheme_obj_mod = b.createModule(.{
         .root_source_file = b.path("src/microcode/zig/scheme_obj.zig"),
@@ -365,61 +454,11 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_scheme.step);
 
     // `zig build test-smoke`
-    const smoke_runtime_mod = b.createModule(.{
-        .root_source_file = b.path("src/microcode/zig/smoke_runtime.zig"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-    });
-    smoke_runtime_mod.addOptions("build_options", zig_options);
-    const smoke_runtime_obj = b.addObject(.{
-        .name = "smoke_runtime",
-        .root_module = smoke_runtime_mod,
-    });
-    const fasl_smoke_mod = b.createModule(.{
-        .root_source_file = b.path("src/microcode/zig/fasl.zig"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-    });
-    fasl_smoke_mod.addOptions("build_options", zig_options);
-    const fasl_smoke_obj = b.addObject(.{
-        .name = "fasl_smoke",
-        .root_module = fasl_smoke_mod,
-    });
-    const gcloop_smoke_mod = b.createModule(.{
-        .root_source_file = b.path("src/microcode/zig/gcloop.zig"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-    });
-    gcloop_smoke_mod.addOptions("build_options", zig_options);
-    const gcloop_smoke_obj = b.addObject(.{
-        .name = "gcloop_smoke",
-        .root_module = gcloop_smoke_mod,
-    });
-    const cmpintmd_smoke_mod = b.createModule(.{
-        .root_source_file = b.path("src/microcode/zig/cmpintmd.zig"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-    });
-    cmpintmd_smoke_mod.addOptions("build_options", zig_options);
-    const cmpintmd_smoke_obj = b.addObject(.{
-        .name = "cmpintmd_smoke",
-        .root_module = cmpintmd_smoke_mod,
-    });
-    const cmpint_smoke_mod = b.createModule(.{
-        .root_source_file = b.path("src/microcode/zig/cmpint.zig"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-    });
-    cmpint_smoke_mod.addOptions("build_options", zig_options);
-    const cmpint_smoke_obj = b.addObject(.{
-        .name = "cmpint_smoke",
-        .root_module = cmpint_smoke_mod,
-    });
+    const smoke_runtime_obj = addMicrocodeObj(b, "smoke_runtime", "src/microcode/zig/smoke_runtime.zig", target, optimize, zig_options);
+    const fasl_smoke_obj = addMicrocodeObj(b, "fasl_smoke", "src/microcode/zig/fasl.zig", target, optimize, zig_options);
+    const gcloop_smoke_obj = addMicrocodeObj(b, "gcloop_smoke", "src/microcode/zig/gcloop.zig", target, optimize, zig_options);
+    const cmpintmd_smoke_obj = addMicrocodeObj(b, "cmpintmd_smoke", "src/microcode/zig/cmpintmd.zig", target, optimize, zig_options);
+    const cmpint_smoke_obj = addMicrocodeObj(b, "cmpint_smoke", "src/microcode/zig/cmpint.zig", target, optimize, zig_options);
     const zig_options_mod = zig_options.createModule();
     const prim_abi_mod = b.createModule(.{
         .root_source_file = b.path("src/microcode/zig/prim_abi.zig"),
@@ -432,52 +471,35 @@ pub fn build(b: *std.Build) void {
     const smoke_specs = [_]struct {
         name: []const u8,
         src: []const u8,
-        needs_cmpint: bool,
-        needs_cmpintmd: bool,
-        needs_native: bool,
-        needs_fasl: bool,
-        needs_gcloop: bool,
-        needs_setjmp: bool,
+        needs_cmpint: bool = false,
+        needs_cmpintmd: bool = false,
+        needs_native: bool = false,
+        needs_fasl: bool = false,
+        needs_gcloop: bool = false,
+        needs_setjmp: bool = false,
     }{
         .{
             .name = "jit-smoke",
             .src = "tests/microcode/jit-smoke.zig",
-            .needs_cmpint = false,
             .needs_cmpintmd = true,
-            .needs_native = false,
-            .needs_fasl = false,
-            .needs_gcloop = false,
             .needs_setjmp = true,
         },
         .{
             .name = "arena-smoke",
             .src = "tests/microcode/arena-smoke.zig",
-            .needs_cmpint = false,
-            .needs_cmpintmd = false,
-            .needs_native = false,
-            .needs_fasl = false,
-            .needs_gcloop = false,
-            .needs_setjmp = false,
         },
         .{
             .name = "gc-arena-smoke",
             .src = "tests/microcode/gc-arena-smoke.zig",
-            .needs_cmpint = false,
             .needs_cmpintmd = true,
-            .needs_native = false,
-            .needs_fasl = false,
             .needs_gcloop = true,
-            .needs_setjmp = false,
         },
         .{
             .name = "fasl-code-smoke",
             .src = "tests/microcode/fasl-code-smoke.zig",
-            .needs_cmpint = false,
             .needs_cmpintmd = true,
-            .needs_native = false,
             .needs_fasl = true,
             .needs_gcloop = true,
-            .needs_setjmp = false,
         },
         .{
             .name = "trampoline-smoke",
@@ -485,9 +507,7 @@ pub fn build(b: *std.Build) void {
             .needs_cmpint = true,
             .needs_cmpintmd = true,
             .needs_native = true,
-            .needs_fasl = false,
             .needs_gcloop = true,
-            .needs_setjmp = false,
         },
     };
 
@@ -602,68 +622,27 @@ pub fn build(b: *std.Build) void {
     });
     plugins_test_step.dependOn(&b.addRunArtifact(blowfish_tests).step);
 
-    const gdbm_c_tc = b.addTranslateC(.{
-        .root_source_file = b.path("src/gdbm/gdbm-shim.h"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-    });
-    gdbm_c_tc.addIncludePath(b.path("tests/plugins/mock-include"));
-    gdbm_c_tc.addIncludePath(b.path("src/gdbm"));
-    const gdbm_c_mod = gdbm_c_tc.createModule();
-    const gdbm_adapter_mod = b.createModule(.{
-        .root_source_file = b.path("src/gdbm/gdbm_adapter.zig"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-    });
-    gdbm_adapter_mod.addImport("gdbm_c", gdbm_c_mod);
-    const gdbm_tests = b.addTest(.{
-        .name = "gdbm-plugin-unit",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("tests/plugins/gdbm_mock_test.zig"),
-            .target = target,
-            .optimize = optimize,
-            .link_libc = true,
-        }),
-    });
-    gdbm_tests.root_module.addImport("gdbm_c", gdbm_c_mod);
-    gdbm_tests.root_module.addImport("gdbm_adapter", gdbm_adapter_mod);
-    plugins_test_step.dependOn(&b.addRunArtifact(gdbm_tests).step);
+    plugins_test_step.dependOn(&addMockPluginTest(b, target, optimize, .{
+        .test_name = "gdbm-plugin-unit",
+        .header_path = "src/gdbm/gdbm-shim.h",
+        .include_dir = "src/gdbm",
+        .c_mod_name = "gdbm_c",
+        .adapter_name = "gdbm_adapter",
+        .adapter_path = "src/gdbm/gdbm_adapter.zig",
+        .test_path = "tests/plugins/gdbm_mock_test.zig",
+    }).step);
 
-    const x11_c_tc = b.addTranslateC(.{
-        .root_source_file = b.path("src/x11/x11.h"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-    });
-    x11_c_tc.addIncludePath(b.path("tests/plugins/mock-include"));
-    x11_c_tc.addIncludePath(b.path("src/x11"));
-    const x11_c_mod = x11_c_tc.createModule();
-    const x11_mod = b.createModule(.{
-        .root_source_file = b.path("src/x11/x11.zig"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-    });
-    x11_mod.addImport("x11_c", x11_c_mod);
-    const x11_tests = b.addTest(.{
-        .name = "x11-plugin-unit",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("tests/plugins/x11_mock_test.zig"),
-            .target = target,
-            .optimize = optimize,
-            .link_libc = true,
-            .sanitize_c = .off,
-        }),
-    });
-    x11_tests.root_module.addImport("x11_c", x11_c_mod);
-    x11_tests.root_module.addImport("x11", x11_mod);
-    x11_tests.root_module.addCSourceFile(.{
-        .file = b.path("src/microcode/scm_setjmp.c"),
-        .flags = &.{},
-    });
-    plugins_test_step.dependOn(&b.addRunArtifact(x11_tests).step);
+    plugins_test_step.dependOn(&addMockPluginTest(b, target, optimize, .{
+        .test_name = "x11-plugin-unit",
+        .header_path = "src/x11/x11.h",
+        .include_dir = "src/x11",
+        .c_mod_name = "x11_c",
+        .adapter_name = "x11",
+        .adapter_path = "src/x11/x11.zig",
+        .test_path = "tests/plugins/x11_mock_test.zig",
+        .extra_c_source = "src/microcode/scm_setjmp.c",
+        .sanitize_c = .off,
+    }).step);
 
     unit_test_step.dependOn(plugins_test_step);
 
@@ -751,47 +730,9 @@ pub fn build(b: *std.Build) void {
     bootstrap_cmd.addPassthruArgs();
     bootstrap_step.dependOn(&bootstrap_cmd.step);
 
-    // `zig build check`
-    const check_step = b.step("check", "Run Scheme test suite against built src/");
-    const check_cmd = b.addSystemCommand(&.{
-        "python3",
-        "tests/ci/check-results.py",
-        "--src-dir",
-        "src",
-        "--allow-arm64-flonum-except",
-        "--library-path",
-        "src/lib",
-        "--scheme-exe",
-    });
-    check_cmd.addFileArg(scheme_exe.getEmittedBin());
-    if (test_suite) |suite| {
-        check_cmd.addArgs(&.{ "--test", suite });
-    }
-    check_cmd.setCwd(b.path("."));
-    check_step.dependOn(&check_cmd.step);
-
-    // `zig build check-zig`
-    const check_zig_step = b.step(
-        "check-zig",
-        "Run Scheme test suite using the Zig-built mit-scheme binary",
-    );
-    const check_zig_cmd = b.addSystemCommand(&.{
-        "python3",
-        "tests/ci/check-results.py",
-        "--src-dir",
-        "src",
-        "--allow-arm64-flonum-except",
-        "--scheme-exe",
-    });
-    check_zig_cmd.addFileArg(scheme_exe.getEmittedBin());
-    if (check_library_path) |lib_path| {
-        check_zig_cmd.addArgs(&.{ "--library-path", lib_path });
-    }
-    if (test_suite) |suite| {
-        check_zig_cmd.addArgs(&.{ "--test", suite });
-    }
-    check_zig_cmd.setCwd(b.path("."));
-    check_zig_step.dependOn(&check_zig_cmd.step);
+    // `zig build check` & `zig build check-zig`
+    addSchemeCheckStep(b, "check", "Run Scheme test suite against built src/", scheme_exe, "src/lib", test_suite);
+    addSchemeCheckStep(b, "check-zig", "Run Scheme test suite using the Zig-built mit-scheme binary", scheme_exe, check_library_path, test_suite);
 
     // `zig build macos-app` & `zig build macos-dmg`
     if (target.result.os.tag.isDarwin()) {

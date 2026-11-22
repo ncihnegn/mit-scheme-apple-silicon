@@ -120,96 +120,18 @@ pub const interp = @import("interp.zig");
 pub const term = @import("term.zig");
 
 comptime {
-    _ = win_api;
-    _ = chacha;
-    _ = keccak;
-    _ = md5;
-    _ = obstack;
-    _ = wind;
-    _ = transact;
-    _ = ptrvec;
-    _ = avltree;
-    _ = jit;
-    _ = code_arena;
-    _ = cmpint;
-    _ = cmpintmd;
-    _ = svm1_interp;
-    _ = prim_abi;
-    _ = prchacha;
-    _ = prkeccak;
-    _ = prmd5;
-    _ = prentropy;
-    _ = bytevector;
-    _ = char;
-    _ = hunk;
-    _ = dfloat;
-    _ = list;
-    _ = vector;
-    _ = bits;
-    _ = fixnum;
-    _ = generic;
-    _ = bignum;
-    _ = artutl;
-    _ = bigprm;
-    _ = intprm;
-    _ = fenv_plat;
-    _ = floenv;
-    _ = flonum;
-    _ = bitstr;
-    _ = string;
-    _ = intern;
-    _ = edwin_defs;
-    _ = syntax;
-    _ = regex;
-    _ = rgxprim;
-    _ = bkpt;
-    _ = daemon;
-    _ = step;
-    _ = extern_prim;
-    _ = sysprim;
-    _ = error_cond;
-    _ = prim;
-    _ = primutl;
-    _ = purutl;
-    _ = ostty;
-    _ = osscheme;
-    _ = returns;
-    _ = storage;
-    _ = utabmd;
-    _ = purify;
-    _ = lookprm;
-    _ = hooks;
-    _ = fasl;
-    _ = utils;
-    _ = memmag;
-    _ = boot;
-    _ = comutl;
-    _ = option;
-    _ = lookup;
-    _ = fasload;
-    _ = fasdump;
-    _ = debug;
-    _ = gcloop;
-    _ = prosio;
-    _ = prosfile;
-    _ = prosfs;
-    _ = prosenv;
-    _ = prostty;
-    _ = prosterm;
-    _ = prospty;
-    _ = prosproc;
-    _ = pruxdld;
-    _ = pruxenv;
-    _ = pruxffi;
-    _ = pruxfs;
-    _ = pruxio;
-    _ = pruxsock;
+    for (std.meta.declarations(@This())) |decl_name| {
+        if (std.mem.eql(u8, decl_name, "os_backend") or
+            std.mem.eql(u8, decl_name, "tterm") or
+            std.mem.eql(u8, decl_name, "termcap_emulate"))
+        {
+            continue;
+        }
+        _ = @field(@This(), decl_name);
+    }
     for (std.meta.declarations(os_backend)) |decl_name| {
         _ = @field(os_backend, decl_name);
     }
-    _ = intext;
-    _ = interp;
-    _ = term;
     if (build_options.use_termcap) {
         _ = tterm;
         if (!build_options.use_terminfo) {
@@ -222,102 +144,6 @@ comptime {
 }
 
 test "microcode zig scaffold" {
-    try std.testing.expect(true);
     std.testing.refAllDecls(@This());
-    _ = outf;
-    _ = win_api;
-    _ = chacha;
-    _ = keccak;
-    _ = md5;
-    _ = obstack;
-    _ = wind;
-    _ = transact;
-    _ = ptrvec;
-    _ = avltree;
-    _ = jit;
-    _ = scheme_obj;
-    _ = code_arena;
-    _ = cmpint;
-    _ = cmpintmd;
-    _ = svm1_interp;
-    _ = prim_abi;
-    _ = prchacha;
-    _ = prkeccak;
-    _ = prmd5;
-    _ = prentropy;
-    _ = bytevector;
-    _ = char;
-    _ = hunk;
-    _ = dfloat;
-    _ = list;
-    _ = vector;
-    _ = bits;
-    _ = fixnum;
-    _ = generic;
-    _ = bignum;
-    _ = artutl;
-    _ = bigprm;
-    _ = intprm;
-    _ = fenv_plat;
-    _ = floenv;
-    _ = flonum;
-    _ = bitstr;
-    _ = string;
-    _ = intern;
-    _ = edwin_defs;
-    _ = syntax;
-    _ = regex;
-    _ = rgxprim;
-    _ = bkpt;
-    _ = daemon;
-    _ = step;
-    _ = extern_prim;
-    _ = sysprim;
-    _ = error_cond;
-    _ = prim;
-    _ = primutl;
-    _ = purutl;
-    _ = ostty;
-    _ = osscheme;
-    _ = returns;
-    _ = storage;
-    _ = utabmd;
-    _ = purify;
-    _ = lookprm;
-    _ = hooks;
-    _ = fasl;
-    _ = utils;
-    _ = memmag;
-    _ = boot;
-    _ = comutl;
-    _ = option;
-    _ = lookup;
-    _ = fasload;
-    _ = fasdump;
-    _ = debug;
-    _ = gcloop;
-    _ = prosio;
-    _ = prosfile;
-    _ = prosfs;
-    _ = prosenv;
-    _ = prostty;
-    _ = prosterm;
-    _ = prospty;
-    _ = prosproc;
-    _ = pruxdld;
-    _ = pruxenv;
-    _ = pruxffi;
-    _ = pruxfs;
-    _ = pruxio;
-    _ = pruxsock;
-    inline for (comptime std.meta.declarations(os_backend)) |decl_name| {
-        _ = @field(os_backend, decl_name);
-    }
-    _ = intext;
-    _ = interp;
-    _ = term;
-    _ = termcap_emulate;
-    if (build_options.use_termcap) {
-        _ = tterm;
-    }
+    std.testing.refAllDecls(os_backend);
 }
