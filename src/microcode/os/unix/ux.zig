@@ -80,6 +80,12 @@ pub fn uxClosefrom(start_fd: c_int) callconv(.c) c_int {
     return status;
 }
 
+/// The mmap'd scheme memory block from `osMallocInit`, tracked so `osFree`
+/// can `munmap` it instead of `free` (which would abort on a non-malloc
+/// pointer).
+var mmap_heap_block: ?*anyopaque = null;
+var mmap_heap_size: usize = 0;
+
 /// Allocate raw OS memory during VM initialization without raising Scheme errors on failure.
 pub fn osMallocInit(size: usize) callconv(.c) ?*anyopaque {
     // Port of ux.c `mmap_heap_malloc`: native builds need the scheme memory
@@ -100,6 +106,8 @@ pub fn osMallocInit(size: usize) callconv(.c) ?*anyopaque {
             0,
         );
         if (addr != std.c.MAP_FAILED) {
+            mmap_heap_block = addr;
+            mmap_heap_size = request;
             return addr;
         }
         outf.err("unable to mmap executable heap -- native code will probably fail\n", .{});
@@ -119,8 +127,18 @@ pub fn osRealloc(ptr: ?*anyopaque, size: usize) callconv(.c) ?*anyopaque {
 
 /// Free memory allocated via `OS_malloc`, `OS_malloc_init`, or `OS_realloc`.
 pub fn osFree(ptr: ?*anyopaque) callconv(.c) void {
+    if (ptr != null and ptr == mmap_heap_block) {
+        const block = ptr.?;
+        const size = mmap_heap_size;
+        mmap_heap_block = null;
+        mmap_heap_size = 0;
+        _ = munmap(block, size);
+        return;
+    }
     std.c.free(ptr);
 }
+
+extern "c" fn munmap(addr: *anyopaque, len: usize) c_int;
 
 comptime {
     if (!builtin.is_test) {
