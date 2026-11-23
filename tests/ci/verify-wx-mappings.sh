@@ -2,8 +2,12 @@
 #
 # Verify OS virtual memory protections for a live native Scheme process:
 # - the code_arena mapping covering (code-space-bounds) is executable;
-# - the heap (>= 8 MiB anonymous region) is mapped RW without execute permission;
-# - no unexpected anonymous region outside code_arena is currently executable.
+# - the scheme memory block (>= 8 MiB anonymous region holding the heap,
+#   constant space, and the control stack) exists; it is expected to be
+#   executable on native builds, which mmap it RWX because compiled closures
+#   and the band's compiler utilities execute directly from it;
+# - no unexpected anonymous region outside code_arena and the scheme memory
+#   block is currently executable.
 
 set -euo pipefail
 
@@ -139,10 +143,24 @@ def verify_darwin(pid, code_start):
 
     # Coalesce contiguous anonymous executable regions (vmmap splits a single
     # MAP_JIT reservation into multiple sub-ranges by residency/zerofill state).
+    # The scheme memory block (the largest anonymous region, holding heap,
+    # constant space, and the control stack) may itself be executable: native
+    # builds mmap it RWX because compiled closures and the band's compiler
+    # utilities execute directly from it (ux.zig osMallocInit).
+    large_anon = None
+    for start, end, rtype, cur_prot, max_prot, is_anon, raw in regions:
+        if not is_anon or (start <= code_start < end):
+            continue
+        size = end - start
+        if size >= 8 * 1024 * 1024 and (large_anon is None or size > large_anon[0] - large_anon[1]):
+            large_anon = (start, end, raw)
+
     exec_runs = []
     for start, end, rtype, cur_prot, max_prot, is_anon, raw in regions:
         if not is_anon or ("x" not in cur_prot):
             continue
+        if large_anon is not None and start >= large_anon[0] and end <= large_anon[1]:
+            continue  # the scheme memory block, not a stray executable mapping
         if exec_runs and exec_runs[-1][1] == start:
             prev = exec_runs[-1]
             exec_runs[-1] = (prev[0], end, prev[2], prev[3] + [raw])
@@ -157,28 +175,10 @@ def verify_darwin(pid, code_start):
         else:
             unexpected_anon_exec.extend(raws)
 
-    large_nx_heap = None
-    for start, end, rtype, cur_prot, max_prot, is_anon, raw in regions:
-        if code_run and (code_run[0] <= start < code_run[1]):
-            continue
-        size = end - start
-        if (
-            (
-                rtype == "Untagged"
-                or rtype.startswith("VM_ALLOCATE")
-                or rtype.startswith("Malloc")
-                or rtype.startswith("MALLOC")
-            )
-            and cur_prot == "rw-"
-            and size >= 8 * 1024 * 1024
-        ):
-            if large_nx_heap is None or size > large_nx_heap[0]:
-                large_nx_heap = (size, raw)
-
     if code_run is None:
         raise RuntimeError(f"Did not find vmmap executable region covering code_start=0x{code_start:x}")
-    if large_nx_heap is None:
-        raise RuntimeError("Did not find >= 8 MiB rw- anonymous NX Scheme heap region")
+    if large_anon is None:
+        raise RuntimeError("Did not find >= 8 MiB anonymous Scheme heap region")
     if unexpected_anon_exec:
         raise RuntimeError(
             "Found unexpected anonymous executable mapping(s):\n"
@@ -188,7 +188,7 @@ def verify_darwin(pid, code_start):
         f"Verified code_arena region: 0x{code_run[0]:x}-0x{code_run[1]:x} "
         f"({code_run[2]}, {len(code_run[3])} vmmap slices)"
     )
-    print(f"Verified NX Scheme heap:   {large_nx_heap[1]}")
+    print(f"Verified Scheme heap:      {large_anon[2]}")
 
 
 def verify_linux(pid, code_start):
@@ -200,7 +200,7 @@ def verify_linux(pid, code_start):
         r'^([0-9a-fA-F]+)-([0-9a-fA-F]+)\s+([rwxsp-]+)\s+[0-9a-fA-F]+\s+\S+\s+\d+(?:\s+(.*))?$'
     )
     code_region = None
-    large_nx_heap = None
+    large_anon = None
     unexpected_anon_exec = []
 
     for line in lines:
@@ -220,23 +220,32 @@ def verify_linux(pid, code_start):
         elif is_anon and ("x" in perms):
             unexpected_anon_exec.append(line)
 
-        if is_anon and not is_code and perms.startswith("rw-") and size >= 8 * 1024 * 1024:
-            if large_nx_heap is None or size > large_nx_heap[0]:
-                large_nx_heap = (size, line)
+        # The scheme memory block is the largest anonymous region (heap,
+        # constant space, and control stack). It may be executable on native
+        # builds, which mmap it RWX because compiled closures and the band's
+        # compiler utilities execute directly from it.
+        if is_anon and not is_code and size >= 8 * 1024 * 1024:
+            if large_anon is None or size > large_anon[0]:
+                large_anon = (size, line)
+
+    # The scheme memory block is expected to be executable on native builds;
+    # drop it from the unexpected list.
+    if large_anon is not None:
+        unexpected_anon_exec = [l for l in unexpected_anon_exec if l != large_anon[1]]
 
     if code_region is None:
         raise RuntimeError(f"Did not find /proc/{pid}/maps region for 0x{code_start:x}")
     if "x" not in code_region[1]:
         raise RuntimeError(f"code_arena region is not executable: {code_region[0]}")
-    if large_nx_heap is None:
-        raise RuntimeError("Did not find >= 8 MiB rw- anonymous NX Scheme heap region")
+    if large_anon is None:
+        raise RuntimeError("Did not find >= 8 MiB anonymous Scheme heap region")
     if unexpected_anon_exec:
         raise RuntimeError(
             "Found unexpected anonymous executable mapping(s):\n"
             + "\n".join(unexpected_anon_exec)
         )
     print(f"Verified code_arena region: {code_region[0]}")
-    print(f"Verified NX Scheme heap:   {large_nx_heap[1]}")
+    print(f"Verified Scheme heap:      {large_anon[1]}")
 
 
 try:

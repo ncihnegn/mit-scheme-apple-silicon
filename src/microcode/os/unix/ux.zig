@@ -1,6 +1,8 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const build_options = @import("build_options");
 const abi = @import("../../core/prim_abi.zig");
+const outf = @import("../../support/outf.zig");
 const osscheme = @import("../osscheme.zig");
 const utils = @import("../../core/utils.zig");
 const stubs = if (builtin.is_test) @import("../../core/test_stubs.zig") else struct {};
@@ -80,6 +82,28 @@ pub fn uxClosefrom(start_fd: c_int) callconv(.c) c_int {
 
 /// Allocate raw OS memory during VM initialization without raising Scheme errors on failure.
 pub fn osMallocInit(size: usize) callconv(.c) ?*anyopaque {
+    // Port of ux.c `mmap_heap_malloc`: native builds need the scheme memory
+    // block executable, since compiled closures and the band's compiler
+    // utilities execute directly from it (compiler_reset points
+    // trampoline_to_interface at the band's heap-resident block). Plain
+    // malloc'd memory is not executable; Linux x86_64 faults on the first
+    // interface crossing after a band load.
+    if (comptime build_options.cc_is_native) {
+        const page_size: usize = @intCast(@max(1, std.c.sysconf(@backingInt(std.c._SC.PAGESIZE))));
+        const request = ((size + page_size - 1) / page_size) * page_size;
+        const addr = std.c.mmap(
+            null,
+            request,
+            .{ .READ = true, .WRITE = true, .EXEC = true },
+            .{ .TYPE = .PRIVATE, .ANONYMOUS = true },
+            -1,
+            0,
+        );
+        if (addr != std.c.MAP_FAILED) {
+            return addr;
+        }
+        outf.err("unable to mmap executable heap -- native code will probably fail\n", .{});
+    }
     return std.c.malloc(size);
 }
 
