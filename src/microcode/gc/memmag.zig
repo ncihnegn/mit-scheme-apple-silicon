@@ -103,7 +103,7 @@ pub export fn setup_memory(
 pub export fn reset_memory() callconv(.c) void {
     code_arena.code_arena_teardown();
     if (storage.memory_block_start) |p| {
-        std.c.free(@ptrCast(p));
+        abi.OS_free(@ptrCast(p));
         storage.memory_block_start = null;
         storage.memory_block_end = null;
     }
